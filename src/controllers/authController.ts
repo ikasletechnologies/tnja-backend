@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import prisma from "../lib/prisma.js";
+import jwt from "jsonwebtoken";
 
 export const login = async (req: Request, res: Response) => {
   const { identifier, password } = req.body;
@@ -17,11 +18,17 @@ export const login = async (req: Request, res: Response) => {
     if (identifier === adminEmail) {
       const isPasswordValid = password === adminPassword;
       if (!isPasswordValid) return res.status(401).json({ error: "Invalid password" });
+      const token = jwt.sign(
+        { userId: "ADMIN", role: "SUPER_ADMIN" },
+        process.env.JWT_SECRET || "fallback",
+        { expiresIn: "24h" }
+      );
+
       return res.json({
         message: "Login successful",
         user: { fullName: "Super Admin", email: adminEmail },
         role: "SUPER_ADMIN",
-        token: "mock-jwt-token",
+        token: token,
       });
     }
 
@@ -77,6 +84,12 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Incorrect password" });
     }
 
+    const token = jwt.sign(
+      { userId: user.id, role: role },
+      process.env.JWT_SECRET || "fallback",
+      { expiresIn: "24h" }
+    );
+
     return res.json({
       message: "Login successful",
       user: {
@@ -88,7 +101,7 @@ export const login = async (req: Request, res: Response) => {
         permanentId: user.permanentId,
       },
       role,
-      token: "mock-jwt-token", // TODO: replace with real JWT
+      token,
     });
 
   } catch (error) {
@@ -96,3 +109,52 @@ export const login = async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+export const getProfile = async (req: any, res: Response) => {
+  const { userId, role } = req.user;
+
+  try {
+    let userData: any = null;
+
+    if (role === "SUPER_ADMIN") {
+      return res.json({
+        role: "SUPER_ADMIN",
+        user: { fullName: "Super Admin", email: process.env.SUPER_ADMIN_EMAIL || "admin@tnja.com" }
+      });
+    }
+
+    if (role === "PLAYER") {
+      userData = await prisma.student.findUnique({
+        where: { id: userId },
+        include: { district: true, taluk: true, club: true }
+      });
+    } else if (role === "COACH") {
+      userData = await prisma.coachReferee.findUnique({
+        where: { id: userId },
+        include: { district: true, taluk: true, club: true }
+      });
+    } else if (role === "MEMBER") {
+      userData = await prisma.member.findUnique({
+        where: { id: userId },
+        include: { district: true, taluk: true }
+      });
+    }
+
+    if (!userData) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Remove password before sending
+    const { password: _, ...safeData } = userData;
+
+    return res.json({
+      role,
+      user: safeData
+    });
+
+  } catch (error) {
+    console.error("Get profile error:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+

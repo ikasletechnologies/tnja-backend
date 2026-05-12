@@ -1,8 +1,11 @@
 import prisma from "../src/lib/prisma.js";
 import { readFileSync } from "fs";
-import { join } from "path";
+import path, { join } from "path";
+import { fileURLToPath } from "url";
 
-const locationsPath = join(process.cwd(), "prisma", "tn_locations.json");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const locationsPath = join(__dirname, "tn_locations.json");
 const tnLocations = JSON.parse(readFileSync(locationsPath, "utf-8"));
 
 const clubsToSeed = [

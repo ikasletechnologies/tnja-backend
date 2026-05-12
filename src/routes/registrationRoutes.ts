@@ -4,6 +4,7 @@ import { updateApplicationStatus, getApplicationDetails, getPendingApplications,
 import { getAllUsers, updateUserCredentials } from "../controllers/userManagementController.js";
 import { getClubs } from "../controllers/clubController.js";
 import { getDistricts, getTaluksByDistrict, getTalukDetails } from "../controllers/locationController.js";
+import { authenticateJWT, authorizeAdmin } from "../middleware/authMiddleware.js";
 
 const router = Router();
 
@@ -17,13 +18,13 @@ router.post("/register/club", registerClub);
 router.post("/register/member", registerMember);
 
 // Admin / Super-admin routes
-router.get("/applications/pending", getPendingApplications);   // ?type=STUDENT|COACH|MEMBER|CLUB
-router.patch("/application/status", updateApplicationStatus);
-router.get("/application/:tempId", getApplicationDetails);
-router.get("/admin/stats", getDashboardStats);
+router.get("/applications/pending", authenticateJWT, authorizeAdmin, getPendingApplications);   // ?type=STUDENT|COACH|MEMBER|CLUB
+router.patch("/application/status", authenticateJWT, authorizeAdmin, updateApplicationStatus);
+router.get("/application/:tempId", authenticateJWT, authorizeAdmin, getApplicationDetails);
+router.get("/admin/stats", authenticateJWT, authorizeAdmin, getDashboardStats);
 
 // User Management (Super Admin)
-router.get("/users/all", getAllUsers);
-router.patch("/users/credentials", updateUserCredentials);
+router.get("/users/all", authenticateJWT, authorizeAdmin, getAllUsers);
+router.patch("/users/credentials", authenticateJWT, authorizeAdmin, updateUserCredentials);
 
 export default router;

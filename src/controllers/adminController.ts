@@ -42,6 +42,7 @@ export const getPendingApplications = async (req: Request, res: Response) => {
 
     if (type === "CLUB") {
       const clubs = await prisma.club.findMany({
+        where: { status: "PENDING" },
         include: { district: true, taluk: true },
         orderBy: { createdAt: "desc" },
       });
@@ -58,10 +59,11 @@ export const getPendingApplications = async (req: Request, res: Response) => {
     }
 
     // Return all pending counts if no type specified
-    const [studentCount, coachCount, memberCount] = await Promise.all([
+    const [studentCount, coachCount, memberCount, clubCount] = await Promise.all([
       prisma.student.count({ where: { status: "PENDING" } }),
       prisma.coachReferee.count({ where: { status: "PENDING" } }),
       prisma.member.count({ where: { status: "PENDING" } }),
+      prisma.club.count({ where: { status: "PENDING" } }),
     ]);
 
     return res.json({
@@ -69,6 +71,7 @@ export const getPendingApplications = async (req: Request, res: Response) => {
         STUDENT: studentCount,
         COACH: coachCount,
         MEMBER: memberCount,
+        CLUB: clubCount,
       },
     });
   } catch (error) {
