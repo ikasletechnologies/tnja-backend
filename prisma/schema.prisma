@@ -1,0 +1,208 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Status {
+  PENDING
+  REJECTED
+  APPROVED
+  REPLAY
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+model District {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  taluks    Taluk[]
+  students  Student[]
+  coaches   CoachReferee[]
+  clubs     Club[]
+  members   Member[]
+  events    Event[]
+}
+
+model Taluk {
+  id         String         @id @default(uuid())
+  name       String
+  pincode    String
+  districtId String
+  district   District       @relation(fields: [districtId], references: [id])
+  clubs      Club[]
+  students   Student[]
+  coaches    CoachReferee[]
+  members    Member[]
+}
+
+model Club {
+  id               String         @id @default(uuid())
+  name             String
+  districtId       String?
+  district         District?      @relation(fields: [districtId], references: [id])
+  talukId          String?
+  taluk            Taluk?         @relation(fields: [talukId], references: [id])
+  pincode          String
+  mobileNumber     String
+  email            String         @unique
+  address1         String
+  address2         String?
+  president        String
+  secretary        String
+  coach            String
+  noOfStudents     Int            @default(0)
+  maleStudents     Int            @default(0)
+  femaleStudents   Int            @default(0)
+  age6to11Male     Int            @default(0)
+  age6to11Female   Int            @default(0)
+  age12to18Male    Int            @default(0)
+  age12to18Female  Int            @default(0)
+  age16AboveMale   Int            @default(0)
+  age16AboveFemale Int            @default(0)
+  password         String         @default("")
+  permanentId      String?        @unique
+  status           Status         @default(PENDING)
+  rejectionRemark  String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  students         Student[]
+  coaches          CoachReferee[]
+}
+
+model Student {
+  id                    String        @id @default(uuid())
+  tempId                String        @unique
+  permanentId           String?       @unique
+  districtId            String
+  district              District      @relation(fields: [districtId], references: [id])
+  talukId               String
+  taluk                 Taluk         @relation(fields: [talukId], references: [id])
+  pincode               String
+  fullName              String
+  profilePhoto          String?
+  gender                Gender
+  dob                   DateTime
+  age                   Int
+  bloodGroup            String
+  mobileNumber          String        @unique
+  alternateMobileNumber String?
+  email                 String        @unique
+  aadhaarNumber         String        @unique
+  aadhaarProof          String?
+  address               String
+  city                  String
+  state                 String
+  addressPincode        String
+  nationality           String
+  annualIncome          Float
+  incomeProof           String?
+  isBPL                 Boolean       @default(false)
+  bplProof              String?
+  clubId                String?
+  club                  Club?         @relation(fields: [clubId], references: [id])
+  schoolName            String
+  grade                 String
+  areaOfInterest        String
+  areaOfStudy           String
+  preferLocation        String
+  password              String
+  status                Status        @default(PENDING)
+  rejectionRemark       String?
+  isPaid                Boolean       @default(false)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+}
+
+model CoachReferee {
+  id                    String   @id @default(uuid())
+  tempId                String   @unique
+  permanentId           String?  @unique
+  districtId            String
+  district              District @relation(fields: [districtId], references: [id])
+  talukId               String
+  taluk                 Taluk    @relation(fields: [talukId], references: [id])
+  pincode               String
+  fullName              String
+  profilePhoto          String?
+  gender                Gender
+  dob                   DateTime
+  age                   Int
+  bloodGroup            String
+  mobileNumber          String   @unique
+  alternateMobileNumber String?
+  email                 String   @unique
+  aadhaarNumber         String   @unique
+  historyInJudo         String
+  historyInOtherMartial String
+  presentGradeInJudo    String
+  coachName             String?
+  refereeName           String?
+  deptName              String
+  contactPersonDept     String
+  addressDept           String
+  clubId                String?
+  club                  Club?    @relation(fields: [clubId], references: [id])
+  password              String
+  status                Status   @default(PENDING)
+  rejectionRemark       String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model Member {
+  id                    String   @id @default(uuid())
+  tempId                String   @unique
+  permanentId           String?  @unique
+  districtId            String
+  district              District @relation(fields: [districtId], references: [id])
+  talukId               String
+  taluk                 Taluk    @relation(fields: [talukId], references: [id])
+  pincode               String
+  fullName              String
+  fatherName            String
+  profilePhoto          String?
+  gender                Gender
+  dob                   DateTime
+  bloodGroup            String
+  mobileNumber          String   @unique
+  alternateMobileNumber String?
+  email                 String   @unique
+  aadhaarNumber         String   @unique
+  aadhaarFront          String?
+  aadhaarBack           String?
+  addressLine1          String
+  addressLine2          String?
+  city                  String
+  addressPincode        String
+  employmentType        String?  // Self / Govt / Private
+  companyName           String?
+  designation           String?
+  workLocation          String?
+  status                Status   @default(PENDING)
+  rejectionRemark       String?
+  password              String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model Event {
+  id              String   @id @default(uuid())
+  title           String
+  description     String
+  date            DateTime
+  location        String
+  districtId      String
+  district        District @relation(fields: [districtId], references: [id])
+  createdBy       String   // ID of the person who created it
+  status          Status   @default(PENDING)
+  rejectionRemark String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}

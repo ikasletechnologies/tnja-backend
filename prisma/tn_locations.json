@@ -1,0 +1,504 @@
+[
+  {
+    "name": "Chennai",
+    "taluks": [
+      { "name": "Mylapore", "pincode": "600004" },
+      { "name": "Adyar", "pincode": "600020" },
+      { "name": "T. Nagar", "pincode": "600017" },
+      { "name": "Ambattur", "pincode": "600053" },
+      { "name": "Guindy", "pincode": "600032" },
+      { "name": "Egmore", "pincode": "600008" },
+      { "name": "Perambur", "pincode": "600011" },
+      { "name": "Velachery", "pincode": "600042" },
+      { "name": "Mambalam", "pincode": "600033" },
+      { "name": "Purasawalkam", "pincode": "600007" },
+      { "name": "Aminjikarai", "pincode": "600029" },
+      { "name": "Ayanavaram", "pincode": "600023" },
+      { "name": "Madhavaram", "pincode": "600060" },
+      { "name": "Maduravoyal", "pincode": "600095" },
+      { "name": "Sholinganallur", "pincode": "600119" },
+      { "name": "Tiruvottiyur", "pincode": "600019" }
+    ]
+  },
+  {
+    "name": "Chengalpattu",
+    "taluks": [
+      { "name": "Chengalpattu", "pincode": "603001" },
+      { "name": "Maduranthakam", "pincode": "603306" },
+      { "name": "Cheyyur", "pincode": "603302" },
+      { "name": "Tirukalukundram", "pincode": "603109" },
+      { "name": "Tiruporur", "pincode": "603110" },
+      { "name": "Tambaram", "pincode": "600045" },
+      { "name": "Pallavaram", "pincode": "600043" },
+      { "name": "Vandalur", "pincode": "600048" }
+    ]
+  },
+  {
+    "name": "Kancheepuram",
+    "taluks": [
+      { "name": "Kancheepuram", "pincode": "631501" },
+      { "name": "Sriperumbudur", "pincode": "602105" },
+      { "name": "Uthiramerur", "pincode": "603406" },
+      { "name": "Walajabad", "pincode": "631605" },
+      { "name": "Kundrathur", "pincode": "600069" }
+    ]
+  },
+  {
+    "name": "Tiruvallur",
+    "taluks": [
+      { "name": "Tiruvallur", "pincode": "602001" },
+      { "name": "Avadi", "pincode": "600054" },
+      { "name": "Ponneri", "pincode": "601204" },
+      { "name": "Gummidipoondi", "pincode": "601201" },
+      { "name": "Uthukkottai", "pincode": "602026" },
+      { "name": "Tiruttani", "pincode": "631209" },
+      { "name": "Pallipattu", "pincode": "631207" },
+      { "name": "RK Pet", "pincode": "631303" },
+      { "name": "Poonamallee", "pincode": "600056" }
+    ]
+  },
+  {
+    "name": "Vellore",
+    "taluks": [
+      { "name": "Vellore", "pincode": "632001" },
+      { "name": "Katpadi", "pincode": "632007" },
+      { "name": "Gudiyatham", "pincode": "632602" },
+      { "name": "Pernampattu", "pincode": "635810" },
+      { "name": "Anaicut", "pincode": "632101" },
+      { "name": "K.V. Kuppam", "pincode": "632201" }
+    ]
+  },
+  {
+    "name": "Ranipet",
+    "taluks": [
+      { "name": "Ranipet", "pincode": "632401" },
+      { "name": "Walajah", "pincode": "632513" },
+      { "name": "Arakkonam", "pincode": "631001" },
+      { "name": "Nemili", "pincode": "631051" },
+      { "name": "Sholinghur", "pincode": "631102" },
+      { "name": "Kalavai", "pincode": "632506" }
+    ]
+  },
+  {
+    "name": "Tirupathur",
+    "taluks": [
+      { "name": "Tirupathur", "pincode": "635601" },
+      { "name": "Vaniyambadi", "pincode": "635751" },
+      { "name": "Ambur", "pincode": "635802" },
+      { "name": "Natrampalli", "pincode": "635852" }
+    ]
+  },
+  {
+    "name": "Tiruvannamalai",
+    "taluks": [
+      { "name": "Tiruvannamalai", "pincode": "606601" },
+      { "name": "Arni", "pincode": "632301" },
+      { "name": "Chengam", "pincode": "606701" },
+      { "name": "Cheyyar", "pincode": "604407" },
+      { "name": "Kalasapakkam", "pincode": "606751" },
+      { "name": "Polur", "pincode": "606803" },
+      { "name": "Thandarampattu", "pincode": "606707" },
+      { "name": "Vandavasi", "pincode": "604408" },
+      { "name": "Jawadhu Hills", "pincode": "606702" },
+      { "name": "Chetpet", "pincode": "606801" },
+      { "name": "Jamunamarathur", "pincode": "635703" },
+      { "name": "Vembakkam", "pincode": "604410" }
+    ]
+  },
+  {
+    "name": "Viluppuram",
+    "taluks": [
+      { "name": "Viluppuram", "pincode": "605602" },
+      { "name": "Vikravandi", "pincode": "605652" },
+      { "name": "Kanai", "pincode": "605301" },
+      { "name": "Kandamangalam", "pincode": "605102" },
+      { "name": "Koliyanur", "pincode": "605103" },
+      { "name": "Mailam", "pincode": "604304" },
+      { "name": "Marakkanam", "pincode": "604303" },
+      { "name": "Olakkur", "pincode": "604305" },
+      { "name": "Vanur", "pincode": "605109" }
+    ]
+  },
+  {
+    "name": "Cuddalore",
+    "taluks": [
+      { "name": "Cuddalore", "pincode": "607001" },
+      { "name": "Panruti", "pincode": "607106" },
+      { "name": "Chidambaram", "pincode": "608001" },
+      { "name": "Kattumannarkoil", "pincode": "608301" },
+      { "name": "Kurinjipadi", "pincode": "607302" },
+      { "name": "Tittakudi", "pincode": "606106" },
+      { "name": "Virudhachalam", "pincode": "606001" },
+      { "name": "Bhuvanagiri", "pincode": "608601" },
+      { "name": "Srimushnam", "pincode": "608703" },
+      { "name": "Veppur", "pincode": "606304" }
+    ]
+  },
+  {
+    "name": "Kallakurichi",
+    "taluks": [
+      { "name": "Kallakurichi", "pincode": "606202" },
+      { "name": "Sankarapuram", "pincode": "606401" },
+      { "name": "Chinna Salem", "pincode": "606201" },
+      { "name": "Tyagadurga", "pincode": "606206" },
+      { "name": "Kalrayan Hills", "pincode": "606209" },
+      { "name": "Ulundurpet", "pincode": "606107" }
+    ]
+  },
+  {
+    "name": "Salem",
+    "taluks": [
+      { "name": "Salem", "pincode": "636001" },
+      { "name": "Salem South", "pincode": "636006" },
+      { "name": "Salem West", "pincode": "636005" },
+      { "name": "Attur", "pincode": "636102" },
+      { "name": "Edappadi", "pincode": "637101" },
+      { "name": "Gangavalli", "pincode": "636105" },
+      { "name": "Mettur", "pincode": "636401" },
+      { "name": "Omalur", "pincode": "636455" },
+      { "name": "Pethanaickenpalayam", "pincode": "636109" },
+      { "name": "Sankari", "pincode": "637301" },
+      { "name": "Vazhapadi", "pincode": "636115" },
+      { "name": "Yercaud", "pincode": "636601" },
+      { "name": "Kadayampatti", "pincode": "636351" }
+    ]
+  },
+  {
+    "name": "Namakkal",
+    "taluks": [
+      { "name": "Namakkal", "pincode": "637001" },
+      { "name": "Rasipuram", "pincode": "637408" },
+      { "name": "Tiruchengode", "pincode": "637211" },
+      { "name": "Paramathi Velur", "pincode": "638182" },
+      { "name": "Sendamangalam", "pincode": "637409" },
+      { "name": "Kumarapalayam", "pincode": "638183" },
+      { "name": "Mohanur", "pincode": "637015" },
+      { "name": "Kollimalai", "pincode": "637411" }
+    ]
+  },
+  {
+    "name": "Dharmapuri",
+    "taluks": [
+      { "name": "Dharmapuri", "pincode": "636701" },
+      { "name": "Harur", "pincode": "636903" },
+      { "name": "Palacode", "pincode": "636808" },
+      { "name": "Pappireddipatti", "pincode": "636905" },
+      { "name": "Pennagaram", "pincode": "636810" },
+      { "name": "Karimangalam", "pincode": "635202" },
+      { "name": "Nallampalli", "pincode": "636807" }
+    ]
+  },
+  {
+    "name": "Krishnagiri",
+    "taluks": [
+      { "name": "Krishnagiri", "pincode": "635001" },
+      { "name": "Hosur", "pincode": "635109" },
+      { "name": "Denkanikottai", "pincode": "635107" },
+      { "name": "Pochampalli", "pincode": "635206" },
+      { "name": "Uthangarai", "pincode": "635207" },
+      { "name": "Shoolagiri", "pincode": "635117" },
+      { "name": "Bargur", "pincode": "635104" },
+      { "name": "Anchetty", "pincode": "635102" }
+    ]
+  },
+  {
+    "name": "Erode",
+    "taluks": [
+      { "name": "Erode", "pincode": "638001" },
+      { "name": "Bhavani", "pincode": "638301" },
+      { "name": "Gobichettipalayam", "pincode": "638452" },
+      { "name": "Perundurai", "pincode": "638052" },
+      { "name": "Sathyamangalam", "pincode": "638401" },
+      { "name": "Anthiyur", "pincode": "638501" },
+      { "name": "Kodumudi", "pincode": "638151" },
+      { "name": "Modakkurichi", "pincode": "638104" },
+      { "name": "Nambiyur", "pincode": "638458" },
+      { "name": "Thalavadi", "pincode": "638461" }
+    ]
+  },
+  {
+    "name": "Coimbatore",
+    "taluks": [
+      { "name": "Coimbatore North", "pincode": "641001" },
+      { "name": "Coimbatore South", "pincode": "641018" },
+      { "name": "Pollachi", "pincode": "642001" },
+      { "name": "Mettupalayam", "pincode": "641301" },
+      { "name": "Valparai", "pincode": "642127" },
+      { "name": "Sulur", "pincode": "641402" },
+      { "name": "Annur", "pincode": "641653" },
+      { "name": "Perur", "pincode": "641010" },
+      { "name": "Madukkarai", "pincode": "641105" },
+      { "name": "Kinathukadavu", "pincode": "642109" },
+      { "name": "Anaimalai", "pincode": "642104" }
+    ]
+  },
+  {
+    "name": "Tiruppur",
+    "taluks": [
+      { "name": "Tiruppur", "pincode": "641601" },
+      { "name": "Avinashi", "pincode": "641654" },
+      { "name": "Dharapuram", "pincode": "638656" },
+      { "name": "Kangeyam", "pincode": "638701" },
+      { "name": "Udumalaipettai", "pincode": "642126" },
+      { "name": "Palladam", "pincode": "641664" },
+      { "name": "Madathukulam", "pincode": "642113" },
+      { "name": "Uthukuli", "pincode": "638751" },
+      { "name": "Kundadam", "pincode": "638702" }
+    ]
+  },
+  {
+    "name": "Nilgiris",
+    "taluks": [
+      { "name": "Udhagamandalam", "pincode": "643001" },
+      { "name": "Coonoor", "pincode": "643101" },
+      { "name": "Kotagiri", "pincode": "643217" },
+      { "name": "Gudalur", "pincode": "643212" },
+      { "name": "Kundah", "pincode": "643219" },
+      { "name": "Pandalur", "pincode": "643233" }
+    ]
+  },
+  {
+    "name": "Tiruchirappalli",
+    "taluks": [
+      { "name": "Tiruchirappalli East", "pincode": "620008" },
+      { "name": "Tiruchirappalli West", "pincode": "620001" },
+      { "name": "Srirangam", "pincode": "620006" },
+      { "name": "Manapparai", "pincode": "621306" },
+      { "name": "Musiri", "pincode": "621211" },
+      { "name": "Thuraiyur", "pincode": "621010" },
+      { "name": "Lalgudi", "pincode": "621601" },
+      { "name": "Thottiam", "pincode": "621215" },
+      { "name": "Marungapuri", "pincode": "621310" },
+      { "name": "Tiruchirappalli South", "pincode": "620001" },
+      { "name": "Manachanallur", "pincode": "621005" }
+    ]
+  },
+  {
+    "name": "Karur",
+    "taluks": [
+      { "name": "Karur", "pincode": "639001" },
+      { "name": "Aravakurichi", "pincode": "639201" },
+      { "name": "Kulithalai", "pincode": "639104" },
+      { "name": "Krishnarayapuram", "pincode": "639105" },
+      { "name": "Kadavur", "pincode": "621311" },
+      { "name": "Manmangalam", "pincode": "639006" },
+      { "name": "Pugalur", "pincode": "639113" }
+    ]
+  },
+  {
+    "name": "Perambalur",
+    "taluks": [
+      { "name": "Perambalur", "pincode": "621212" },
+      { "name": "Kunnam", "pincode": "621708" },
+      { "name": "Alathur", "pincode": "621118" },
+      { "name": "Veppanthattai", "pincode": "621116" }
+    ]
+  },
+  {
+    "name": "Ariyalur",
+    "taluks": [
+      { "name": "Ariyalur", "pincode": "621704" },
+      { "name": "Udayarpalayam", "pincode": "621804" },
+      { "name": "Sendurai", "pincode": "621714" },
+      { "name": "Andimadam", "pincode": "621801" }
+    ]
+  },
+  {
+    "name": "Pudukkottai",
+    "taluks": [
+      { "name": "Pudukkottai", "pincode": "622001" },
+      { "name": "Alangudi", "pincode": "622301" },
+      { "name": "Aranthangi", "pincode": "614616" },
+      { "name": "Avudaiyarkoil", "pincode": "614618" },
+      { "name": "Gandarvakottai", "pincode": "613301" },
+      { "name": "Illuppur", "pincode": "622102" },
+      { "name": "Karambakudi", "pincode": "622302" },
+      { "name": "Kulathur", "pincode": "622502" },
+      { "name": "Ponnamaravathi", "pincode": "622407" },
+      { "name": "Thirumayam", "pincode": "622507" },
+      { "name": "Viralimalai", "pincode": "621316" },
+      { "name": "Manamelkudi", "pincode": "614620" }
+    ]
+  },
+  {
+    "name": "Thanjavur",
+    "taluks": [
+      { "name": "Thanjavur", "pincode": "613001" },
+      { "name": "Kumbakonam", "pincode": "612001" },
+      { "name": "Pattukkottai", "pincode": "614601" },
+      { "name": "Orathanadu", "pincode": "614625" },
+      { "name": "Papanasam", "pincode": "614205" },
+      { "name": "Peravurani", "pincode": "614804" },
+      { "name": "Thiruvaiyaru", "pincode": "613204" },
+      { "name": "Thiruvidaimarudur", "pincode": "612104" },
+      { "name": "Budalur", "pincode": "613602" }
+    ]
+  },
+  {
+    "name": "Nagapattinam",
+    "taluks": [
+      { "name": "Nagapattinam", "pincode": "611001" },
+      { "name": "Kilvelur", "pincode": "611104" },
+      { "name": "Vedaranyam", "pincode": "614810" },
+      { "name": "Tirukkuvalai", "pincode": "610204" },
+      { "name": "Thalaignayiru", "pincode": "614712" }
+    ]
+  },
+  {
+    "name": "Mayiladuthurai",
+    "taluks": [
+      { "name": "Mayiladuthurai", "pincode": "609001" },
+      { "name": "Sirkazhi", "pincode": "609110" },
+      { "name": "Tharangambadi", "pincode": "609306" },
+      { "name": "Kuthalam", "pincode": "609801" }
+    ]
+  },
+  {
+    "name": "Tiruvarur",
+    "taluks": [
+      { "name": "Tiruvarur", "pincode": "610001" },
+      { "name": "Kudavasal", "pincode": "612601" },
+      { "name": "Nannilam", "pincode": "610105" },
+      { "name": "Needamangalam", "pincode": "614404" },
+      { "name": "Mannargudi", "pincode": "614001" },
+      { "name": "Thiruthuraipoondi", "pincode": "614713" },
+      { "name": "Valangaiman", "pincode": "612804" },
+      { "name": "Koothanallur", "pincode": "614101" }
+    ]
+  },
+  {
+    "name": "Madurai",
+    "taluks": [
+      { "name": "Madurai East", "pincode": "625020" },
+      { "name": "Madurai West", "pincode": "625003" },
+      { "name": "Madurai North", "pincode": "625002" },
+      { "name": "Madurai South", "pincode": "625001" },
+      { "name": "Melur", "pincode": "625106" },
+      { "name": "Thirumangalam", "pincode": "625706" },
+      { "name": "Usilampatti", "pincode": "625532" },
+      { "name": "Vadipatti", "pincode": "625218" },
+      { "name": "Peraiyur", "pincode": "625703" },
+      { "name": "Thiruparankundram", "pincode": "625005" },
+      { "name": "Kalligudi", "pincode": "625701" }
+    ]
+  },
+  {
+    "name": "Theni",
+    "taluks": [
+      { "name": "Theni", "pincode": "625531" },
+      { "name": "Bodinayakanur", "pincode": "625513" },
+      { "name": "Periyakulam", "pincode": "625501" },
+      { "name": "Uthamapalayam", "pincode": "625533" },
+      { "name": "Andipatti", "pincode": "625512" }
+    ]
+  },
+  {
+    "name": "Dindigul",
+    "taluks": [
+      { "name": "Dindigul East", "pincode": "624001" },
+      { "name": "Dindigul West", "pincode": "624004" },
+      { "name": "Palani", "pincode": "624601" },
+      { "name": "Kodaikanal", "pincode": "624101" },
+      { "name": "Oddanchatram", "pincode": "624619" },
+      { "name": "Vedasandur", "pincode": "624710" },
+      { "name": "Nilakottai", "pincode": "624208" },
+      { "name": "Natham", "pincode": "624401" },
+      { "name": "Atthur", "pincode": "624701" },
+      { "name": "Gujiliamparai", "pincode": "624703" }
+    ]
+  },
+  {
+    "name": "Sivaganga",
+    "taluks": [
+      { "name": "Sivaganga", "pincode": "630561" },
+      { "name": "Devakottai", "pincode": "630303" },
+      { "name": "Karaikudi", "pincode": "630001" },
+      { "name": "Ilayangudi", "pincode": "630702" },
+      { "name": "Manamadurai", "pincode": "630606" },
+      { "name": "Thiruppuvanam", "pincode": "630611" },
+      { "name": "Kalaiyarkoil", "pincode": "630551" },
+      { "name": "Tirupathur", "pincode": "630211" },
+      { "name": "Singampunari", "pincode": "630502" }
+    ]
+  },
+  {
+    "name": "Ramanathapuram",
+    "taluks": [
+      { "name": "Ramanathapuram", "pincode": "623501" },
+      { "name": "Tiruvadanai", "pincode": "623407" },
+      { "name": "Paramakudi", "pincode": "623707" },
+      { "name": "Mudukulathur", "pincode": "623704" },
+      { "name": "Kamuthi", "pincode": "623603" },
+      { "name": "Kadaladi", "pincode": "623703" },
+      { "name": "Rameswaram", "pincode": "623526" },
+      { "name": "Kilakarai", "pincode": "623517" }
+    ]
+  },
+  {
+    "name": "Virudhunagar",
+    "taluks": [
+      { "name": "Virudhunagar", "pincode": "626001" },
+      { "name": "Aruppukkottai", "pincode": "626101" },
+      { "name": "Rajapalayam", "pincode": "626117" },
+      { "name": "Sattur", "pincode": "626203" },
+      { "name": "Sivakasi", "pincode": "626123" },
+      { "name": "Srivilliputhur", "pincode": "626125" },
+      { "name": "Tiruchuli", "pincode": "626129" },
+      { "name": "Kariapatti", "pincode": "626106" },
+      { "name": "Watrap", "pincode": "626132" },
+      { "name": "Vembakottai", "pincode": "626131" }
+    ]
+  },
+  {
+    "name": "Tirunelveli",
+    "taluks": [
+      { "name": "Tirunelveli", "pincode": "627001" },
+      { "name": "Palayamkottai", "pincode": "627002" },
+      { "name": "Ambasamudram", "pincode": "627401" },
+      { "name": "Nanguneri", "pincode": "627108" },
+      { "name": "Radhapuram", "pincode": "627111" },
+      { "name": "Manur", "pincode": "627201" },
+      { "name": "Cheranmahadevi", "pincode": "627414" },
+      { "name": "Thisayanvilai", "pincode": "627657" }
+    ]
+  },
+  {
+    "name": "Tenkasi",
+    "taluks": [
+      { "name": "Tenkasi", "pincode": "627811" },
+      { "name": "Kadayanallur", "pincode": "627751" },
+      { "name": "Sankarankovil", "pincode": "627756" },
+      { "name": "Shenkottai", "pincode": "627809" },
+      { "name": "Sivagiri", "pincode": "627757" },
+      { "name": "Alangulam", "pincode": "627851" },
+      { "name": "Kuruvikulam", "pincode": "627754" },
+      { "name": "Thiruvengadam", "pincode": "627719" }
+    ]
+  },
+  {
+    "name": "Thoothukudi",
+    "taluks": [
+      { "name": "Thoothukudi", "pincode": "628001" },
+      { "name": "Eral", "pincode": "628801" },
+      { "name": "Ettayapuram", "pincode": "628902" },
+      { "name": "Kayathar", "pincode": "628952" },
+      { "name": "Kovilpatti", "pincode": "628501" },
+      { "name": "Ottapidaram", "pincode": "628401" },
+      { "name": "Sathankulam", "pincode": "628704" },
+      { "name": "Srivaikuntam", "pincode": "628601" },
+      { "name": "Tiruchendur", "pincode": "628215" },
+      { "name": "Vilathikulam", "pincode": "628907" }
+    ]
+  },
+  {
+    "name": "Kanyakumari",
+    "taluks": [
+      { "name": "Agastheeswaram", "pincode": "629001" },
+      { "name": "Kalkulam", "pincode": "629175" },
+      { "name": "Thovalai", "pincode": "629302" },
+      { "name": "Vilavancode", "pincode": "629155" },
+      { "name": "Killiyur", "pincode": "629171" },
+      { "name": "Thiruvattar", "pincode": "629177" }
+    ]
+  }
+]
