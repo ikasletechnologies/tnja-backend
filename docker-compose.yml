@@ -1,53 +1,43 @@
-# ─────────────────────────────────────────────
-#  TNJA – Tamil Nadu Judo Association
-#  Docker Compose – Development / Staging Stack
-# ─────────────────────────────────────────────
+version: '3.9'
 
 services:
-
   # ── PostgreSQL Database ──────────────────────
-  db:
-    image: postgres:15-alpine
-    container_name: tnja_db
+  postgres:
+    image: postgres:16-alpine
+    container_name: tnja_postgres
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
-      POSTGRES_USER: ${DB_USER:-tnja}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-tnja}
-      POSTGRES_DB: ${DB_NAME:-tnja}
+      POSTGRES_USER: tnja
+      POSTGRES_PASSWORD: tnja
+      POSTGRES_DB: tnja
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - '5432:5432'
     volumes:
       - tnja_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-tnja} -d ${DB_NAME:-tnja}"]
+      test: ['CMD-SHELL', 'pg_isready -U tnja -d tnja']
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # ── Backend (Express + Prisma) ───────────────
-  backend:
+  # ── Backend API ──────────────────────────────
+  api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: tnja_backend
+    container_name: tnja_api
     restart: unless-stopped
-    env_file:
-      - .env
+    env_file: .env
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-tnja}:${DB_PASSWORD:-tnja}@db:5432/${DB_NAME:-tnja}
-      PORT: ${PORT:-5000}
-      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://tnja:tnja@postgres:5432/tnja
+      PORT: 5000
+      NODE_ENV: development
     ports:
-      - "${PORT:-5000}:5000"
+      - '5000:5000'
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
     volumes:
-      # Uncomment for hot-reload in dev (remove in production):
-      # - .:/app
-      # - /app/node_modules
       - tnja_uploads:/app/uploads
 
   # ── Frontend (Next.js) ──────────────────────
@@ -57,16 +47,14 @@ services:
       dockerfile: Dockerfile
     container_name: tnja_frontend
     restart: unless-stopped
-    env_file:
-      - ../tnja-frontend/.env
+    env_file: ../tnja-frontend/.env
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5000/api}
+      NEXT_PUBLIC_API_URL: http://localhost:5000/api
     ports:
-      - "3000:3000"
+      - '3000:3000'
     depends_on:
-      - backend
+      - api
 
-# ── Named Volumes ────────────────────────────
 volumes:
   tnja_pgdata:
     driver: local

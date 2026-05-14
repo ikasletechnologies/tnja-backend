@@ -31,3 +31,13 @@ export const authorizeAdmin = (req: AuthRequest, res: Response, next: NextFuncti
     res.status(403).json({ error: "Forbidden: Admin access required" });
   }
 };
+
+export const authorize = (roles: string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (req.user && roles.includes(req.user.role)) {
+      next();
+    } else {
+      res.status(403).json({ error: "Forbidden: You do not have permission to access this resource" });
+    }
+  };
+};

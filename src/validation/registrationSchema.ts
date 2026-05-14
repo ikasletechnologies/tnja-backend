@@ -42,6 +42,7 @@ export const coachRegistrationSchema = z.object({
   talukId: z.string().uuid("Invalid Taluk selection"),
   pincode: z.string().length(6),
   fullName: z.string().min(3),
+  fatherName: z.string().min(3),
   gender: GenderEnum,
   dob: z.string().refine((val) => !isNaN(Date.parse(val)), {
     message: "Invalid date format",

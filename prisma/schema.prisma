@@ -70,6 +70,10 @@ model Club {
   permanentId      String?        @unique
   status           Status         @default(PENDING)
   rejectionRemark  String?
+  mustChangePassword Boolean      @default(false)
+  resetPasswordToken String?
+  resetPasswordExpires DateTime?
+  isPaid           Boolean        @default(false)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   students         Student[]
@@ -115,6 +119,9 @@ model Student {
   password              String
   status                Status        @default(PENDING)
   rejectionRemark       String?
+  mustChangePassword    Boolean       @default(false)
+  resetPasswordToken    String?
+  resetPasswordExpires  DateTime?
   isPaid                Boolean       @default(false)
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
@@ -130,6 +137,7 @@ model CoachReferee {
   taluk                 Taluk    @relation(fields: [talukId], references: [id])
   pincode               String
   fullName              String
+  fatherName            String
   profilePhoto          String?
   gender                Gender
   dob                   DateTime
@@ -152,6 +160,10 @@ model CoachReferee {
   password              String
   status                Status   @default(PENDING)
   rejectionRemark       String?
+  mustChangePassword    Boolean  @default(false)
+  resetPasswordToken    String?
+  resetPasswordExpires  DateTime?
+  isPaid                Boolean  @default(false)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
@@ -187,6 +199,10 @@ model Member {
   workLocation          String?
   status                Status   @default(PENDING)
   rejectionRemark       String?
+  mustChangePassword    Boolean  @default(false)
+  resetPasswordToken    String?
+  resetPasswordExpires  DateTime?
+  isPaid                Boolean  @default(false)
   password              String
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
@@ -205,4 +221,27 @@ model Event {
   rejectionRemark String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+model GlobalSettings {
+  id              String   @id @default("GLOBAL")
+  playerFee       Float    @default(500)
+  coachFee        Float    @default(1000)
+  memberFee       Float    @default(1000)
+  clubFee         Float    @default(1000)
+  updatedAt       DateTime @updatedAt
+}
+
+model Grievance {
+  id          String   @id @default(uuid())
+  userId      String
+  userName    String
+  userEmail   String
+  role        String   // Student, Coach, or Referee
+  subject     String
+  description String
+  status      Status   @default(PENDING)
+  reply       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

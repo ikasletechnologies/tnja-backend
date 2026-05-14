@@ -1,15 +1,22 @@
-import prisma from "../src/lib/prisma.js";
+import { PrismaClient } from "@prisma/client";
 
-async function main() {
-  try {
-    const districts = await prisma.district.findMany();
-    console.log("Districts in DB:", districts.length);
-    console.log(JSON.stringify(districts, null, 2));
-  } catch (error) {
-    console.error("Error fetching districts:", error);
-  } finally {
-    process.exit(0);
-  }
+const prisma = new PrismaClient();
+
+async function checkDistricts() {
+  console.log("--- MEMBERS ---");
+  const members = await prisma.member.findMany({
+    select: { id: true, fullName: true, districtId: true, district: { select: { name: true } } }
+  });
+  members.forEach(m => console.log(`${m.fullName} (${m.id}): District: ${m.district?.name} (${m.districtId})`));
+
+  console.log("\n--- PENDING STUDENTS ---");
+  const students = await prisma.student.findMany({
+    where: { status: "PENDING" },
+    select: { id: true, fullName: true, districtId: true, district: { select: { name: true } } }
+  });
+  students.forEach(s => console.log(`${s.fullName} (${s.id}): District: ${s.district?.name} (${s.districtId})`));
 }
 
-main();
+checkDistricts()
+  .catch(e => console.error(e))
+  .finally(() => prisma.$disconnect());

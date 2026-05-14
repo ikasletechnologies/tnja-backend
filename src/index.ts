@@ -5,6 +5,7 @@ import express from "express";
 import cors from "cors";
 import registrationRoutes from "./routes/registrationRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import grievanceRoutes from "./routes/grievanceRoutes.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -22,6 +23,7 @@ app.use((req, res, next) => {
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 app.use("/api", registrationRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api", grievanceRoutes);
 
 // Basic health check
 app.get("/health", (req, res) => {

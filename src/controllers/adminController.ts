@@ -2,7 +2,13 @@ import type { Request, Response } from "express";
 import prisma from "../lib/prisma.js";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
-import { sendApprovalEmail, sendRejectionEmail } from "../lib/mailer.js";
+import { sendApprovalEmail, sendRejectionEmail, sendPaymentRequestEmail } from "../lib/mailer.js";
+import Razorpay from "razorpay";
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID || "",
+  key_secret: process.env.RAZORPAY_KEY_SECRET || "",
+});
 
 const generatePermanentId = (prefix: string) => {
   return `${prefix}-${Date.now().toString().slice(-6)}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
@@ -20,14 +26,35 @@ const generatePassword = async () => {
 // ──────────────────────────────────────────────────────────────────────────────
 export const getPendingApplications = async (req: Request, res: Response) => {
   const type = (req.query.type as string || "").toUpperCase();
+  const { role, districtId } = (req as any).user;
 
   try {
+    console.log(`[getPendingApplications] User: ${role}, District: ${districtId}, Type: ${type}`);
+
+    // Basic permissions: MEMBER can ONLY see STUDENT applications
+    if (role === "MEMBER" && type !== "STUDENT" && type !== "") {
+      return res.status(403).json({ error: "District Admins can only view player applications" });
+    }
+
+    // Common where clause for filtering
+    const whereClause: any = { status: "PENDING" };
+    
+    // TEMPORARY: Logging the check but not enforcing district filter to debug
+    if ((role === "MEMBER" || role === "DISTRICT_ADMIN") && districtId) {
+      console.log(`[DEBUG] Member has districtId: ${districtId}. Enforcing filter...`);
+      whereClause.districtId = districtId;
+    } else {
+      console.log(`[DEBUG] No districtId found for Member or role is Super Admin. Showing all.`);
+    }
+
     if (type === "STUDENT") {
+      console.log(`[DEBUG] Fetching students with whereClause:`, JSON.stringify(whereClause));
       const students = await prisma.student.findMany({
-        where: { status: "PENDING" },
+        where: whereClause,
         include: { district: true, taluk: true, club: true },
         orderBy: { createdAt: "desc" },
       });
+      console.log(`[DEBUG] Found ${students.length} students`);
       return res.json({ type: "STUDENT", data: students });
     }
 
@@ -60,10 +87,10 @@ export const getPendingApplications = async (req: Request, res: Response) => {
 
     // Return all pending counts if no type specified
     const [studentCount, coachCount, memberCount, clubCount] = await Promise.all([
-      prisma.student.count({ where: { status: "PENDING" } }),
-      prisma.coachReferee.count({ where: { status: "PENDING" } }),
-      prisma.member.count({ where: { status: "PENDING" } }),
-      prisma.club.count({ where: { status: "PENDING" } }),
+      prisma.student.count({ where: whereClause }),
+      prisma.coachReferee.count({ where: whereClause }),
+      prisma.member.count({ where: whereClause }),
+      prisma.club.count({ where: whereClause }),
     ]);
 
     return res.json({
@@ -85,27 +112,41 @@ export const getPendingApplications = async (req: Request, res: Response) => {
 // ──────────────────────────────────────────────────────────────────────────────
 export const updateApplicationStatus = async (req: Request, res: Response) => {
   const { id, type, status, remark } = req.body;
+  const { role, districtId } = (req as any).user;
   // type: 'student' | 'coach' | 'club' | 'member'
   // status: 'APPROVED' | 'REJECTED'
 
   try {
+    // Member can ONLY update 'student' applications
+    if (role === "MEMBER" && type !== "student") {
+      return res.status(403).json({ error: "District Admins can only approve player applications" });
+    }
+
     // ── STUDENT ──────────────────────────────────────────────────────────────
     if (type === "student") {
       const student = await prisma.student.findUnique({ where: { id } });
       if (!student) return res.status(404).json({ error: "Student not found" });
 
+      // Verify district for Member/District Admin
+      if ((role === "MEMBER" || role === "DISTRICT_ADMIN") && districtId && student.districtId !== districtId) {
+        return res.status(403).json({ error: "You do not have permission to approve students outside your district" });
+      }
+
       const updateData: any = { status, rejectionRemark: remark || null };
 
       if (status === "APPROVED") {
-        if (student.isBPL || student.isPaid) {
+        if (student.isBPL) {
+          // BPL Students get approved immediately with permanent ID
           updateData.permanentId = generatePermanentId("STU");
-
+          
+          // Generate new password for final account (optional, keeping current is fine too but common to refresh)
           const { raw, hashed } = await generatePassword();
           updateData.password = hashed;
+          updateData.mustChangePassword = true;
+          updateData.isPaid = true; // BPL counts as paid/waived
 
           const updated = await prisma.student.update({ where: { id }, data: updateData });
 
-          // Send approval email
           try {
             await sendApprovalEmail({
               toEmail: student.email,
@@ -116,12 +157,37 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
               role: "Student",
             });
           } catch (mailErr) {
-            console.error("[Mailer] Failed to send student approval email:", mailErr);
+            console.error("[Mailer] Failed to send BPL student approval email:", mailErr);
           }
 
-          return res.json({ message: "Student APPROVED. Email sent.", data: updated });
+          return res.json({ message: "BPL Student APPROVED. Credentials sent.", data: updated });
         } else {
-          return res.status(400).json({ error: "Payment required for non-BPL students before approval" });
+          // Non-BPL Students: Approve but require payment
+          const { raw, hashed } = await generatePassword();
+          const updated = await prisma.student.update({ 
+            where: { id }, 
+            data: { 
+              status: "APPROVED", 
+              isPaid: false,
+              password: hashed,
+              mustChangePassword: true
+            } 
+          });
+
+          // Send payment notification email with password
+          try {
+            await sendPaymentRequestEmail({
+              toEmail: student.email,
+              toName: student.fullName,
+              tempId: student.tempId,
+              password: raw,
+              role: "Player"
+            });
+          } catch (mailErr) {
+            console.error("[Mailer] Failed to send payment request email:", mailErr);
+          }
+
+          return res.json({ message: "Student application APPROVED. Payment required for Permanent ID.", data: updated });
         }
       }
 
@@ -149,27 +215,30 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
       const updateData: any = { status, rejectionRemark: remark || null };
 
       if (status === "APPROVED") {
-        updateData.permanentId = generatePermanentId("COA");
-
         const { raw, hashed } = await generatePassword();
-        updateData.password = hashed;
-
-        const updated = await prisma.coachReferee.update({ where: { id }, data: updateData });
+        const updated = await prisma.coachReferee.update({ 
+          where: { id }, 
+          data: { 
+            status: "APPROVED", 
+            isPaid: false,
+            password: hashed,
+            mustChangePassword: true
+          } 
+        });
 
         try {
-          await sendApprovalEmail({
+          await sendPaymentRequestEmail({
             toEmail: coach.email,
             toName: coach.fullName,
             tempId: coach.tempId,
-            permanentId: updated.permanentId!,
             password: raw,
-            role: "Coach",
+            role: "Coach"
           });
         } catch (mailErr) {
-          console.error("[Mailer] Failed to send coach approval email:", mailErr);
+          console.error("[Mailer] Failed to send coach payment request email:", mailErr);
         }
 
-        return res.json({ message: "Coach APPROVED. Email sent.", data: updated });
+        return res.json({ message: "Coach APPROVED. Payment required for Permanent ID.", data: updated });
       }
 
       if (status === "REJECTED") {
@@ -196,27 +265,30 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
       const updateData: any = { status, rejectionRemark: remark || null };
 
       if (status === "APPROVED") {
-        updateData.permanentId = generatePermanentId("MEM");
-
         const { raw, hashed } = await generatePassword();
-        updateData.password = hashed;
-
-        const updated = await prisma.member.update({ where: { id }, data: updateData });
+        const updated = await prisma.member.update({ 
+          where: { id }, 
+          data: { 
+            status: "APPROVED", 
+            isPaid: false,
+            password: hashed,
+            mustChangePassword: true
+          } 
+        });
 
         try {
-          await sendApprovalEmail({
+          await sendPaymentRequestEmail({
             toEmail: member.email,
             toName: member.fullName,
             tempId: member.tempId,
-            permanentId: updated.permanentId!,
             password: raw,
-            role: "Member",
+            role: "Member"
           });
         } catch (mailErr) {
-          console.error("[Mailer] Failed to send member approval email:", mailErr);
+          console.error("[Mailer] Failed to send member payment request email:", mailErr);
         }
 
-        return res.json({ message: "Member APPROVED. Email sent.", data: updated });
+        return res.json({ message: "Member APPROVED. Payment required for Permanent ID.", data: updated });
       }
 
       if (status === "REJECTED") {
@@ -243,26 +315,30 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
       const updateData: any = { status, rejectionRemark: remark || null };
 
       if (status === "APPROVED") {
-        updateData.permanentId = generatePermanentId("CLB");
         const { raw, hashed } = await generatePassword();
-        updateData.password = hashed;
-
-        const updated = await prisma.club.update({ where: { id }, data: updateData });
+        const updated = await prisma.club.update({ 
+          where: { id }, 
+          data: { 
+            status: "APPROVED", 
+            isPaid: false,
+            password: hashed,
+            mustChangePassword: true
+          } 
+        });
 
         try {
-          await sendApprovalEmail({
+          await sendPaymentRequestEmail({
             toEmail: club.email,
             toName: club.name,
-            tempId: club.id,
-            permanentId: updated.permanentId!,
+            tempId: club.id, // Clubs use UUID as tempId
             password: raw,
-            role: "Club",
+            role: "Club"
           });
         } catch (mailErr) {
-          console.error("[Mailer] Failed to send club approval email:", mailErr);
+          console.error("[Mailer] Failed to send club payment request email:", mailErr);
         }
 
-        return res.json({ message: "Club APPROVED. Email sent.", data: updated });
+        return res.json({ message: "Club APPROVED. Payment required for Permanent ID.", data: updated });
       }
 
       if (status === "REJECTED") {
@@ -325,7 +401,15 @@ export const getApplicationDetails = async (req: Request, res: Response) => {
 // GET /api/admin/stats  – get counts for the dashboard
 // ──────────────────────────────────────────────────────────────────────────────
 export const getDashboardStats = async (req: Request, res: Response) => {
+  const { role, districtId } = (req as any).user;
+  const filter: any = {};
+  if ((role === "MEMBER" || role === "DISTRICT_ADMIN") && districtId) {
+    filter.districtId = districtId;
+  }
+
   try {
+    const pendingFilter = { ...filter, status: "PENDING" };
+
     const [
       studentCount,
       coachCount,
@@ -336,22 +420,22 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       pendingMembers,
       pendingClubs,
     ] = await Promise.all([
-      prisma.student.count(),
-      prisma.coachReferee.count(),
-      prisma.member.count(),
-      prisma.club.count(),
-      prisma.student.count({ where: { status: "PENDING" } }),
-      prisma.coachReferee.count({ where: { status: "PENDING" } }),
-      prisma.member.count({ where: { status: "PENDING" } }),
-      prisma.club.count({ where: { status: "PENDING" } }),
+      prisma.student.count({ where: filter }),
+      prisma.coachReferee.count({ where: filter }),
+      prisma.member.count({ where: filter }),
+      prisma.club.count({ where: filter }),
+      prisma.student.count({ where: pendingFilter }),
+      prisma.coachReferee.count({ where: pendingFilter }),
+      prisma.member.count({ where: pendingFilter }),
+      prisma.club.count({ where: pendingFilter }),
     ]);
 
     // Get recent 5 pending across all types
     const [s, c, m, cl] = await Promise.all([
-      prisma.student.findMany({ where: { status: "PENDING" }, take: 5, orderBy: { createdAt: "desc" } }),
-      prisma.coachReferee.findMany({ where: { status: "PENDING" }, take: 5, orderBy: { createdAt: "desc" } }),
-      prisma.member.findMany({ where: { status: "PENDING" }, take: 5, orderBy: { createdAt: "desc" } }),
-      prisma.club.findMany({ where: { status: "PENDING" }, take: 5, orderBy: { createdAt: "desc" } }),
+      prisma.student.findMany({ where: pendingFilter, take: 5, orderBy: { createdAt: "desc" } }),
+      prisma.coachReferee.findMany({ where: pendingFilter, take: 5, orderBy: { createdAt: "desc" } }),
+      prisma.member.findMany({ where: pendingFilter, take: 5, orderBy: { createdAt: "desc" } }),
+      prisma.club.findMany({ where: pendingFilter, take: 5, orderBy: { createdAt: "desc" } }),
     ]);
 
     const recent = [
@@ -385,3 +469,147 @@ export const getDashboardStats = async (req: Request, res: Response) => {
   }
 };
 
+export const createPaymentOrder = async (req: Request, res: Response) => {
+  const { id, type, amount } = req.body;
+  // type: 'student' | 'coach' | 'member' | 'club'
+  
+  try {
+    let record: any = null;
+    
+    // Fetch Global Settings
+    let settings = await prisma.globalSettings.findUnique({ where: { id: "GLOBAL" } });
+    if (!settings) {
+      // Initialize if not exists
+      settings = await prisma.globalSettings.create({
+        data: { id: "GLOBAL", playerFee: 500, coachFee: 1000, memberFee: 1000, clubFee: 1000 }
+      });
+    }
+
+    let calculatedAmount = 0;
+    if (type === "student") {
+      record = await prisma.student.findUnique({ where: { id } });
+      calculatedAmount = settings.playerFee;
+    } else if (type === "coach") {
+      record = await prisma.coachReferee.findUnique({ where: { id } });
+      calculatedAmount = settings.coachFee;
+    } else if (type === "member") {
+      record = await prisma.member.findUnique({ where: { id } });
+      calculatedAmount = settings.memberFee;
+    } else if (type === "club") {
+      record = await prisma.club.findUnique({ where: { id } });
+      calculatedAmount = settings.clubFee;
+    }
+
+    if (!record) return res.status(404).json({ error: `${type} not found` });
+
+    const options = {
+      amount: calculatedAmount * 100, // amount in the smallest currency unit (paise)
+      currency: "INR",
+      receipt: `receipt_${record.tempId || record.id}`,
+    };
+
+    const order = await razorpay.orders.create(options);
+    return res.json(order);
+  } catch (error) {
+    console.error("Razorpay order error:", error);
+    return res.status(500).json({ error: "Failed to create payment order" });
+  }
+};
+
+export const verifyPayment = async (req: Request, res: Response) => {
+  const { id, type, razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
+  // type: 'student' | 'coach' | 'member' | 'club'
+
+  try {
+    let record: any = null;
+    let updateFn: any = null;
+    let prefix = "";
+    let roleLabel: "Student" | "Coach" | "Member" | "Club" = "Student";
+
+    if (type === "student") {
+      record = await prisma.student.findUnique({ where: { id } });
+      updateFn = prisma.student.update;
+      prefix = "STU";
+      roleLabel = "Student";
+    } else if (type === "coach") {
+      record = await prisma.coachReferee.findUnique({ where: { id } });
+      updateFn = prisma.coachReferee.update;
+      prefix = "COA";
+      roleLabel = "Coach";
+    } else if (type === "member") {
+      record = await prisma.member.findUnique({ where: { id } });
+      updateFn = prisma.member.update;
+      prefix = "MEM";
+      roleLabel = "Member";
+    } else if (type === "club") {
+      record = await prisma.club.findUnique({ where: { id } });
+      updateFn = prisma.club.update;
+      prefix = "CLB";
+      roleLabel = "Club";
+    }
+
+    if (!record) return res.status(404).json({ error: `${type} application not found` });
+
+    if (record.isPaid) {
+      return res.status(400).json({ error: "Payment already processed" });
+    }
+
+    // Process success
+    const permanentId = generatePermanentId(prefix);
+
+    const updated = await updateFn({
+      where: { id },
+      data: {
+        isPaid: true,
+        permanentId
+      }
+    });
+
+    try {
+      await sendApprovalEmail({
+        toEmail: record.email,
+        toName: record.fullName || record.name,
+        tempId: record.tempId || record.id,
+        permanentId: updated.permanentId!,
+        password: "Use your existing password",
+        role: roleLabel,
+      });
+    } catch (mailErr) {
+      console.error("Mail error after payment verification:", mailErr);
+    }
+
+    return res.json({ message: "Payment verified and ID issued", permanentId: updated.permanentId });
+
+  } catch (error) {
+    console.error("Payment verification error:", error);
+    return res.status(500).json({ error: "Verification failed" });
+  }
+};
+
+export const getGlobalSettings = async (req: Request, res: Response) => {
+  try {
+    let settings = await prisma.globalSettings.findUnique({ where: { id: "GLOBAL" } });
+    if (!settings) {
+      settings = await prisma.globalSettings.create({
+        data: { id: "GLOBAL" }
+      });
+    }
+    return res.json(settings);
+  } catch (error) {
+    return res.status(500).json({ error: "Failed to fetch settings" });
+  }
+};
+
+export const updateGlobalSettings = async (req: Request, res: Response) => {
+  const { playerFee, coachFee, memberFee, clubFee } = req.body;
+  try {
+    const settings = await prisma.globalSettings.upsert({
+      where: { id: "GLOBAL" },
+      update: { playerFee, coachFee, memberFee, clubFee },
+      create: { id: "GLOBAL", playerFee, coachFee, memberFee, clubFee }
+    });
+    return res.json({ message: "Settings updated successfully", settings });
+  } catch (error) {
+    return res.status(500).json({ error: "Failed to update settings" });
+  }
+};
