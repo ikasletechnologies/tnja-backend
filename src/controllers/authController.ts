@@ -52,7 +52,7 @@ export const login = async (req: Request, res: Response) => {
       user = await prisma.member.findFirst({
         where: { OR: [{ email: identifier }, { tempId: identifier }, { permanentId: identifier }] },
       });
-      if (user) role = "MEMBER";
+      if (user) role = user.role; // Use the role from the DB (MEMBER, DISTRICT_PRESIDENT, etc.)
     }
 
     // ── Club ──────────────────────────────────────────────────────────────────
@@ -93,8 +93,9 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Incorrect password" });
     }
 
+    const isMemberRole = ["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "DISTRICT_ADMIN"].includes(role);
     const tokenPayload: any = { userId: user.id, role: role };
-    if (role === "MEMBER" && user.districtId) {
+    if (isMemberRole && user.districtId) {
       tokenPayload.districtId = user.districtId;
     }
 
@@ -149,7 +150,7 @@ export const getProfile = async (req: any, res: Response) => {
         where: { id: userId },
         include: { district: true, taluk: true, club: true }
       });
-    } else if (role === "MEMBER" || role === "DISTRICT_ADMIN") {
+    } else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "DISTRICT_ADMIN"].includes(role)) {
       userData = await prisma.member.findUnique({
         where: { id: userId },
         include: { district: true, taluk: true }
@@ -193,7 +194,7 @@ export const changePassword = async (req: any, res: Response) => {
 
     if (role === "PLAYER") model = prisma.student;
     else if (role === "COACH") model = prisma.coachReferee;
-    else if (role === "MEMBER" || role === "DISTRICT_ADMIN") model = prisma.member;
+    else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "DISTRICT_ADMIN"].includes(role)) model = prisma.member;
     else if (role === "CLUB") model = prisma.club;
     else return res.status(403).json({ error: "Super Admin password cannot be changed via this endpoint" });
 

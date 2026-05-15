@@ -25,7 +25,19 @@ export const authenticateJWT = (req: AuthRequest, res: Response, next: NextFunct
 };
 
 export const authorizeAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (req.user && (req.user.role === "SUPER_ADMIN" || req.user.role === "DISTRICT_ADMIN")) {
+  const adminRoles = [
+    "SUPER_ADMIN", 
+    "DISTRICT_ADMIN", 
+    "DISTRICT_PRESIDENT", 
+    "DISTRICT_SECRETARY", 
+    "ZONE_PRESIDENT", 
+    "ZONE_SECRETARY", 
+    "STATE_PRESIDENT", 
+    "STATE_SECRETARY",
+    "MEMBER" // Some members act as district admins
+  ];
+
+  if (req.user && adminRoles.includes(req.user.role)) {
     next();
   } else {
     res.status(403).json({ error: "Forbidden: Admin access required" });

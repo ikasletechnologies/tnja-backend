@@ -70,6 +70,8 @@ model Club {
   permanentId      String?        @unique
   status           Status         @default(PENDING)
   rejectionRemark  String?
+  approvedBy       String?
+  approvedAt       DateTime?
   mustChangePassword Boolean      @default(false)
   resetPasswordToken String?
   resetPasswordExpires DateTime?
@@ -119,6 +121,8 @@ model Student {
   password              String
   status                Status        @default(PENDING)
   rejectionRemark       String?
+  approvedBy            String?
+  approvedAt            DateTime?
   mustChangePassword    Boolean       @default(false)
   resetPasswordToken    String?
   resetPasswordExpires  DateTime?
@@ -160,12 +164,24 @@ model CoachReferee {
   password              String
   status                Status   @default(PENDING)
   rejectionRemark       String?
+  approvedBy            String?
+  approvedAt            DateTime?
   mustChangePassword    Boolean  @default(false)
   resetPasswordToken    String?
   resetPasswordExpires  DateTime?
   isPaid                Boolean  @default(false)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+}
+
+enum MemberRole {
+  MEMBER
+  DISTRICT_PRESIDENT
+  DISTRICT_SECRETARY
+  ZONE_PRESIDENT
+  ZONE_SECRETARY
+  STATE_PRESIDENT
+  STATE_SECRETARY
 }
 
 model Member {
@@ -197,8 +213,11 @@ model Member {
   companyName           String?
   designation           String?
   workLocation          String?
+  role                  MemberRole @default(MEMBER)
   status                Status   @default(PENDING)
   rejectionRemark       String?
+  approvedBy            String?
+  approvedAt            DateTime?
   mustChangePassword    Boolean  @default(false)
   resetPasswordToken    String?
   resetPasswordExpires  DateTime?

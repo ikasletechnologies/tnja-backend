@@ -4,26 +4,38 @@ import bcrypt from "bcrypt";
 
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
+    const { role: requesterRole, districtId } = (req as any).user;
+    const where: any = {};
+    const districtRestrictedRoles = ["MEMBER", "DISTRICT_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"];
+
+    if (districtRestrictedRoles.includes(requesterRole) && districtId) {
+      where.districtId = districtId;
+    }
+
     const [students, coaches, members, clubs] = await Promise.all([
       prisma.student.findMany({
-        select: { id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, district: { select: { name: true } } },
+        where,
+        select: { id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, districtId: true, district: { select: { name: true } }, taluk: { select: { name: true } } },
       }),
       prisma.coachReferee.findMany({
-        select: { id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, district: { select: { name: true } } },
+        where,
+        select: { id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, districtId: true, district: { select: { name: true } }, taluk: { select: { name: true } } },
       }),
       prisma.member.findMany({
-        select: { id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, district: { select: { name: true } } },
+        where,
+        select: { id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, role: true, createdAt: true, districtId: true, district: { select: { name: true } }, taluk: { select: { name: true } } },
       }),
       prisma.club.findMany({
-        select: { id: true, name: true, email: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, district: { select: { name: true } } },
+        where,
+        select: { id: true, name: true, email: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, districtId: true, district: { select: { name: true } }, taluk: { select: { name: true } } },
       }),
     ]);
 
     const allUsers = [
-      ...students.map(u => ({ ...u, role: "STUDENT", districtName: u.district?.name })),
-      ...coaches.map(u => ({ ...u, role: "COACH", districtName: u.district?.name })),
-      ...members.map(u => ({ ...u, role: "MEMBER", districtName: u.district?.name })),
-      ...clubs.map(u => ({ ...u, fullName: u.name, tempId: u.id, role: "CLUB", districtName: u.district?.name })),
+      ...students.map(u => ({ ...u, role: "STUDENT", districtName: u.district?.name, talukName: u.taluk?.name })),
+      ...coaches.map(u => ({ ...u, role: "COACH", districtName: u.district?.name, talukName: u.taluk?.name })),
+      ...members.map(u => ({ ...u, role: u.role, districtName: u.district?.name, talukName: u.taluk?.name })),
+      ...clubs.map(u => ({ ...u, fullName: u.name, tempId: u.id, role: "CLUB", districtName: u.district?.name, talukName: u.taluk?.name })),
     ];
 
     return res.json(allUsers);
@@ -55,7 +67,7 @@ export const updateUserCredentials = async (req: Request, res: Response) => {
       updated = await prisma.student.update({ where: { id: userId }, data: updateData });
     } else if (role === "COACH") {
       updated = await prisma.coachReferee.update({ where: { id: userId }, data: updateData });
-    } else if (role === "MEMBER") {
+    } else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"].includes(role)) {
       updated = await prisma.member.update({ where: { id: userId }, data: updateData });
     } else if (role === "CLUB") {
       updated = await prisma.club.update({ where: { id: userId }, data: updateData });

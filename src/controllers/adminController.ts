@@ -40,11 +40,22 @@ export const getPendingApplications = async (req: Request, res: Response) => {
     const whereClause: any = { status: "PENDING" };
     
     // TEMPORARY: Logging the check but not enforcing district filter to debug
-    if ((role === "MEMBER" || role === "DISTRICT_ADMIN") && districtId) {
-      console.log(`[DEBUG] Member has districtId: ${districtId}. Enforcing filter...`);
+    const districtRestrictedRoles = [
+      "MEMBER", 
+      "DISTRICT_ADMIN", 
+      "DISTRICT_PRESIDENT", 
+      "DISTRICT_SECRETARY", 
+      "ZONE_PRESIDENT", 
+      "ZONE_SECRETARY", 
+      "STATE_PRESIDENT", 
+      "STATE_SECRETARY"
+    ];
+
+    if (districtRestrictedRoles.includes(role) && districtId) {
+      console.log(`[DEBUG] Role ${role} has districtId: ${districtId}. Enforcing filter...`);
       whereClause.districtId = districtId;
     } else {
-      console.log(`[DEBUG] No districtId found for Member or role is Super Admin. Showing all.`);
+      console.log(`[DEBUG] No districtId found or role is Super Admin. Showing all.`);
     }
 
     if (type === "STUDENT") {
@@ -117,7 +128,16 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
   // status: 'APPROVED' | 'REJECTED'
 
   try {
-    // Member can ONLY update 'student' applications
+    const districtRestrictedRoles = ["MEMBER", "DISTRICT_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"];
+    const auditor = role === "SUPER_ADMIN" ? "Super Admin" : null;
+    let auditorInfo = auditor;
+
+    if (role !== "SUPER_ADMIN") {
+      const member = await prisma.member.findUnique({ where: { id: (req as any).user.userId } });
+      auditorInfo = member ? `${member.fullName} (${role})` : role;
+    }
+
+    // Basic permissions: Standard MEMBER can ONLY update 'student' applications
     if (role === "MEMBER" && type !== "student") {
       return res.status(403).json({ error: "District Admins can only approve player applications" });
     }
@@ -127,14 +147,16 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
       const student = await prisma.student.findUnique({ where: { id } });
       if (!student) return res.status(404).json({ error: "Student not found" });
 
-      // Verify district for Member/District Admin
-      if ((role === "MEMBER" || role === "DISTRICT_ADMIN") && districtId && student.districtId !== districtId) {
+      if (districtRestrictedRoles.includes(role) && districtId && student.districtId !== districtId) {
         return res.status(403).json({ error: "You do not have permission to approve students outside your district" });
       }
 
       const updateData: any = { status, rejectionRemark: remark || null };
 
       if (status === "APPROVED") {
+        updateData.approvedBy = auditorInfo;
+        updateData.approvedAt = new Date();
+
         if (student.isBPL) {
           // BPL Students get approved immediately with permanent ID
           updateData.permanentId = generatePermanentId("STU");
@@ -168,6 +190,8 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
             where: { id }, 
             data: { 
               status: "APPROVED", 
+              approvedBy: auditorInfo,
+              approvedAt: new Date(),
               isPaid: false,
               password: hashed,
               mustChangePassword: true
@@ -212,6 +236,10 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
       const coach = await prisma.coachReferee.findUnique({ where: { id } });
       if (!coach) return res.status(404).json({ error: "Coach not found" });
 
+      if (districtRestrictedRoles.includes(role) && districtId && coach.districtId !== districtId) {
+        return res.status(403).json({ error: "You do not have permission to approve coaches outside your district" });
+      }
+
       const updateData: any = { status, rejectionRemark: remark || null };
 
       if (status === "APPROVED") {
@@ -220,6 +248,8 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
           where: { id }, 
           data: { 
             status: "APPROVED", 
+            approvedBy: auditorInfo,
+            approvedAt: new Date(),
             isPaid: false,
             password: hashed,
             mustChangePassword: true
@@ -262,6 +292,10 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
       const member = await prisma.member.findUnique({ where: { id } });
       if (!member) return res.status(404).json({ error: "Member not found" });
 
+      if (districtRestrictedRoles.includes(role) && districtId && member.districtId !== districtId) {
+        return res.status(403).json({ error: "You do not have permission to approve members outside your district" });
+      }
+
       const updateData: any = { status, rejectionRemark: remark || null };
 
       if (status === "APPROVED") {
@@ -270,6 +304,8 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
           where: { id }, 
           data: { 
             status: "APPROVED", 
+            approvedBy: auditorInfo,
+            approvedAt: new Date(),
             isPaid: false,
             password: hashed,
             mustChangePassword: true
@@ -312,6 +348,10 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
       const club = await prisma.club.findUnique({ where: { id } });
       if (!club) return res.status(404).json({ error: "Club not found" });
 
+      if (districtRestrictedRoles.includes(role) && districtId && club.districtId !== districtId) {
+        return res.status(403).json({ error: "You do not have permission to approve clubs outside your district" });
+      }
+
       const updateData: any = { status, rejectionRemark: remark || null };
 
       if (status === "APPROVED") {
@@ -320,6 +360,8 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
           where: { id }, 
           data: { 
             status: "APPROVED", 
+            approvedBy: auditorInfo,
+            approvedAt: new Date(),
             isPaid: false,
             password: hashed,
             mustChangePassword: true
@@ -403,7 +445,18 @@ export const getApplicationDetails = async (req: Request, res: Response) => {
 export const getDashboardStats = async (req: Request, res: Response) => {
   const { role, districtId } = (req as any).user;
   const filter: any = {};
-  if ((role === "MEMBER" || role === "DISTRICT_ADMIN") && districtId) {
+  const districtRestrictedRoles = [
+    "MEMBER", 
+    "DISTRICT_ADMIN", 
+    "DISTRICT_PRESIDENT", 
+    "DISTRICT_SECRETARY", 
+    "ZONE_PRESIDENT", 
+    "ZONE_SECRETARY", 
+    "STATE_PRESIDENT", 
+    "STATE_SECRETARY"
+  ];
+
+  if (districtRestrictedRoles.includes(role) && districtId) {
     filter.districtId = districtId;
   }
 
@@ -613,3 +666,83 @@ export const updateGlobalSettings = async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Failed to update settings" });
   }
 };
+// ──────────────────────────────────────────────────────────────────────────────
+// PATCH /api/member/promote      – promote a member to a specific role
+// ──────────────────────────────────────────────────────────────────────────────
+export const promoteMember = async (req: Request, res: Response) => {
+  const { memberId, role } = req.body;
+  const { role: requesterRole } = (req as any).user;
+
+  if (requesterRole !== "SUPER_ADMIN") {
+    return res.status(403).json({ error: "Only Super Admin can promote members" });
+  }
+
+  const validRoles = [
+    "MEMBER",
+    "DISTRICT_PRESIDENT",
+    "DISTRICT_SECRETARY",
+    "ZONE_PRESIDENT",
+    "ZONE_SECRETARY",
+    "STATE_PRESIDENT",
+    "STATE_SECRETARY"
+  ];
+
+  if (!validRoles.includes(role)) {
+    return res.status(400).json({ error: "Invalid role specified" });
+  }
+
+  try {
+    const member = await prisma.member.findUnique({ where: { id: memberId } });
+    if (!member) return res.status(404).json({ error: "Member not found" });
+
+    const updated = await prisma.member.update({
+      where: { id: memberId },
+      data: { role: role as any }
+    });
+
+    return res.json({ message: `Member promoted to ${role} successfully`, data: updated });
+  } catch (error) {
+    console.error("[promoteMember]", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// GET /api/admin/location-analytics – get detailed breakdown by taluk
+// ──────────────────────────────────────────────────────────────────────────────
+export const getLocationAnalytics = async (req: Request, res: Response) => {
+  const { role, districtId } = (req as any).user;
+  const filter: any = {};
+  
+  if (["DISTRICT_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY"].includes(role) && districtId) {
+    filter.districtId = districtId;
+  }
+
+  try {
+    const taluks = await prisma.taluk.findMany({
+      where: filter.districtId ? { districtId: filter.districtId } : {},
+      include: {
+        students: { select: { id: true } },
+        coaches: { select: { id: true } },
+        members: { select: { id: true } },
+        clubs: { select: { id: true } }
+      }
+    });
+
+    const analytics = taluks.map(t => ({
+      id: t.id,
+      name: t.name,
+      players: t.students.length,
+      coaches: t.coaches.length,
+      members: t.members.length,
+      clubs: t.clubs.length,
+      total: t.students.length + t.coaches.length + t.members.length + t.clubs.length
+    })).sort((a, b) => b.total - a.total);
+
+    return res.json(analytics);
+  } catch (error) {
+    console.error("[getLocationAnalytics]", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
