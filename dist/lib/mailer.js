@@ -83,7 +83,8 @@ export async function sendApprovalEmail(opts) {
           </table>
         </div>
         <div class="warning">
-          ⚠️ Please change your password after your first login for security purposes.
+          <svg style="vertical-align:middle; margin-right:6px;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m12 9 0 4"/><path d="m12 17.01 0.01 0"/><path d="m2.09 19.4 9-16a2 2 0 0 1 3.82 0l9 16A2 2 0 0 1 21.91 22H2.09a2 2 0 0 1-1.72-2.6z"/></svg>
+          Please change your password after your first login for security purposes.
         </div>
         <p style="margin-top:24px;">Welcome to the Tamil Nadu Judo Association family!</p>
         <p>Regards,<br/><strong>TNJA Admin Team</strong></p>

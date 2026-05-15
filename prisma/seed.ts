@@ -1,4 +1,5 @@
-import prisma from "../src/lib/prisma.js";
+import { PrismaClient, Gender, Status, MemberRole } from "@prisma/client";
+const prisma = new PrismaClient();
 import { readFileSync } from "fs";
 import path, { join } from "path";
 import { fileURLToPath } from "url";
@@ -107,15 +108,86 @@ async function main() {
       update: {
         ...clubInfo,
         districtId: district.id,
-        talukId: taluk.id
+        talukId: taluk.id,
+        status: "APPROVED" // Seeded clubs should be approved for testing
       },
       create: {
         ...clubInfo,
         districtId: district.id,
-        talukId: taluk.id
+        talukId: taluk.id,
+        status: "APPROVED"
       }
     });
     console.log(`Upserted Club: ${clubInfo.name}`);
+  }
+
+  console.log("Seeding Members...");
+  const chennaiDistrict = await prisma.district.findUnique({ where: { name: "Chennai" } });
+  const mylaporeTaluk = await prisma.taluk.findFirst({ where: { name: "Mylapore", districtId: chennaiDistrict?.id } });
+
+  if (chennaiDistrict && mylaporeTaluk) {
+    const sampleMembers = [
+      {
+        tempId: "MEM-TEMP-001",
+        permanentId: "TNJA-MEM-001",
+        fullName: "Manikandan M",
+        email: "mani@example.com",
+        mobileNumber: "9876500001",
+        fatherName: "Muthu",
+        gender: "MALE" as Gender,
+        dob: new Date("1990-01-01"),
+        bloodGroup: "O+",
+        aadhaarNumber: "123456789012",
+        addressLine1: "No 1, Judo Street",
+        city: "Chennai",
+        addressPincode: "600004",
+        pincode: "600004",
+        status: "APPROVED" as Status,
+        role: "MEMBER" as MemberRole,
+        password: "" // will be hashed below
+      },
+      {
+        tempId: "MEM-TEMP-002",
+        permanentId: "TNJA-MEM-002",
+        fullName: "Anitha R",
+        email: "anitha@example.com",
+        mobileNumber: "9876500002",
+        fatherName: "Ramesh",
+        gender: "FEMALE" as Gender,
+        dob: new Date("1992-05-15"),
+        bloodGroup: "A+",
+        aadhaarNumber: "123456789013",
+        addressLine1: "No 2, Sports Colony",
+        city: "Chennai",
+        addressPincode: "600004",
+        pincode: "600004",
+        status: "APPROVED" as Status,
+        role: "DISTRICT_PRESIDENT" as MemberRole,
+        password: "" // will be hashed below
+      }
+    ];
+
+    const bcrypt = await import("bcrypt");
+    const hashedPwd = await bcrypt.default.hash("password123", 10);
+    sampleMembers[0].password = hashedPwd;
+    sampleMembers[1].password = hashedPwd;
+
+    for (const memberData of sampleMembers) {
+      await prisma.member.upsert({
+        where: { email: memberData.email },
+        update: {
+          ...memberData,
+          districtId: chennaiDistrict.id,
+          talukId: mylaporeTaluk.id
+        },
+        create: {
+          ...memberData,
+          districtId: chennaiDistrict.id,
+          talukId: mylaporeTaluk.id
+        }
+      });
+      console.log(`Upserted Member: ${memberData.fullName}`);
+    }
   }
 
   console.log("Seeding finished successfully!");
