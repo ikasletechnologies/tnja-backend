@@ -1,5 +1,5 @@
-import { PrismaClient, Gender, Status, MemberRole } from "@prisma/client";
-const prisma = new PrismaClient();
+import prisma from "../src/lib/prisma.js";
+import { Gender, Status, MemberRole } from "@prisma/client";
 import { readFileSync } from "fs";
 import path, { join } from "path";
 import { fileURLToPath } from "url";
