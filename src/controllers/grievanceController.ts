@@ -33,7 +33,7 @@ export const createGrievance = async (req: Request, res: Response) => {
 
 export const getMyGrievances = async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = String(req.params.userId);
     const grievances = await prisma.grievance.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" }
@@ -61,7 +61,7 @@ export const getAllGrievances = async (req: Request, res: Response) => {
 
 export const replyToGrievance = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { reply } = req.body;
 
     const grievance = await prisma.grievance.update({
