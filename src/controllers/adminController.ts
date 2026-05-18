@@ -211,7 +211,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
             console.error("[Mailer] Failed to send payment request email:", mailErr);
           }
 
-          return res.json({ message: "Student application APPROVED. Payment required for Permanent ID.", data: updated });
+          return res.json({ message: "Student application APPROVED. Payment required for Player ID.", data: updated });
         }
       }
 
@@ -268,7 +268,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
           console.error("[Mailer] Failed to send coach payment request email:", mailErr);
         }
 
-        return res.json({ message: "Coach APPROVED. Payment required for Permanent ID.", data: updated });
+        return res.json({ message: "Coach APPROVED. Payment required for Coach ID.", data: updated });
       }
 
       if (status === "REJECTED") {
@@ -324,7 +324,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
           console.error("[Mailer] Failed to send member payment request email:", mailErr);
         }
 
-        return res.json({ message: "Member APPROVED. Payment required for Permanent ID.", data: updated });
+        return res.json({ message: "Member APPROVED. Payment required for Member ID.", data: updated });
       }
 
       if (status === "REJECTED") {
@@ -380,7 +380,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
           console.error("[Mailer] Failed to send club payment request email:", mailErr);
         }
 
-        return res.json({ message: "Club APPROVED. Payment required for Permanent ID.", data: updated });
+        return res.json({ message: "Club APPROVED. Payment required for Club ID.", data: updated });
       }
 
       if (status === "REJECTED") {
