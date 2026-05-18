@@ -194,7 +194,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
               approvedAt: new Date(),
               isPaid: false,
               password: hashed,
-              mustChangePassword: true
+              mustChangePassword: false
             } 
           });
 
@@ -252,7 +252,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
             approvedAt: new Date(),
             isPaid: false,
             password: hashed,
-            mustChangePassword: true
+            mustChangePassword: false
           } 
         });
 
@@ -308,7 +308,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
             approvedAt: new Date(),
             isPaid: false,
             password: hashed,
-            mustChangePassword: true
+            mustChangePassword: false
           } 
         });
 
@@ -364,7 +364,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
             approvedAt: new Date(),
             isPaid: false,
             password: hashed,
-            mustChangePassword: true
+            mustChangePassword: false
           } 
         });
 
@@ -614,7 +614,8 @@ export const verifyPayment = async (req: Request, res: Response) => {
       where: { id },
       data: {
         isPaid: true,
-        permanentId
+        permanentId,
+        mustChangePassword: true
       }
     });
 

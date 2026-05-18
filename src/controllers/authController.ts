@@ -115,7 +115,7 @@ export const login = async (req: Request, res: Response) => {
         tempId: user.tempId,
         permanentId: user.permanentId,
         districtId: user.districtId,
-        mustChangePassword: user.mustChangePassword
+        mustChangePassword: user.permanentId ? user.mustChangePassword : false
       },
       role,
       token,
