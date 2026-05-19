@@ -32,12 +32,17 @@ export const studentRegistrationSchema = z.object({
     areaOfInterest: z.string().min(1),
     areaOfStudy: z.string().min(1),
     preferLocation: z.string().min(1),
+    profilePhoto: z.string().optional().or(z.literal("")),
+    aadhaarProof: z.string().optional().or(z.literal("")),
+    incomeProof: z.string().optional().or(z.literal("")),
+    bplProof: z.string().optional().or(z.literal("")),
 });
 export const coachRegistrationSchema = z.object({
     districtId: z.string().uuid("Invalid District selection"),
     talukId: z.string().uuid("Invalid Taluk selection"),
     pincode: z.string().length(6),
     fullName: z.string().min(3),
+    fatherName: z.string().min(3),
     gender: GenderEnum,
     dob: z.string().refine((val) => !isNaN(Date.parse(val)), {
         message: "Invalid date format",
@@ -57,6 +62,7 @@ export const coachRegistrationSchema = z.object({
     contactPersonDept: z.string().min(1),
     addressDept: z.string().min(1),
     clubId: z.string().optional().or(z.literal("")),
+    profilePhoto: z.string().optional().or(z.literal("")),
 });
 export const clubRegistrationSchema = z.object({
     districtId: z.string().uuid("Invalid District selection"),
@@ -99,5 +105,12 @@ export const memberRegistrationSchema = z.object({
     addressLine2: z.string().optional(),
     city: z.string().min(1),
     addressPincode: z.string().length(6),
+    profilePhoto: z.string().optional().or(z.literal("")),
+    aadhaarFront: z.string().optional().or(z.literal("")),
+    aadhaarBack: z.string().optional().or(z.literal("")),
+    employmentType: z.string().optional().or(z.literal("")),
+    companyName: z.string().optional().or(z.literal("")),
+    designation: z.string().optional().or(z.literal("")),
+    workLocation: z.string().optional().or(z.literal("")),
 });
 //# sourceMappingURL=registrationSchema.js.map

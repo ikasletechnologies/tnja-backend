@@ -31,14 +31,12 @@ export const authenticateJWT = (req: AuthRequest, res: Response, next: NextFunct
 export const authorizeAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
   const adminRoles = [
     "SUPER_ADMIN", 
-    "DISTRICT_ADMIN", 
     "DISTRICT_PRESIDENT", 
     "DISTRICT_SECRETARY", 
     "ZONE_PRESIDENT", 
     "ZONE_SECRETARY", 
     "STATE_PRESIDENT", 
-    "STATE_SECRETARY",
-    "MEMBER" // Some members act as district admins
+    "STATE_SECRETARY"
   ];
 
   if (req.user && adminRoles.includes(req.user.role)) {

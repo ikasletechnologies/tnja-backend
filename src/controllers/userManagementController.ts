@@ -2,11 +2,67 @@ import type { Request, Response } from "express";
 import prisma from "../lib/prisma.js";
 import bcrypt from "bcrypt";
 
+export const getPublicCoaches = async (req: Request, res: Response) => {
+  try {
+    const { districtId, talukId } = req.query;
+    const where: any = { status: "APPROVED" };
+
+    if (districtId) where.districtId = String(districtId);
+    if (talukId) where.talukId = String(talukId);
+
+    const coaches = await prisma.coachReferee.findMany({
+      where,
+      select: {
+        id: true,
+        fullName: true,
+        districtId: true,
+        talukId: true,
+      },
+      orderBy: { fullName: "asc" }
+    });
+    return res.json(coaches);
+  } catch (error) {
+    console.error("Error fetching public coaches:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const getPublicMembers = async (req: Request, res: Response) => {
+  try {
+    const { districtId, talukId } = req.query;
+    const where: any = { status: "APPROVED" };
+
+    if (districtId) where.districtId = String(districtId);
+    if (talukId) where.talukId = String(talukId);
+
+    const members = await prisma.member.findMany({
+      where,
+      select: {
+        id: true,
+        fullName: true,
+        districtId: true,
+        talukId: true,
+      },
+      orderBy: { fullName: "asc" }
+    });
+    return res.json(members);
+  } catch (error) {
+    console.error("Error fetching public members:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
     const { role: requesterRole, districtId } = (req as any).user;
+
+    const allowedRoles = ["SUPER_ADMIN", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"];
+    if (!allowedRoles.includes(requesterRole)) {
+      return res.status(403).json({ error: "You do not have permission to view the directory" });
+    }
+
     const where: any = {};
-    const districtRestrictedRoles = ["MEMBER", "DISTRICT_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"];
+    const districtRestrictedRoles = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"];
 
     if (districtRestrictedRoles.includes(requesterRole) && districtId) {
       where.districtId = districtId;
@@ -18,7 +74,9 @@ export const getAllUsers = async (req: Request, res: Response) => {
         select: { 
           id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, districtId: true, 
           district: { select: { name: true } }, taluk: { select: { name: true } },
-          profilePhoto: true, aadhaarProof: true, incomeProof: true, bplProof: true
+          profilePhoto: true, aadhaarProof: true, incomeProof: true, bplProof: true,
+          wins: true, losses: true, draws: true, coachId: true,
+          coach: { select: { fullName: true } }
         },
       }),
       prisma.coachReferee.findMany({
@@ -61,7 +119,7 @@ export const getAllUsers = async (req: Request, res: Response) => {
 };
 
 export const updateUserCredentials = async (req: Request, res: Response) => {
-  const { userId, role, permanentId, password } = req.body;
+  const { userId, role, permanentId, password, wins, losses, draws, coachId } = req.body;
 
   if (!userId || !role) {
     return res.status(400).json({ error: "User ID and role are required" });
@@ -69,13 +127,17 @@ export const updateUserCredentials = async (req: Request, res: Response) => {
 
   try {
     const updateData: any = {};
-    if (permanentId) updateData.permanentId = permanentId;
+    if (permanentId !== undefined) updateData.permanentId = permanentId;
     if (password) {
       updateData.password = await bcrypt.hash(password, 10);
     }
 
     let updated;
     if (role === "STUDENT") {
+      if (wins !== undefined) updateData.wins = Number(wins) || 0;
+      if (losses !== undefined) updateData.losses = Number(losses) || 0;
+      if (draws !== undefined) updateData.draws = Number(draws) || 0;
+      if (coachId !== undefined) updateData.coachId = coachId || null;
       updated = await prisma.student.update({ where: { id: userId }, data: updateData });
     } else if (role === "COACH") {
       updated = await prisma.coachReferee.update({ where: { id: userId }, data: updateData });

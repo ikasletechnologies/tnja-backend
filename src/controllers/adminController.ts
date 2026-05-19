@@ -31,24 +31,27 @@ export const getPendingApplications = async (req: Request, res: Response) => {
   try {
     console.log(`[getPendingApplications] User: ${role}, District: ${districtId}, Type: ${type}`);
 
-    // Basic permissions: MEMBER can ONLY see STUDENT applications
-    if (role === "MEMBER" && type !== "STUDENT" && type !== "") {
-      return res.status(403).json({ error: "District Admins can only view player applications" });
+    // Basic permissions: Standard MEMBER role is not allowed to view pending applications
+    const allowedRoles = [
+      "SUPER_ADMIN",
+      "STATE_PRESIDENT",
+      "STATE_SECRETARY",
+      "ZONE_PRESIDENT",
+      "ZONE_SECRETARY",
+      "DISTRICT_PRESIDENT",
+      "DISTRICT_SECRETARY"
+    ];
+
+    if (!allowedRoles.includes(role)) {
+      return res.status(403).json({ error: "You do not have permission to view pending applications" });
     }
 
     // Common where clause for filtering
     const whereClause: any = { status: "PENDING" };
     
-    // TEMPORARY: Logging the check but not enforcing district filter to debug
     const districtRestrictedRoles = [
-      "MEMBER", 
-      "DISTRICT_ADMIN", 
       "DISTRICT_PRESIDENT", 
-      "DISTRICT_SECRETARY", 
-      "ZONE_PRESIDENT", 
-      "ZONE_SECRETARY", 
-      "STATE_PRESIDENT", 
-      "STATE_SECRETARY"
+      "DISTRICT_SECRETARY"
     ];
 
     if (districtRestrictedRoles.includes(role) && districtId) {
@@ -71,7 +74,7 @@ export const getPendingApplications = async (req: Request, res: Response) => {
 
     if (type === "COACH") {
       const coaches = await prisma.coachReferee.findMany({
-        where: { status: "PENDING" },
+        where: whereClause,
         include: { district: true, taluk: true, club: true },
         orderBy: { createdAt: "desc" },
       });
@@ -80,7 +83,7 @@ export const getPendingApplications = async (req: Request, res: Response) => {
 
     if (type === "CLUB") {
       const clubs = await prisma.club.findMany({
-        where: { status: "PENDING" },
+        where: whereClause,
         include: { district: true, taluk: true },
         orderBy: { createdAt: "desc" },
       });
@@ -89,19 +92,111 @@ export const getPendingApplications = async (req: Request, res: Response) => {
 
     if (type === "MEMBER") {
       const members = await prisma.member.findMany({
-        where: { status: "PENDING" },
+        where: whereClause,
         include: { district: true, taluk: true },
         orderBy: { createdAt: "desc" },
       });
       return res.json({ type: "MEMBER", data: members });
     }
 
+    if (type === "EVENT") {
+      const eventWhere: any = { status: "PENDING" };
+
+      if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
+        eventWhere.level = "DISTRICT";
+        if (districtId) {
+          eventWhere.districtId = districtId;
+        }
+      } else if (["ZONE_PRESIDENT", "ZONE_SECRETARY"].includes(role)) {
+        eventWhere.level = "ZONE";
+        if (districtId) {
+          eventWhere.zoneId = districtId;
+        }
+      }
+
+      console.log(`[DEBUG] Fetching events with whereClause:`, JSON.stringify(eventWhere));
+      const events = await prisma.event.findMany({
+        where: eventWhere,
+        include: { district: true },
+        orderBy: { createdAt: "desc" },
+      });
+      return res.json({ type: "EVENT", data: events });
+    }
+
+    if (type === "EVENT_REGISTRATION") {
+      const regWhere: any = { status: "PENDING" };
+
+      if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
+        regWhere.event = {
+          level: "DISTRICT",
+          districtId: districtId || undefined
+        };
+      } else if (["ZONE_PRESIDENT", "ZONE_SECRETARY"].includes(role)) {
+        regWhere.event = {
+          level: "ZONE",
+          zoneId: districtId || undefined
+        };
+      }
+
+      const registrations = await prisma.eventRegistration.findMany({
+        where: regWhere,
+        include: { 
+          event: { include: { district: true } }
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      const detailedRegistrations = await Promise.all(registrations.map(async (reg) => {
+        let userDetails: any = null;
+        if (reg.role === "STUDENT") {
+          userDetails = await prisma.student.findUnique({ where: { id: reg.userId }, select: { fullName: true, email: true, tempId: true } });
+        } else if (reg.role === "COACH") {
+          userDetails = await prisma.coachReferee.findUnique({ where: { id: reg.userId }, select: { fullName: true, email: true, tempId: true } });
+        } else if (reg.role === "MEMBER") {
+          userDetails = await prisma.member.findUnique({ where: { id: reg.userId }, select: { fullName: true, email: true, tempId: true } });
+        } else if (reg.role === "CLUB") {
+          userDetails = await prisma.club.findUnique({ where: { id: reg.userId }, select: { name: true, email: true, tempId: true } });
+        }
+        return {
+          ...reg,
+          applicantName: userDetails ? (userDetails.fullName || userDetails.name) : "Unknown",
+          applicantEmail: userDetails ? userDetails.email : "Unknown",
+          applicantTempId: userDetails ? userDetails.tempId : null
+        };
+      }));
+
+      return res.json({ type: "EVENT_REGISTRATION", data: detailedRegistrations });
+    }
+
     // Return all pending counts if no type specified
-    const [studentCount, coachCount, memberCount, clubCount] = await Promise.all([
+    const eventCountWhere: any = { status: "PENDING" };
+    const regWhere: any = { status: "PENDING" };
+
+    if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
+      eventCountWhere.level = "DISTRICT";
+      if (districtId) eventCountWhere.districtId = districtId;
+
+      regWhere.event = {
+        level: "DISTRICT",
+        districtId: districtId || undefined
+      };
+    } else if (["ZONE_PRESIDENT", "ZONE_SECRETARY"].includes(role)) {
+      eventCountWhere.level = "ZONE";
+      if (districtId) eventCountWhere.zoneId = districtId;
+
+      regWhere.event = {
+        level: "ZONE",
+        zoneId: districtId || undefined
+      };
+    }
+
+    const [studentCount, coachCount, memberCount, clubCount, eventCount, regCount] = await Promise.all([
       prisma.student.count({ where: whereClause }),
       prisma.coachReferee.count({ where: whereClause }),
       prisma.member.count({ where: whereClause }),
       prisma.club.count({ where: whereClause }),
+      prisma.event.count({ where: eventCountWhere }),
+      prisma.eventRegistration.count({ where: regWhere }),
     ]);
 
     return res.json({
@@ -110,6 +205,8 @@ export const getPendingApplications = async (req: Request, res: Response) => {
         COACH: coachCount,
         MEMBER: memberCount,
         CLUB: clubCount,
+        EVENT: eventCount,
+        EVENT_REGISTRATION: regCount,
       },
     });
   } catch (error) {
@@ -128,18 +225,27 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
   // status: 'APPROVED' | 'REJECTED'
 
   try {
-    const districtRestrictedRoles = ["MEMBER", "DISTRICT_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"];
+    const allowedRoles = [
+      "SUPER_ADMIN",
+      "STATE_PRESIDENT",
+      "STATE_SECRETARY",
+      "ZONE_PRESIDENT",
+      "ZONE_SECRETARY",
+      "DISTRICT_PRESIDENT",
+      "DISTRICT_SECRETARY"
+    ];
+
+    if (!allowedRoles.includes(role)) {
+      return res.status(403).json({ error: "You do not have permission to manage applications" });
+    }
+
+    const districtRestrictedRoles = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"];
     const auditor = role === "SUPER_ADMIN" ? "Super Admin" : null;
     let auditorInfo = auditor;
 
     if (role !== "SUPER_ADMIN") {
       const member = await prisma.member.findUnique({ where: { id: (req as any).user.userId } });
       auditorInfo = member ? `${member.fullName} (${role})` : role;
-    }
-
-    // Basic permissions: Standard MEMBER can ONLY update 'student' applications
-    if (role === "MEMBER" && type !== "student") {
-      return res.status(403).json({ error: "District Admins can only approve player applications" });
     }
 
     // ── STUDENT ──────────────────────────────────────────────────────────────
@@ -372,7 +478,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
           await sendPaymentRequestEmail({
             toEmail: club.email,
             toName: club.name,
-            tempId: club.id, // Clubs use UUID as tempId
+            tempId: club.tempId || club.id,
             password: raw,
             role: "Club"
           });
@@ -399,6 +505,79 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
       }
     }
 
+    // ── EVENT ─────────────────────────────────────────────────────────────────
+    if (type === "event") {
+      const eventItem = await prisma.event.findUnique({ where: { id } });
+      if (!eventItem) return res.status(404).json({ error: "Event not found" });
+
+      if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
+        if (eventItem.level !== "DISTRICT") {
+          return res.status(403).json({ error: "District officers can only manage district-level events" });
+        }
+        if (districtId && eventItem.districtId !== districtId) {
+          return res.status(403).json({ error: "You can only manage events in your own district" });
+        }
+      }
+
+      if (["ZONE_PRESIDENT", "ZONE_SECRETARY"].includes(role)) {
+        if (eventItem.level !== "ZONE") {
+          return res.status(403).json({ error: "Zone officers can only manage zone-level events" });
+        }
+        if (districtId && eventItem.zoneId !== districtId) {
+          return res.status(403).json({ error: "You can only manage events in your own zone" });
+        }
+      }
+
+      const updateData: any = { 
+        status, 
+        rejectionRemark: status === "REJECTED" ? remark || "Rejected" : null,
+        approvedBy: status === "APPROVED" ? auditorInfo : null,
+        approvedAt: status === "APPROVED" ? new Date() : null
+      };
+
+      const updated = await prisma.event.update({
+        where: { id },
+        data: updateData
+      });
+
+      return res.json({ message: `Event ${status.toLowerCase()} successfully`, data: updated });
+    }
+
+    // ── EVENT REGISTRATION ───────────────────────────────────────────────────
+    if (type === "event_registration") {
+      const reg = await prisma.eventRegistration.findUnique({ 
+        where: { id },
+        include: { event: true }
+      });
+      if (!reg) return res.status(404).json({ error: "Event registration not found" });
+
+      const eventItem = reg.event;
+
+      if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
+        if (eventItem.level !== "DISTRICT") {
+          return res.status(403).json({ error: "District officers can only manage registrations for district-level events" });
+        }
+        if (districtId && eventItem.districtId !== districtId) {
+          return res.status(403).json({ error: "You can only manage registrations in your own district" });
+        }
+      }
+
+      if (["ZONE_PRESIDENT", "ZONE_SECRETARY"].includes(role)) {
+        if (eventItem.level !== "ZONE") {
+          return res.status(403).json({ error: "Zone officers can only manage registrations for zone-level events" });
+        }
+        if (districtId && eventItem.zoneId !== districtId) {
+          return res.status(403).json({ error: "You can only manage registrations in your own zone" });
+        }
+      }
+
+      const updated = await prisma.eventRegistration.update({
+        where: { id },
+        data: { status }
+      });
+
+      return res.json({ message: `Registration ${status.toLowerCase()} successfully`, data: updated });
+    }
 
     return res.status(400).json({ error: "Invalid application type" });
 
@@ -433,6 +612,12 @@ export const getApplicationDetails = async (req: Request, res: Response) => {
     });
     if (member) return res.json({ type: "member", data: member });
 
+    const eventItem = await prisma.event.findUnique({
+      where: { id: tempId },
+      include: { district: true },
+    });
+    if (eventItem) return res.json({ type: "event", data: eventItem });
+
     return res.status(404).json({ error: "Application not found with this Temporary ID" });
   } catch (error) {
     return res.status(500).json({ error: "Internal Server Error" });
@@ -446,14 +631,8 @@ export const getDashboardStats = async (req: Request, res: Response) => {
   const { role, districtId } = (req as any).user;
   const filter: any = {};
   const districtRestrictedRoles = [
-    "MEMBER", 
-    "DISTRICT_ADMIN", 
     "DISTRICT_PRESIDENT", 
-    "DISTRICT_SECRETARY", 
-    "ZONE_PRESIDENT", 
-    "ZONE_SECRETARY", 
-    "STATE_PRESIDENT", 
-    "STATE_SECRETARY"
+    "DISTRICT_SECRETARY"
   ];
 
   if (districtRestrictedRoles.includes(role) && districtId) {
@@ -555,10 +734,11 @@ export const createPaymentOrder = async (req: Request, res: Response) => {
 
     if (!record) return res.status(404).json({ error: `${type} not found` });
 
+    const receiptId = (record.tempId || record.id).substring(0, 30);
     const options = {
       amount: calculatedAmount * 100, // amount in the smallest currency unit (paise)
       currency: "INR",
-      receipt: `receipt_${record.tempId || record.id}`,
+      receipt: `rcpt_${receiptId}`,
     };
 
     const order = await razorpay.orders.create(options);
@@ -715,7 +895,7 @@ export const getLocationAnalytics = async (req: Request, res: Response) => {
   const { role, districtId } = (req as any).user;
   const filter: any = {};
   
-  if (["DISTRICT_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY"].includes(role) && districtId) {
+  if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role) && districtId) {
     filter.districtId = districtId;
   }
 

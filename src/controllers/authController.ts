@@ -58,7 +58,7 @@ export const login = async (req: Request, res: Response) => {
     // ── Club ──────────────────────────────────────────────────────────────────
     if (!user) {
       user = await prisma.club.findFirst({
-        where: { OR: [{ email: identifier }, { permanentId: identifier }] },
+        where: { OR: [{ email: identifier }, { permanentId: identifier }, { tempId: identifier }] },
       });
       if (user) role = "CLUB";
     }
@@ -93,7 +93,7 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Incorrect password" });
     }
 
-    const isMemberRole = ["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "DISTRICT_ADMIN"].includes(role);
+    const isMemberRole = ["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"].includes(role);
     const tokenPayload: any = { userId: user.id, role: role };
     if (isMemberRole && user.districtId) {
       tokenPayload.districtId = user.districtId;
@@ -109,7 +109,7 @@ export const login = async (req: Request, res: Response) => {
       message: "Login successful",
       user: {
         id: user.id,
-        fullName: user.fullName,
+        fullName: user.fullName || user.name,
         email: user.email,
         status: user.status,
         tempId: user.tempId,
@@ -143,14 +143,14 @@ export const getProfile = async (req: any, res: Response) => {
     if (role === "PLAYER") {
       userData = await prisma.student.findUnique({
         where: { id: userId },
-        include: { district: true, taluk: true, club: true }
+        include: { district: true, taluk: true, club: true, coach: true }
       });
     } else if (role === "COACH") {
       userData = await prisma.coachReferee.findUnique({
         where: { id: userId },
         include: { district: true, taluk: true, club: true }
       });
-    } else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "DISTRICT_ADMIN"].includes(role)) {
+    } else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"].includes(role)) {
       userData = await prisma.member.findUnique({
         where: { id: userId },
         include: { district: true, taluk: true }
@@ -194,7 +194,7 @@ export const changePassword = async (req: any, res: Response) => {
 
     if (role === "PLAYER") model = prisma.student;
     else if (role === "COACH") model = prisma.coachReferee;
-    else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "DISTRICT_ADMIN"].includes(role)) model = prisma.member;
+    else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"].includes(role)) model = prisma.member;
     else if (role === "CLUB") model = prisma.club;
     else return res.status(403).json({ error: "Super Admin password cannot be changed via this endpoint" });
 

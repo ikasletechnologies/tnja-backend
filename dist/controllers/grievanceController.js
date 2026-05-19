@@ -1,0 +1,102 @@
+import prisma from "../lib/prisma.js";
+export const createGrievance = async (req, res) => {
+    try {
+        const { userId, userName, userEmail, role, subject, description } = req.body;
+        if (!userId || !role || !subject || !description) {
+            return res.status(400).json({ error: "Missing required fields" });
+        }
+        const grievance = await prisma.grievance.create({
+            data: {
+                userId,
+                userName: userName || "Anonymous",
+                userEmail: userEmail || "N/A",
+                role,
+                subject,
+                description,
+                status: "PENDING"
+            }
+        });
+        try {
+            const { sendNotificationToAdmins } = await import("../lib/ws.js");
+            sendNotificationToAdmins({
+                type: "NEW_GRIEVANCE",
+                grievanceId: grievance.id,
+                userName: grievance.userName,
+                subject: grievance.subject,
+                message: `New grievance submitted by ${grievance.userName}: "${grievance.subject}"`,
+            });
+        }
+        catch (wsErr) {
+            console.error("WS notify admins error:", wsErr);
+        }
+        return res.status(201).json({
+            message: "Grievance submitted successfully",
+            grievance
+        });
+    }
+    catch (error) {
+        console.error("Create Grievance error:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+export const getMyGrievances = async (req, res) => {
+    try {
+        const userId = String(req.params.userId);
+        const grievances = await prisma.grievance.findMany({
+            where: { userId },
+            orderBy: { createdAt: "desc" }
+        });
+        return res.status(200).json(grievances);
+    }
+    catch (error) {
+        console.error("Get My Grievances error:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+export const getAllGrievances = async (req, res) => {
+    try {
+        const grievances = await prisma.grievance.findMany({
+            orderBy: { createdAt: "desc" }
+        });
+        return res.status(200).json(grievances);
+    }
+    catch (error) {
+        console.error("Get All Grievances error:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+export const replyToGrievance = async (req, res) => {
+    try {
+        const id = String(req.params.id);
+        const { reply } = req.body;
+        const grievance = await prisma.grievance.update({
+            where: { id },
+            data: {
+                reply,
+                status: "REPLAY"
+            }
+        });
+        try {
+            const { sendNotificationToUser } = await import("../lib/ws.js");
+            sendNotificationToUser(grievance.userId, {
+                type: "GRIEVANCE_REPLY",
+                grievanceId: grievance.id,
+                subject: grievance.subject,
+                reply: grievance.reply,
+                message: `Admin has replied to your grievance regarding: "${grievance.subject}"`,
+            });
+        }
+        catch (wsErr) {
+            console.error("WS notification error:", wsErr);
+        }
+        return res.status(200).json({
+            message: "Reply sent successfully",
+            grievance
+        });
+    }
+    catch (error) {
+        console.error("Reply to Grievance error:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+//# sourceMappingURL=grievanceController.js.map

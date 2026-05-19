@@ -21,6 +21,19 @@ export const createGrievance = async (req: Request, res: Response) => {
       }
     });
 
+    try {
+      const { sendNotificationToAdmins } = await import("../lib/ws.js");
+      sendNotificationToAdmins({
+        type: "NEW_GRIEVANCE",
+        grievanceId: grievance.id,
+        userName: grievance.userName,
+        subject: grievance.subject,
+        message: `New grievance submitted by ${grievance.userName}: "${grievance.subject}"`,
+      });
+    } catch (wsErr) {
+      console.error("WS notify admins error:", wsErr);
+    }
+
     return res.status(201).json({
       message: "Grievance submitted successfully",
       grievance
@@ -71,6 +84,19 @@ export const replyToGrievance = async (req: Request, res: Response) => {
         status: "REPLAY" 
       }
     });
+
+    try {
+      const { sendNotificationToUser } = await import("../lib/ws.js");
+      sendNotificationToUser(grievance.userId, {
+        type: "GRIEVANCE_REPLY",
+        grievanceId: grievance.id,
+        subject: grievance.subject,
+        reply: grievance.reply,
+        message: `Admin has replied to your grievance regarding: "${grievance.subject}"`,
+      });
+    } catch (wsErr) {
+      console.error("WS notification error:", wsErr);
+    }
 
     return res.status(200).json({
       message: "Reply sent successfully",

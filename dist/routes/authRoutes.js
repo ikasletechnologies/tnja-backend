@@ -1,6 +1,11 @@
 import { Router } from "express";
-import { login } from "../controllers/authController.js";
+import { login, getProfile, changePassword, forgotPassword, resetPassword } from "../controllers/authController.js";
+import { authenticateJWT } from "../middleware/authMiddleware.js";
 const router = Router();
 router.post("/login", login);
+router.get("/profile", authenticateJWT, getProfile);
+router.post("/change-password", authenticateJWT, changePassword);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
 export default router;
 //# sourceMappingURL=authRoutes.js.map

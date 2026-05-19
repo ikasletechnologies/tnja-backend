@@ -29,12 +29,17 @@ export declare const studentRegistrationSchema: z.ZodObject<{
     areaOfInterest: z.ZodString;
     areaOfStudy: z.ZodString;
     preferLocation: z.ZodString;
+    profilePhoto: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
+    aadhaarProof: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
+    incomeProof: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
+    bplProof: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
 }, z.core.$strip>;
 export declare const coachRegistrationSchema: z.ZodObject<{
     districtId: z.ZodString;
     talukId: z.ZodString;
     pincode: z.ZodString;
     fullName: z.ZodString;
+    fatherName: z.ZodString;
     gender: z.ZodEnum<{
         MALE: "MALE";
         FEMALE: "FEMALE";
@@ -56,6 +61,7 @@ export declare const coachRegistrationSchema: z.ZodObject<{
     contactPersonDept: z.ZodString;
     addressDept: z.ZodString;
     clubId: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
+    profilePhoto: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
 }, z.core.$strip>;
 export declare const clubRegistrationSchema: z.ZodObject<{
     districtId: z.ZodString;
@@ -100,5 +106,12 @@ export declare const memberRegistrationSchema: z.ZodObject<{
     addressLine2: z.ZodOptional<z.ZodString>;
     city: z.ZodString;
     addressPincode: z.ZodString;
+    profilePhoto: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
+    aadhaarFront: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
+    aadhaarBack: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
+    employmentType: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
+    companyName: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
+    designation: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
+    workLocation: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
 }, z.core.$strip>;
 //# sourceMappingURL=registrationSchema.d.ts.map

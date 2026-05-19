@@ -188,6 +188,95 @@ async function main() {
       });
       console.log(`Upserted Member: ${memberData.fullName}`);
     }
+
+    // Seed sample Coach
+    const sampleCoach = {
+      tempId: "TEMP-COA-001",
+      permanentId: "TNJA-COA-001",
+      fullName: "Sensei Yadu",
+      fatherName: "Judo Master",
+      gender: "MALE" as Gender,
+      dob: new Date("1980-01-01"),
+      age: 46,
+      bloodGroup: "A+",
+      mobileNumber: "9876500003",
+      email: "coach@example.com",
+      aadhaarNumber: "123456789014",
+      pincode: "600004",
+      historyInJudo: "Black belt 5th Dan",
+      historyInOtherMartial: "Karate",
+      presentGradeInJudo: "5th Dan",
+      deptName: "Sports",
+      contactPersonDept: "Admin",
+      addressDept: "Sports Complex",
+      status: "APPROVED" as Status,
+      isPaid: true,
+      password: hashedPwd
+    };
+
+    const coach = await prisma.coachReferee.upsert({
+      where: { email: sampleCoach.email },
+      update: {
+        ...sampleCoach,
+        districtId: chennaiDistrict.id,
+        talukId: mylaporeTaluk.id
+      },
+      create: {
+        ...sampleCoach,
+        districtId: chennaiDistrict.id,
+        talukId: mylaporeTaluk.id
+      }
+    });
+    console.log(`Upserted Coach: ${coach.fullName}`);
+
+    // Seed sample Student (Player)
+    const sampleStudent = {
+      tempId: "TEMP-STU-001",
+      permanentId: "TNJA-STU-001",
+      fullName: "Rohan Judo player",
+      gender: "MALE" as Gender,
+      dob: new Date("2005-01-01"),
+      age: 21,
+      bloodGroup: "B+",
+      mobileNumber: "9876500004",
+      email: "player@example.com",
+      aadhaarNumber: "123456789015",
+      pincode: "600004",
+      address: "12 Judo Apartments",
+      city: "Chennai",
+      state: "Tamil Nadu",
+      addressPincode: "600004",
+      nationality: "Indian",
+      annualIncome: 500000,
+      isBPL: false,
+      schoolName: "TNJA Judo School",
+      grade: "A",
+      areaOfInterest: "Fighting",
+      areaOfStudy: "Arts",
+      preferLocation: "Chennai",
+      status: "APPROVED" as Status,
+      isPaid: true,
+      password: hashedPwd,
+      wins: 15,
+      losses: 3,
+      draws: 2,
+      coachId: coach.id
+    };
+
+    const student = await prisma.student.upsert({
+      where: { email: sampleStudent.email },
+      update: {
+        ...sampleStudent,
+        districtId: chennaiDistrict.id,
+        talukId: mylaporeTaluk.id
+      },
+      create: {
+        ...sampleStudent,
+        districtId: chennaiDistrict.id,
+        talukId: mylaporeTaluk.id
+      }
+    });
+    console.log(`Upserted Student: ${student.fullName}`);
   }
 
   console.log("Seeding finished successfully!");

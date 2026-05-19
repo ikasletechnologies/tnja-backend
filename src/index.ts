@@ -8,6 +8,9 @@ import authRoutes from "./routes/authRoutes.js";
 import grievanceRoutes from "./routes/grievanceRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 
+import { createServer } from "http";
+import { initWebSocketServer } from "./lib/ws.js";
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -35,6 +38,9 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", message: "TNJA Backend is running" });
 });
 
-app.listen(PORT, () => {
+const server = createServer(app);
+initWebSocketServer(server);
+
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

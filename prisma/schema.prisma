@@ -44,6 +44,7 @@ model Taluk {
 
 model Club {
   id               String         @id @default(uuid())
+  tempId           String?        @unique
   name             String
   districtId       String?
   district         District?      @relation(fields: [districtId], references: [id])
@@ -127,6 +128,11 @@ model Student {
   resetPasswordToken    String?
   resetPasswordExpires  DateTime?
   isPaid                Boolean       @default(false)
+  wins                  Int           @default(0)
+  losses                Int           @default(0)
+  draws                 Int           @default(0)
+  coachId               String?
+  coach                 CoachReferee? @relation("CoachStudents", fields: [coachId], references: [id])
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
 }
@@ -161,6 +167,7 @@ model CoachReferee {
   addressDept           String
   clubId                String?
   club                  Club?    @relation(fields: [clubId], references: [id])
+  students              Student[] @relation("CoachStudents")
   password              String
   status                Status   @default(PENDING)
   rejectionRemark       String?
@@ -227,19 +234,54 @@ model Member {
   updatedAt             DateTime @updatedAt
 }
 
+enum EventLevel {
+  DISTRICT
+  ZONE
+  STATE
+}
+
+enum EventParticipantType {
+  ALL
+  STUDENT
+  COACH
+  MEMBER
+  CLUB
+}
+
 model Event {
-  id              String   @id @default(uuid())
+  id              String      @id @default(uuid())
   title           String
   description     String
   date            DateTime
   location        String
-  districtId      String
-  district        District @relation(fields: [districtId], references: [id])
-  createdBy       String   // ID of the person who created it
-  status          Status   @default(PENDING)
+  level           EventLevel  @default(DISTRICT)
+  participantType EventParticipantType @default(ALL)
+  districtId      String?
+  district        District?   @relation(fields: [districtId], references: [id])
+  zoneId          String?
+  createdBy       String      // ID of the person who created it
+  status          Status      @default(PENDING)
   rejectionRemark String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  approvedBy      String?
+  approvedAt      DateTime?
+  isPaid          Boolean     @default(false)
+  entryFee        Float       @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  registrations   EventRegistration[]
+}
+
+model EventRegistration {
+  id        String   @id @default(uuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id])
+  userId    String
+  role      String   // STUDENT, COACH, MEMBER, CLUB
+  status    Status   @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([eventId, userId])
 }
 
 model GlobalSettings {
