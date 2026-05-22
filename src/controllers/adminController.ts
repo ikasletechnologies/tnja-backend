@@ -14,9 +14,30 @@ const generatePermanentId = (prefix: string) => {
   return `${prefix}-${Date.now().toString().slice(-6)}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
 };
 
-/** Generate a readable 8-char password and return both raw + hashed */
+/** Generate a readable 8-char password that meets security requirements and return both raw + hashed */
 const generatePassword = async () => {
-  const raw = crypto.randomBytes(4).toString("hex"); // e.g. "a3f91bc2"
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const num = "0123456789";
+  const special = "@$!%*?&";
+  
+  const allChars = upper + lower + num + special;
+  
+  let raw = "";
+  // Ensure at least one of each required type
+  raw += upper[Math.floor(Math.random() * upper.length)];
+  raw += lower[Math.floor(Math.random() * lower.length)];
+  raw += num[Math.floor(Math.random() * num.length)];
+  raw += special[Math.floor(Math.random() * special.length)];
+  
+  // Fill the rest up to 8 characters
+  for (let i = 4; i < 8; i++) {
+    raw += allChars[Math.floor(Math.random() * allChars.length)];
+  }
+  
+  // Shuffle the password
+  raw = raw.split('').sort(() => 0.5 - Math.random()).join('');
+
   const hashed = await bcrypt.hash(raw, 10);
   return { raw, hashed };
 };
@@ -851,7 +872,7 @@ export const updateGlobalSettings = async (req: Request, res: Response) => {
 // PATCH /api/member/promote      – promote a member to a specific role
 // ──────────────────────────────────────────────────────────────────────────────
 export const promoteMember = async (req: Request, res: Response) => {
-  const { memberId, role } = req.body;
+  const { memberId, role, districtId } = req.body;
   const { role: requesterRole } = (req as any).user;
 
   if (requesterRole !== "SUPER_ADMIN") {
@@ -878,7 +899,10 @@ export const promoteMember = async (req: Request, res: Response) => {
 
     const updated = await prisma.member.update({
       where: { id: memberId },
-      data: { role: role as any }
+      data: { 
+        role: role as any,
+        ...(districtId && { districtId })
+      }
     });
 
     return res.json({ message: `Member promoted to ${role} successfully`, data: updated });

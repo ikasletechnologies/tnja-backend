@@ -81,6 +81,7 @@ model Club {
   updatedAt        DateTime       @updatedAt
   students         Student[]
   coaches          CoachReferee[]
+  tournaments      Tournament[]
 }
 
 model Student {
@@ -133,6 +134,7 @@ model Student {
   draws                 Int           @default(0)
   coachId               String?
   coach                 CoachReferee? @relation("CoachStudents", fields: [coachId], references: [id])
+  tournamentRegs        TournamentRegistration[]
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
 }
@@ -282,6 +284,38 @@ model EventRegistration {
   updatedAt DateTime @updatedAt
 
   @@unique([eventId, userId])
+}
+
+model Tournament {
+  id             String                   @id @default(uuid())
+  title          String
+  date           DateTime
+  location       String
+  description    String
+  entryFee       Float                    @default(0)
+  totalSlots     Int                      @default(32)
+  ageGroup       String?
+  weightCategory String?
+  clubId         String
+  club           Club                     @relation(fields: [clubId], references: [id])
+  registrations  TournamentRegistration[]
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+}
+
+model TournamentRegistration {
+  id           String     @id @default(uuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id])
+  playerId     String
+  player       Student    @relation(fields: [playerId], references: [id])
+  status       Status     @default(PENDING)
+  isPaid       Boolean    @default(false)
+  paymentId    String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([tournamentId, playerId])
 }
 
 model GlobalSettings {

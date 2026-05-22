@@ -188,6 +188,11 @@ export const changePassword = async (req: any, res: Response) => {
     return res.status(400).json({ error: "Current and new passwords are required" });
   }
 
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  if (!passwordRegex.test(newPassword)) {
+    return res.status(400).json({ error: "Password must contain at least 8 characters, one uppercase, one lowercase, one number, and one special character." });
+  }
+
   try {
     let user: any = null;
     let model: any = null;
@@ -290,6 +295,11 @@ export const resetPassword = async (req: Request, res: Response) => {
 
   if (!token || !newPassword) {
     return res.status(400).json({ error: "Token and new password are required" });
+  }
+
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  if (!passwordRegex.test(newPassword)) {
+    return res.status(400).json({ error: "Password must contain at least 8 characters, one uppercase, one lowercase, one number, and one special character." });
   }
 
   try {
