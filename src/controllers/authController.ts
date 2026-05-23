@@ -346,3 +346,67 @@ export const resetPassword = async (req: Request, res: Response) => {
   }
 };
 
+export const trackStatus = async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  if (!id) {
+    return res.status(400).json({ error: "Tracking ID is required" });
+  }
+
+  try {
+    let user: any = null;
+    let role = "";
+
+    // Check Student
+    user = await prisma.student.findFirst({
+      where: { OR: [{ tempId: id }, { permanentId: id }] },
+      include: { district: true }
+    });
+    if (user) role = "PLAYER";
+
+    // Check Coach
+    if (!user) {
+      user = await prisma.coachReferee.findFirst({
+        where: { OR: [{ tempId: id }, { permanentId: id }] },
+        include: { district: true }
+      });
+      if (user) role = "COACH";
+    }
+
+    // Check Member
+    if (!user) {
+      user = await prisma.member.findFirst({
+        where: { OR: [{ tempId: id }, { permanentId: id }] },
+        include: { district: true }
+      });
+      if (user) role = user.role;
+    }
+
+    // Check Club
+    if (!user) {
+      user = await prisma.club.findFirst({
+        where: { OR: [{ tempId: id }, { permanentId: id }] },
+        include: { district: true }
+      });
+      if (user) role = "CLUB";
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: "No application found with this Temporary ID." });
+    }
+
+    const { password, ...safeUser } = user;
+    
+    return res.json({
+      user: {
+        ...safeUser,
+        fullName: safeUser.fullName || safeUser.name || safeUser.clubName,
+        role: role
+      }
+    });
+  } catch (error) {
+    console.error("Track status error:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
