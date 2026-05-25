@@ -11,6 +11,7 @@ enum Status {
   REJECTED
   APPROVED
   REPLAY
+  CLOSED
 }
 
 enum Gender {
@@ -337,6 +338,7 @@ model Grievance {
   description String
   status      Status   @default(PENDING)
   reply       String?
+  remark      String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
