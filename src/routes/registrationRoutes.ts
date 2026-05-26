@@ -6,7 +6,7 @@ import { getClubs } from "../controllers/clubController.js";
 import { getDistricts, getTaluksByDistrict, getTalukDetails } from "../controllers/locationController.js";
 import { authenticateJWT, authorizeAdmin, authorize } from "../middleware/authMiddleware.js";
 import { createEvent, getActiveEvents, getAdminEvents, applyForEvent, createEventPaymentOrder, verifyEventPayment } from "../controllers/eventController.js";
-import { createTournament, getClubTournaments, getTournamentRegistrations, updateRegistrationStatus, updateTournament, deleteTournament, getPlayerTournaments, createTournamentPaymentOrder, verifyTournamentPayment } from "../controllers/tournamentController.js";
+import { createTournament, getClubTournaments, getTournamentRegistrations, updateRegistrationStatus, updateTournament, deleteTournament, getPlayerTournaments, createTournamentPaymentOrder, verifyTournamentPayment, getAdminTournaments, approveTournament } from "../controllers/tournamentController.js";
 
 const router = Router();
 
@@ -30,6 +30,10 @@ router.get("/tournaments/player", authenticateJWT, getPlayerTournaments);
 router.post("/tournaments/create-payment-order", authenticateJWT, createTournamentPaymentOrder);
 router.post("/tournaments/verify-payment", authenticateJWT, verifyTournamentPayment);
 
+// --- Admin Tournaments ---
+router.get("/tournaments/admin", authenticateJWT, authorize(["SUPER_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"]), getAdminTournaments);
+router.patch("/tournaments/:id/approve", authenticateJWT, authorize(["SUPER_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"]), approveTournament);
+
 router.get("/districts", getDistricts);
 router.get("/districts/:districtId/taluks", getTaluksByDistrict);
 router.get("/taluks/:id", getTalukDetails);
@@ -42,7 +46,7 @@ router.post("/register/club", registerClub);
 router.post("/register/member", registerMember);
 
 // Admin / Super-admin routes
-const ALL_ADMIN_ROLES = ["SUPER_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"];
+const ALL_ADMIN_ROLES = ["SUPER_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"];
 
 router.get("/applications/pending", authenticateJWT, authorize(ALL_ADMIN_ROLES), getPendingApplications);   // ?type=STUDENT|COACH|MEMBER|CLUB
 router.patch("/application/status", authenticateJWT, authorize(ALL_ADMIN_ROLES), updateApplicationStatus);
@@ -58,7 +62,7 @@ router.patch("/settings/global", authenticateJWT, authorizeAdmin, updateGlobalSe
 // User Management (Super Admin)
 router.get("/users/all", authenticateJWT, authorizeAdmin, getAllUsers);
 router.patch("/users/credentials", authenticateJWT, authorizeAdmin, updateUserCredentials);
-router.patch("/users/profile", authenticateJWT, authorize(["SUPER_ADMIN"]), updateUserProfile);
+router.patch("/users/profile", authenticateJWT, authorize(["SUPER_ADMIN", "CEO"]), updateUserProfile);
 router.patch("/member/promote", authenticateJWT, authorizeAdmin, promoteMember);
 
 export default router;

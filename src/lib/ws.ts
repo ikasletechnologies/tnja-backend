@@ -50,6 +50,7 @@ export function sendNotificationToAdmins(data: any) {
     "ZONE_SECRETARY",
     "STATE_PRESIDENT",
     "STATE_SECRETARY",
+    "CEO",
   ];
   let count = 0;
   for (const [userId, conn] of clients.entries()) {

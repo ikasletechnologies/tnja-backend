@@ -56,7 +56,7 @@ export const getAllUsers = async (req: Request, res: Response) => {
   try {
     const { role: requesterRole, districtId } = (req as any).user;
 
-    const allowedRoles = ["SUPER_ADMIN", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"];
+    const allowedRoles = ["SUPER_ADMIN", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "CEO"];
     if (!allowedRoles.includes(requesterRole)) {
       return res.status(403).json({ error: "You do not have permission to view the directory" });
     }
@@ -120,8 +120,8 @@ export const getAllUsers = async (req: Request, res: Response) => {
 
 export const updateUserProfile = async (req: Request, res: Response) => {
   const { role: requesterRole } = (req as any).user;
-  if (requesterRole !== "SUPER_ADMIN") {
-    return res.status(403).json({ error: "Only Super Admin can edit user profiles" });
+  if (requesterRole !== "SUPER_ADMIN" && requesterRole !== "CEO") {
+    return res.status(403).json({ error: "Only Super Admin or CEO can edit user profiles" });
   }
 
   const { userId, role, ...fields } = req.body;
@@ -149,7 +149,7 @@ export const updateUserProfile = async (req: Request, res: Response) => {
       if (safe.dob) safe.dob = new Date(safe.dob);
       if (safe.age) safe.age = Number(safe.age);
       updated = await prisma.coachReferee.update({ where: { id: userId }, data: safe });
-    } else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"].includes(role)) {
+    } else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role)) {
       if (safe.dob) safe.dob = new Date(safe.dob);
       updated = await prisma.member.update({ where: { id: userId }, data: safe });
     } else if (role === "CLUB") {
@@ -191,7 +191,7 @@ export const updateUserCredentials = async (req: Request, res: Response) => {
       updated = await prisma.student.update({ where: { id: userId }, data: updateData });
     } else if (role === "COACH") {
       updated = await prisma.coachReferee.update({ where: { id: userId }, data: updateData });
-    } else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"].includes(role)) {
+    } else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role)) {
       updated = await prisma.member.update({ where: { id: userId }, data: updateData });
     } else if (role === "CLUB") {
       updated = await prisma.club.update({ where: { id: userId }, data: updateData });

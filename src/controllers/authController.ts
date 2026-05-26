@@ -93,7 +93,7 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Incorrect password" });
     }
 
-    const isMemberRole = ["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"].includes(role);
+    const isMemberRole = ["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role);
     const tokenPayload: any = { userId: user.id, role: role };
     if (isMemberRole && user.districtId) {
       tokenPayload.districtId = user.districtId;
@@ -150,7 +150,7 @@ export const getProfile = async (req: any, res: Response) => {
         where: { id: userId },
         include: { district: true, taluk: true, club: true }
       });
-    } else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"].includes(role)) {
+    } else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role)) {
       userData = await prisma.member.findUnique({
         where: { id: userId },
         include: { district: true, taluk: true }
@@ -199,7 +199,7 @@ export const changePassword = async (req: any, res: Response) => {
 
     if (role === "PLAYER") model = prisma.student;
     else if (role === "COACH") model = prisma.coachReferee;
-    else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"].includes(role)) model = prisma.member;
+    else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role)) model = prisma.member;
     else if (role === "CLUB") model = prisma.club;
     else return res.status(403).json({ error: "Super Admin password cannot be changed via this endpoint" });
 

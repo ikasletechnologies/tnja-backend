@@ -192,6 +192,7 @@ enum MemberRole {
   ZONE_SECRETARY
   STATE_PRESIDENT
   STATE_SECRETARY
+  CEO
 }
 
 model Member {
@@ -241,6 +242,7 @@ enum EventLevel {
   DISTRICT
   ZONE
   STATE
+  NATIONAL
 }
 
 enum EventParticipantType {
@@ -288,20 +290,34 @@ model EventRegistration {
 }
 
 model Tournament {
-  id             String                   @id @default(uuid())
-  title          String
-  date           DateTime
-  location       String
-  description    String
-  entryFee       Float                    @default(0)
-  totalSlots     Int                      @default(32)
-  ageGroup       String?
-  weightCategory String?
-  clubId         String
-  club           Club                     @relation(fields: [clubId], references: [id])
-  registrations  TournamentRegistration[]
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
+  id                 String                   @id @default(uuid())
+  title              String
+  date               DateTime                 // This acts as dateFrom
+  dateTo             DateTime?
+  location           String
+  description        String
+  entryFee           Float                    @default(0)
+  totalSlots         Int                      @default(32)
+  ageFrom            Int                      @default(0)
+  ageTo              Int                      @default(100)
+  gender             String                   @default("BOTH")
+  allowBPL           Boolean                  @default(false)
+  beltEligibility    String?
+  level              EventLevel               @default(DISTRICT)
+  
+  districtApproval   Status                   @default(PENDING)
+  stateApproval      Status                   @default(PENDING)
+  superAdminApproval Status                   @default(PENDING)
+  ceoApproval        Status                   @default(PENDING)
+  
+  status             Status                   @default(PENDING)
+  rejectionRemark    String?
+  
+  clubId             String
+  club               Club                     @relation(fields: [clubId], references: [id])
+  registrations      TournamentRegistration[]
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
 }
 
 model TournamentRegistration {
@@ -313,6 +329,8 @@ model TournamentRegistration {
   status       Status     @default(PENDING)
   isPaid       Boolean    @default(false)
   paymentId    String?
+  height       String?
+  weight       String?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 

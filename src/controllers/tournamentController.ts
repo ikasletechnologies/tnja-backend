@@ -17,24 +17,40 @@ export const createTournament = async (req: Request, res: Response) => {
     return res.status(403).json({ error: "Only clubs can create tournaments" });
   }
 
-  const { title, date, location, description, entryFee, totalSlots, ageGroup, weightCategory } = req.body;
+  const { title, dateFrom, dateTo, location, description, entryFee, totalSlots, ageFrom, ageTo, gender, allowBPL, beltEligibility, level } = req.body;
 
-  if (!title || !date || !location || !description || !entryFee || !totalSlots) {
-    return res.status(400).json({ error: "title, date, location, description, entryFee, and totalSlots are required" });
+  if (!title || !dateFrom || !location || !description || entryFee === undefined || !totalSlots || !level) {
+    return res.status(400).json({ error: "Required fields missing" });
   }
 
   try {
+    // Initial approval setup based on level
+    const districtApproval = level === "NATIONAL" ? "PENDING" : "APPROVED";
+    const stateApproval = ["NATIONAL", "STATE", "ZONAL", "DISTRICT"].includes(level) ? "PENDING" : "APPROVED";
+    const superAdminApproval = "PENDING";
+    const ceoApproval = ["NATIONAL", "STATE", "ZONAL"].includes(level) ? "PENDING" : "APPROVED";
+
     const tournament = await prisma.tournament.create({
       data: {
         title,
-        date: new Date(date),
+        date: new Date(dateFrom),
+        dateTo: dateTo ? new Date(dateTo) : null,
         location,
         description,
         entryFee: Number(entryFee),
         totalSlots: Number(totalSlots),
-        ageGroup: ageGroup || null,
-        weightCategory: weightCategory || null,
+        ageFrom: Number(ageFrom || 0),
+        ageTo: Number(ageTo || 100),
+        gender: gender || "BOTH",
+        allowBPL: Boolean(allowBPL),
+        beltEligibility: beltEligibility || null,
+        level,
         clubId: userId,
+        status: "PENDING",
+        districtApproval,
+        stateApproval,
+        superAdminApproval,
+        ceoApproval,
       },
     });
 
@@ -47,7 +63,7 @@ export const createTournament = async (req: Request, res: Response) => {
     for (const player of paidPlayers) {
       sendNotificationToUser(player.id, {
         type: "NEW_TOURNAMENT",
-        message: `Your club has created a new tournament: "${title}" on ${new Date(date).toLocaleDateString("en-IN")}. Entry fee: ₹${entryFee}. Go to Tournaments to register.`,
+        message: `Your club has proposed a new tournament: "${title}" on ${new Date(dateFrom).toLocaleDateString("en-IN")}. It is currently waiting for approvals.`,
         tournamentId: tournament.id,
         createdAt: new Date().toISOString(),
       });
@@ -172,7 +188,7 @@ export const updateTournament = async (req: Request, res: Response) => {
     return res.status(403).json({ error: "Only clubs can update tournaments" });
   }
 
-  const { title, date, location, description, entryFee, totalSlots, ageGroup, weightCategory } = req.body;
+  const { title, dateFrom, dateTo, location, description, entryFee, totalSlots, ageFrom, ageTo, gender, allowBPL, beltEligibility, level } = req.body;
 
   try {
     const tournament = await prisma.tournament.findUnique({ where: { id } });
@@ -183,13 +199,18 @@ export const updateTournament = async (req: Request, res: Response) => {
       where: { id },
       data: {
         ...(title && { title }),
-        ...(date && { date: new Date(date) }),
+        ...(dateFrom && { date: new Date(dateFrom) }),
+        ...(dateTo !== undefined && { dateTo: dateTo ? new Date(dateTo) : null }),
         ...(location && { location }),
         ...(description && { description }),
         ...(entryFee !== undefined && { entryFee: Number(entryFee) }),
         ...(totalSlots !== undefined && { totalSlots: Number(totalSlots) }),
-        ageGroup: ageGroup || null,
-        weightCategory: weightCategory || null,
+        ...(ageFrom !== undefined && { ageFrom: Number(ageFrom) }),
+        ...(ageTo !== undefined && { ageTo: Number(ageTo) }),
+        ...(gender && { gender }),
+        ...(allowBPL !== undefined && { allowBPL: Boolean(allowBPL) }),
+        ...(beltEligibility !== undefined && { beltEligibility }),
+        ...(level && { level }),
       },
     });
 
@@ -269,10 +290,10 @@ export const getPlayerTournaments = async (req: Request, res: Response) => {
   }
 };
 
-// ─── PLAYER: Create Razorpay Payment Order ───────────────────────────────────
+// ─── PLAYER: Create Tournament Payment Order ────────────────────────────────
 export const createTournamentPaymentOrder = async (req: Request, res: Response) => {
   const { userId, role } = (req as any).user;
-  const { tournamentId } = req.body;
+  const { tournamentId, height, weight } = req.body;
 
   if (role !== "PLAYER" && role !== "STUDENT") {
     return res.status(403).json({ error: "Only players can register for tournaments" });
@@ -311,6 +332,30 @@ export const createTournamentPaymentOrder = async (req: Request, res: Response) 
     });
     if (existing) return res.status(400).json({ error: "You have already registered for this tournament" });
 
+    // Handle Free/BPL Registration
+    const isFree = tournament.entryFee === 0 || (tournament.allowBPL && player.isBPL);
+    if (isFree) {
+      const registration = await prisma.tournamentRegistration.create({
+        data: {
+          tournamentId,
+          playerId: userId,
+          status: "PENDING",
+          isPaid: true, // It's free, so consider it paid
+          height: height || null,
+          weight: weight || null,
+        },
+      });
+
+      sendNotificationToUser(tournament.clubId, {
+        type: "NEW_TOURNAMENT_REGISTRATION",
+        message: `A player has registered for your tournament "${tournament.title}". Review and approve in Tournaments.`,
+        tournamentId,
+        createdAt: new Date().toISOString(),
+      });
+
+      return res.json({ isFree: true, message: "Registered successfully for free tournament.", registration });
+    }
+
     const receipt = `trn_${tournamentId.substring(0, 10)}_${userId.substring(0, 10)}`;
     const order = await razorpay.orders.create({
       amount: Math.round(tournament.entryFee * 100),
@@ -328,7 +373,7 @@ export const createTournamentPaymentOrder = async (req: Request, res: Response) 
 // ─── PLAYER: Verify Payment & Register ───────────────────────────────────────
 export const verifyTournamentPayment = async (req: Request, res: Response) => {
   const { userId, role } = (req as any).user;
-  const { tournamentId, razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
+  const { tournamentId, razorpay_payment_id, razorpay_order_id, razorpay_signature, height, weight } = req.body;
 
   if (role !== "PLAYER" && role !== "STUDENT") {
     return res.status(403).json({ error: "Only players can register for tournaments" });
@@ -369,6 +414,8 @@ export const verifyTournamentPayment = async (req: Request, res: Response) => {
         status: "PENDING",
         isPaid: true,
         paymentId: razorpay_payment_id,
+        height: height || null,
+        weight: weight || null,
       },
     });
 
@@ -387,5 +434,115 @@ export const verifyTournamentPayment = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error verifying tournament payment:", error);
     return res.status(500).json({ error: "Payment verification failed" });
+  }
+};
+
+// ─── ADMIN: Get Tournaments Pending Approval ────────────────────────────────
+export const getAdminTournaments = async (req: Request, res: Response) => {
+  const { role } = (req as any).user;
+
+  try {
+    let whereClause: any = {};
+
+    if (role === "DISTRICT_PRESIDENT" || role === "DISTRICT_SECRETARY") {
+      whereClause = { status: "PENDING", districtApproval: "PENDING", level: "NATIONAL" };
+    } else if (role === "STATE_PRESIDENT" || role === "STATE_SECRETARY") {
+      whereClause = { 
+        status: "PENDING",
+        stateApproval: "PENDING",
+        level: { in: ["NATIONAL", "STATE", "ZONAL", "DISTRICT"] }
+      };
+    } else if (role === "SUPER_ADMIN") {
+      whereClause = { 
+        status: "PENDING",
+        superAdminApproval: "PENDING"
+      };
+    } else if (role === "CEO") {
+      whereClause = {
+        status: "PENDING",
+        ceoApproval: "PENDING",
+        level: { in: ["NATIONAL", "STATE", "ZONAL"] }
+      };
+    } else {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const tournaments = await prisma.tournament.findMany({
+      where: whereClause,
+      include: {
+        club: { select: { name: true, district: { select: { name: true } } } }
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return res.json(tournaments);
+  } catch (error) {
+    console.error("Error fetching admin tournaments:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// ─── ADMIN: Approve or Reject Tournament ────────────────────────────────────
+export const approveTournament = async (req: Request, res: Response) => {
+  const { role } = (req as any).user;
+  const { id } = req.params;
+  const { status, remark } = req.body;
+
+  if (!["APPROVED", "REJECTED"].includes(status)) {
+    return res.status(400).json({ error: "Status must be APPROVED or REJECTED" });
+  }
+
+  if (status === "REJECTED" && !remark) {
+    return res.status(400).json({ error: "Rejection remark is required" });
+  }
+
+  try {
+    const tournament = await prisma.tournament.findUnique({ where: { id } });
+    if (!tournament) return res.status(404).json({ error: "Tournament not found" });
+
+    let dataToUpdate: any = {};
+
+    if (status === "REJECTED") {
+      dataToUpdate = { status: "REJECTED", rejectionRemark: remark };
+      if (role.startsWith("DISTRICT")) dataToUpdate.districtApproval = "REJECTED";
+      if (role.startsWith("STATE")) dataToUpdate.stateApproval = "REJECTED";
+      if (role === "SUPER_ADMIN") dataToUpdate.superAdminApproval = "REJECTED";
+      if (role === "CEO") dataToUpdate.ceoApproval = "REJECTED";
+    } else {
+      // APPROVED
+      if (role.startsWith("DISTRICT")) dataToUpdate.districtApproval = "APPROVED";
+      if (role.startsWith("STATE")) dataToUpdate.stateApproval = "APPROVED";
+      if (role === "SUPER_ADMIN") dataToUpdate.superAdminApproval = "APPROVED";
+      if (role === "CEO") dataToUpdate.ceoApproval = "APPROVED";
+      
+      // If ANY authorized admin approves it, the entire tournament becomes APPROVED immediately.
+      dataToUpdate.status = "APPROVED";
+    }
+
+    const updated = await prisma.tournament.update({
+      where: { id },
+      data: dataToUpdate,
+    });
+
+    if (dataToUpdate.status === "APPROVED") {
+      sendNotificationToUser(tournament.clubId, {
+        type: "TOURNAMENT_APPROVED",
+        message: `Your tournament "${tournament.title}" has been fully approved and is now live!`,
+        tournamentId: id,
+        createdAt: new Date().toISOString(),
+      });
+    } else if (dataToUpdate.status === "REJECTED") {
+      sendNotificationToUser(tournament.clubId, {
+        type: "TOURNAMENT_REJECTED",
+        message: `Your tournament "${tournament.title}" was rejected. Reason: ${remark}`,
+        tournamentId: id,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    return res.json({ message: `Tournament ${status.toLowerCase()} successfully`, tournament: updated });
+  } catch (error) {
+    console.error("Error approving tournament:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 };

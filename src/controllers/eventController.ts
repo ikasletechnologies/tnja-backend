@@ -14,7 +14,7 @@ export const createEvent = async (req: Request, res: Response) => {
 
   try {
     // Only CLUB role or admin roles can propose events
-    const adminRoles = ["SUPER_ADMIN", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"];
+    const adminRoles = ["SUPER_ADMIN", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "CEO"];
     if (role !== "CLUB" && !adminRoles.includes(role)) {
       return res.status(403).json({ error: "Only clubs or authorized admins can propose events" });
     }
@@ -71,7 +71,7 @@ export const getActiveEvents = async (req: Request, res: Response) => {
       where: { 
         status: "APPROVED",
         // Admins can see all, otherwise only see 'ALL' or specific target
-        participantType: ["SUPER_ADMIN", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role) 
+        participantType: ["SUPER_ADMIN", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "CEO"].includes(role) 
           ? undefined 
           : { in: ["ALL", targetParticipant] as any }
       },

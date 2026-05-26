@@ -36,7 +36,8 @@ export const authorizeAdmin = (req: AuthRequest, res: Response, next: NextFuncti
     "ZONE_PRESIDENT", 
     "ZONE_SECRETARY", 
     "STATE_PRESIDENT", 
-    "STATE_SECRETARY"
+    "STATE_SECRETARY",
+    "CEO"
   ];
 
   if (req.user && adminRoles.includes(req.user.role)) {

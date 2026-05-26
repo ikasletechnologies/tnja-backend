@@ -60,7 +60,8 @@ export const getPendingApplications = async (req: Request, res: Response) => {
       "ZONE_PRESIDENT",
       "ZONE_SECRETARY",
       "DISTRICT_PRESIDENT",
-      "DISTRICT_SECRETARY"
+      "DISTRICT_SECRETARY",
+      "CEO"
     ];
 
     if (!allowedRoles.includes(role)) {
@@ -253,7 +254,8 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
       "ZONE_PRESIDENT",
       "ZONE_SECRETARY",
       "DISTRICT_PRESIDENT",
-      "DISTRICT_SECRETARY"
+      "DISTRICT_SECRETARY",
+      "CEO"
     ];
 
     if (!allowedRoles.includes(role)) {
@@ -261,10 +263,10 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
     }
 
     const districtRestrictedRoles = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"];
-    const auditor = role === "SUPER_ADMIN" ? "Super Admin" : null;
+    const auditor = (role === "SUPER_ADMIN" || role === "CEO") ? role : null;
     let auditorInfo = auditor;
 
-    if (role !== "SUPER_ADMIN") {
+    if (role !== "SUPER_ADMIN" && role !== "CEO") {
       const member = await prisma.member.findUnique({ where: { id: (req as any).user.userId } });
       auditorInfo = member ? `${member.fullName} (${role})` : role;
     }
@@ -875,7 +877,7 @@ export const promoteMember = async (req: Request, res: Response) => {
   const { memberId, role, districtId } = req.body;
   const { role: requesterRole } = (req as any).user;
 
-  if (requesterRole !== "SUPER_ADMIN") {
+  if (requesterRole !== "SUPER_ADMIN" && requesterRole !== "CEO") {
     return res.status(403).json({ error: "Only Super Admin can promote members" });
   }
 
@@ -886,7 +888,8 @@ export const promoteMember = async (req: Request, res: Response) => {
     "ZONE_PRESIDENT",
     "ZONE_SECRETARY",
     "STATE_PRESIDENT",
-    "STATE_SECRETARY"
+    "STATE_SECRETARY",
+    "CEO"
   ];
 
   if (!validRoles.includes(role)) {
