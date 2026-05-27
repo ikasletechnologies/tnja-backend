@@ -6,7 +6,7 @@ import { getClubs } from "../controllers/clubController.js";
 import { getDistricts, getTaluksByDistrict, getTalukDetails } from "../controllers/locationController.js";
 import { authenticateJWT, authorizeAdmin, authorize } from "../middleware/authMiddleware.js";
 import { createEvent, getActiveEvents, getAdminEvents, applyForEvent, createEventPaymentOrder, verifyEventPayment } from "../controllers/eventController.js";
-import { createTournament, getClubTournaments, getTournamentRegistrations, updateRegistrationStatus, updateTournament, deleteTournament, getPlayerTournaments, createTournamentPaymentOrder, verifyTournamentPayment, getAdminTournaments, approveTournament } from "../controllers/tournamentController.js";
+import { createTournament, getClubTournaments, getTournamentRegistrations, updateRegistrationStatus, updateTournament, deleteTournament, getPlayerTournaments, createTournamentPaymentOrder, verifyTournamentPayment, getAdminTournaments, approveTournament, getApprovedTournaments } from "../controllers/tournamentController.js";
 
 const router = Router();
 
@@ -21,6 +21,7 @@ router.post("/events/verify-payment", authenticateJWT, verifyEventPayment);
 // Club
 router.post("/tournaments/club/create", authenticateJWT, createTournament);
 router.get("/tournaments/club", authenticateJWT, getClubTournaments);
+router.get("/tournaments/approved", authenticateJWT, getApprovedTournaments);
 router.get("/tournaments/:id/registrations", authenticateJWT, getTournamentRegistrations);
 router.patch("/tournaments/:id/registrations/:regId", authenticateJWT, updateRegistrationStatus);
 router.put("/tournaments/:id", authenticateJWT, updateTournament);

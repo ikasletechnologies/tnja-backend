@@ -106,6 +106,37 @@ export const getClubTournaments = async (req: Request, res: Response) => {
   }
 };
 
+// ─── CLUB: Get All Approved Tournaments ──────────────────────────────────────
+export const getApprovedTournaments = async (req: Request, res: Response) => {
+  const { role } = (req as any).user;
+
+  if (role !== "CLUB") {
+    return res.status(403).json({ error: "Access denied" });
+  }
+
+  try {
+    const tournaments = await prisma.tournament.findMany({
+      where: { status: "APPROVED" },
+      include: {
+        _count: { select: { registrations: true } },
+        club: { select: { name: true, district: { select: { name: true } } } }
+      },
+      orderBy: { date: "desc" },
+    });
+
+    const result = tournaments.map((t) => ({
+      ...t,
+      registrationCount: t._count.registrations,
+      _count: undefined,
+    }));
+
+    return res.json(result);
+  } catch (error) {
+    console.error("Error fetching approved tournaments:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 // ─── CLUB: Get Registrations for a Tournament ────────────────────────────────
 export const getTournamentRegistrations = async (req: Request, res: Response) => {
   const { userId, role } = (req as any).user;
@@ -264,7 +295,7 @@ export const getPlayerTournaments = async (req: Request, res: Response) => {
     if (!player.clubId) return res.json([]); // Player not linked to a club
 
     const tournaments = await prisma.tournament.findMany({
-      where: { clubId: player.clubId },
+      where: { clubId: player.clubId, status: "APPROVED" },
       include: {
         _count: { select: { registrations: true } },
         registrations: {
