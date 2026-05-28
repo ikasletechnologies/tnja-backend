@@ -10,9 +10,25 @@ const razorpay = new Razorpay({
 const generatePermanentId = (prefix) => {
     return `${prefix}-${Date.now().toString().slice(-6)}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
 };
-/** Generate a readable 8-char password and return both raw + hashed */
+/** Generate a readable 8-char password that meets security requirements and return both raw + hashed */
 const generatePassword = async () => {
-    const raw = crypto.randomBytes(4).toString("hex"); // e.g. "a3f91bc2"
+    const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const lower = "abcdefghijklmnopqrstuvwxyz";
+    const num = "0123456789";
+    const special = "@$!%*?&";
+    const allChars = upper + lower + num + special;
+    let raw = "";
+    // Ensure at least one of each required type
+    raw += upper[Math.floor(Math.random() * upper.length)];
+    raw += lower[Math.floor(Math.random() * lower.length)];
+    raw += num[Math.floor(Math.random() * num.length)];
+    raw += special[Math.floor(Math.random() * special.length)];
+    // Fill the rest up to 8 characters
+    for (let i = 4; i < 8; i++) {
+        raw += allChars[Math.floor(Math.random() * allChars.length)];
+    }
+    // Shuffle the password
+    raw = raw.split('').sort(() => 0.5 - Math.random()).join('');
     const hashed = await bcrypt.hash(raw, 10);
     return { raw, hashed };
 };
@@ -32,7 +48,8 @@ export const getPendingApplications = async (req, res) => {
             "ZONE_PRESIDENT",
             "ZONE_SECRETARY",
             "DISTRICT_PRESIDENT",
-            "DISTRICT_SECRETARY"
+            "DISTRICT_SECRETARY",
+            "CEO"
         ];
         if (!allowedRoles.includes(role)) {
             return res.status(403).json({ error: "You do not have permission to view pending applications" });
@@ -211,15 +228,16 @@ export const updateApplicationStatus = async (req, res) => {
             "ZONE_PRESIDENT",
             "ZONE_SECRETARY",
             "DISTRICT_PRESIDENT",
-            "DISTRICT_SECRETARY"
+            "DISTRICT_SECRETARY",
+            "CEO"
         ];
         if (!allowedRoles.includes(role)) {
             return res.status(403).json({ error: "You do not have permission to manage applications" });
         }
         const districtRestrictedRoles = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"];
-        const auditor = role === "SUPER_ADMIN" ? "Super Admin" : null;
+        const auditor = (role === "SUPER_ADMIN" || role === "CEO") ? role : null;
         let auditorInfo = auditor;
-        if (role !== "SUPER_ADMIN") {
+        if (role !== "SUPER_ADMIN" && role !== "CEO") {
             const member = await prisma.member.findUnique({ where: { id: req.user.userId } });
             auditorInfo = member ? `${member.fullName} (${role})` : role;
         }
@@ -775,9 +793,9 @@ export const updateGlobalSettings = async (req, res) => {
 // PATCH /api/member/promote      – promote a member to a specific role
 // ──────────────────────────────────────────────────────────────────────────────
 export const promoteMember = async (req, res) => {
-    const { memberId, role } = req.body;
+    const { memberId, role, districtId } = req.body;
     const { role: requesterRole } = req.user;
-    if (requesterRole !== "SUPER_ADMIN") {
+    if (requesterRole !== "SUPER_ADMIN" && requesterRole !== "CEO") {
         return res.status(403).json({ error: "Only Super Admin can promote members" });
     }
     const validRoles = [
@@ -787,7 +805,8 @@ export const promoteMember = async (req, res) => {
         "ZONE_PRESIDENT",
         "ZONE_SECRETARY",
         "STATE_PRESIDENT",
-        "STATE_SECRETARY"
+        "STATE_SECRETARY",
+        "CEO"
     ];
     if (!validRoles.includes(role)) {
         return res.status(400).json({ error: "Invalid role specified" });
@@ -798,7 +817,10 @@ export const promoteMember = async (req, res) => {
             return res.status(404).json({ error: "Member not found" });
         const updated = await prisma.member.update({
             where: { id: memberId },
-            data: { role: role }
+            data: {
+                role: role,
+                ...(districtId && { districtId })
+            }
         });
         return res.json({ message: `Member promoted to ${role} successfully`, data: updated });
     }

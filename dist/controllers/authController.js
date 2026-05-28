@@ -78,7 +78,7 @@ export const login = async (req, res) => {
         if (!isPasswordValid) {
             return res.status(401).json({ error: "Incorrect password" });
         }
-        const isMemberRole = ["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"].includes(role);
+        const isMemberRole = ["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role);
         const tokenPayload = { userId: user.id, role: role };
         if (isMemberRole && user.districtId) {
             tokenPayload.districtId = user.districtId;
@@ -127,7 +127,7 @@ export const getProfile = async (req, res) => {
                 include: { district: true, taluk: true, club: true }
             });
         }
-        else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"].includes(role)) {
+        else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role)) {
             userData = await prisma.member.findUnique({
                 where: { id: userId },
                 include: { district: true, taluk: true }
@@ -160,6 +160,10 @@ export const changePassword = async (req, res) => {
     if (!currentPassword || !newPassword) {
         return res.status(400).json({ error: "Current and new passwords are required" });
     }
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(newPassword)) {
+        return res.status(400).json({ error: "Password must contain at least 8 characters, one uppercase, one lowercase, one number, and one special character." });
+    }
     try {
         let user = null;
         let model = null;
@@ -167,7 +171,7 @@ export const changePassword = async (req, res) => {
             model = prisma.student;
         else if (role === "COACH")
             model = prisma.coachReferee;
-        else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"].includes(role))
+        else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role))
             model = prisma.member;
         else if (role === "CLUB")
             model = prisma.club;
@@ -251,6 +255,10 @@ export const resetPassword = async (req, res) => {
     if (!token || !newPassword) {
         return res.status(400).json({ error: "Token and new password are required" });
     }
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(newPassword)) {
+        return res.status(400).json({ error: "Password must contain at least 8 characters, one uppercase, one lowercase, one number, and one special character." });
+    }
     try {
         let user = null;
         let modelName = "";
@@ -285,6 +293,65 @@ export const resetPassword = async (req, res) => {
     }
     catch (error) {
         console.error("Reset password error:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+export const trackStatus = async (req, res) => {
+    const id = req.params.id;
+    if (!id) {
+        return res.status(400).json({ error: "Tracking ID is required" });
+    }
+    try {
+        let user = null;
+        let role = "";
+        // Check Student
+        user = await prisma.student.findFirst({
+            where: { OR: [{ tempId: id }, { permanentId: id }] },
+            include: { district: true }
+        });
+        if (user)
+            role = "PLAYER";
+        // Check Coach
+        if (!user) {
+            user = await prisma.coachReferee.findFirst({
+                where: { OR: [{ tempId: id }, { permanentId: id }] },
+                include: { district: true }
+            });
+            if (user)
+                role = "COACH";
+        }
+        // Check Member
+        if (!user) {
+            user = await prisma.member.findFirst({
+                where: { OR: [{ tempId: id }, { permanentId: id }] },
+                include: { district: true }
+            });
+            if (user)
+                role = user.role;
+        }
+        // Check Club
+        if (!user) {
+            user = await prisma.club.findFirst({
+                where: { OR: [{ tempId: id }, { permanentId: id }] },
+                include: { district: true }
+            });
+            if (user)
+                role = "CLUB";
+        }
+        if (!user) {
+            return res.status(404).json({ error: "No application found with this Temporary ID." });
+        }
+        const { password, ...safeUser } = user;
+        return res.json({
+            user: {
+                ...safeUser,
+                fullName: safeUser.fullName || safeUser.name || safeUser.clubName,
+                role: role
+            }
+        });
+    }
+    catch (error) {
+        console.error("Track status error:", error);
         return res.status(500).json({ error: "Internal Server Error" });
     }
 };

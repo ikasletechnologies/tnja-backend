@@ -21,6 +21,10 @@ router.post("/events/verify-payment", authenticateJWT, verifyEventPayment);
 // Club
 router.post("/tournaments/club/create", authenticateJWT, createTournament);
 router.get("/tournaments/club", authenticateJWT, getClubTournaments);
+// Official
+router.post("/tournaments/official/create", authenticateJWT, authorize(["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN"]), createTournament);
+router.get("/tournaments/official/my", authenticateJWT, authorize(["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN"]), getClubTournaments); // Reusing getClubTournaments since we can modify it
+
 router.get("/tournaments/approved", authenticateJWT, getApprovedTournaments);
 router.get("/tournaments/:id/registrations", authenticateJWT, getTournamentRegistrations);
 router.patch("/tournaments/:id/registrations/:regId", authenticateJWT, updateRegistrationStatus);

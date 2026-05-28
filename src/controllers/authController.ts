@@ -347,7 +347,7 @@ export const resetPassword = async (req: Request, res: Response) => {
 };
 
 export const trackStatus = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
 
   if (!id) {
     return res.status(400).json({ error: "Tracking ID is required" });

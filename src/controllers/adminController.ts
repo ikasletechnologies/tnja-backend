@@ -295,6 +295,11 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
           updateData.password = hashed;
           updateData.mustChangePassword = true;
           updateData.isPaid = true; // BPL counts as paid/waived
+          
+          // Set membership validity to 1 year from approval
+          const nextYear = new Date();
+          nextYear.setFullYear(nextYear.getFullYear() + 1);
+          updateData.validUntil = nextYear;
 
           const updated = await prisma.student.update({ where: { id }, data: updateData });
 
@@ -813,12 +818,17 @@ export const verifyPayment = async (req: Request, res: Response) => {
     // Process success
     const permanentId = generatePermanentId(prefix);
 
+    // Set membership validity to 1 year from payment
+    const nextYear = new Date();
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
+
     const updated = await updateFn({
       where: { id },
       data: {
         isPaid: true,
         permanentId,
-        mustChangePassword: true
+        mustChangePassword: true,
+        validUntil: nextYear
       }
     });
 

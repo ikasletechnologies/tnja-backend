@@ -26,7 +26,8 @@ export const authorizeAdmin = (req, res, next) => {
         "ZONE_PRESIDENT",
         "ZONE_SECRETARY",
         "STATE_PRESIDENT",
-        "STATE_SECRETARY"
+        "STATE_SECRETARY",
+        "CEO"
     ];
     if (req.user && adminRoles.includes(req.user.role)) {
         next();

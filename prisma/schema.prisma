@@ -12,6 +12,7 @@ enum Status {
   APPROVED
   REPLAY
   CLOSED
+  NOT_REQUIRED
 }
 
 enum Gender {
@@ -78,6 +79,7 @@ model Club {
   resetPasswordToken String?
   resetPasswordExpires DateTime?
   isPaid           Boolean        @default(false)
+  validUntil       DateTime?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   students         Student[]
@@ -130,6 +132,7 @@ model Student {
   resetPasswordToken    String?
   resetPasswordExpires  DateTime?
   isPaid                Boolean       @default(false)
+  validUntil            DateTime?
   wins                  Int           @default(0)
   losses                Int           @default(0)
   draws                 Int           @default(0)
@@ -180,6 +183,7 @@ model CoachReferee {
   resetPasswordToken    String?
   resetPasswordExpires  DateTime?
   isPaid                Boolean  @default(false)
+  validUntil            DateTime?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
@@ -233,9 +237,11 @@ model Member {
   resetPasswordToken    String?
   resetPasswordExpires  DateTime?
   isPaid                Boolean  @default(false)
+  validUntil            DateTime?
   password              String
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+  tournaments           Tournament[]
 }
 
 enum EventLevel {
@@ -313,8 +319,10 @@ model Tournament {
   status             Status                   @default(PENDING)
   rejectionRemark    String?
   
-  clubId             String
-  club               Club                     @relation(fields: [clubId], references: [id])
+  clubId             String?
+  club               Club?                    @relation(fields: [clubId], references: [id])
+  officialId         String?
+  official           Member?                  @relation(fields: [officialId], references: [id])
   registrations      TournamentRegistration[]
   createdAt          DateTime                 @default(now())
   updatedAt          DateTime                 @updatedAt

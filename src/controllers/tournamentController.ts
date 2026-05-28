@@ -13,8 +13,11 @@ const razorpay = new Razorpay({
 export const createTournament = async (req: Request, res: Response) => {
   const { userId, role } = (req as any).user;
 
-  if (role !== "CLUB") {
-    return res.status(403).json({ error: "Only clubs can create tournaments" });
+  const isClub = role === "CLUB";
+  const isOfficial = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN"].includes(role);
+
+  if (!isClub && !isOfficial) {
+    return res.status(403).json({ error: "Only clubs or authorized officials can create tournaments" });
   }
 
   const { title, dateFrom, dateTo, location, description, entryFee, totalSlots, ageFrom, ageTo, gender, allowBPL, beltEligibility, level } = req.body;
@@ -25,10 +28,20 @@ export const createTournament = async (req: Request, res: Response) => {
 
   try {
     // Initial approval setup based on level
-    const districtApproval = level === "NATIONAL" ? "PENDING" : "APPROVED";
-    const stateApproval = ["NATIONAL", "STATE", "ZONAL", "DISTRICT"].includes(level) ? "PENDING" : "APPROVED";
+    let districtApproval = level === "NATIONAL" ? "PENDING" : "APPROVED";
+    let stateApproval = ["NATIONAL", "STATE", "ZONE", "DISTRICT"].includes(level) ? "PENDING" : "APPROVED";
     const superAdminApproval = "PENDING";
-    const ceoApproval = ["NATIONAL", "STATE", "ZONAL"].includes(level) ? "PENDING" : "APPROVED";
+    const ceoApproval = ["NATIONAL", "STATE", "ZONE"].includes(level) ? "PENDING" : "APPROVED";
+
+    if (isOfficial) {
+      if (role === "STATE_PRESIDENT" || role === "STATE_SECRETARY" || role === "CEO" || role === "SUPER_ADMIN") {
+        districtApproval = "NOT_REQUIRED";
+        stateApproval = "NOT_REQUIRED";
+      } else if (role === "DISTRICT_PRESIDENT" || role === "DISTRICT_SECRETARY" || role === "ZONE_PRESIDENT" || role === "ZONE_SECRETARY") {
+        districtApproval = "NOT_REQUIRED";
+        // stateApproval remains PENDING
+      }
+    }
 
     const tournament = await prisma.tournament.create({
       data: {
@@ -45,28 +58,31 @@ export const createTournament = async (req: Request, res: Response) => {
         allowBPL: Boolean(allowBPL),
         beltEligibility: beltEligibility || null,
         level,
-        clubId: userId,
+        clubId: isClub ? userId : null,
+        officialId: isOfficial ? userId : null,
         status: "PENDING",
-        districtApproval,
-        stateApproval,
+        districtApproval: districtApproval as any,
+        stateApproval: stateApproval as any,
         superAdminApproval,
         ceoApproval,
       },
     });
 
-    // Notify all paid players of this club who are currently online
-    const paidPlayers = await prisma.student.findMany({
-      where: { clubId: userId, isPaid: true, status: "APPROVED" },
-      select: { id: true, fullName: true },
-    });
-
-    for (const player of paidPlayers) {
-      sendNotificationToUser(player.id, {
-        type: "NEW_TOURNAMENT",
-        message: `Your club has proposed a new tournament: "${title}" on ${new Date(dateFrom).toLocaleDateString("en-IN")}. It is currently waiting for approvals.`,
-        tournamentId: tournament.id,
-        createdAt: new Date().toISOString(),
+    if (isClub) {
+      // Notify all paid players of this club who are currently online
+      const paidPlayers = await prisma.student.findMany({
+        where: { clubId: userId, isPaid: true, status: "APPROVED" },
+        select: { id: true, fullName: true },
       });
+
+      for (const player of paidPlayers) {
+        sendNotificationToUser(player.id, {
+          type: "NEW_TOURNAMENT",
+          message: `Your club has proposed a new tournament: "${title}" on ${new Date(dateFrom).toLocaleDateString("en-IN")}. It is currently waiting for approvals.`,
+          tournamentId: tournament.id,
+          createdAt: new Date().toISOString(),
+        });
+      }
     }
 
     return res.status(201).json({ message: "Tournament created successfully", tournament });
@@ -80,13 +96,18 @@ export const createTournament = async (req: Request, res: Response) => {
 export const getClubTournaments = async (req: Request, res: Response) => {
   const { userId, role } = (req as any).user;
 
-  if (role !== "CLUB") {
+  const isClub = role === "CLUB";
+  const isOfficial = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN"].includes(role);
+
+  if (!isClub && !isOfficial) {
     return res.status(403).json({ error: "Access denied" });
   }
 
   try {
+    const whereClause = isClub ? { clubId: userId } : { officialId: userId };
+
     const tournaments = await prisma.tournament.findMany({
-      where: { clubId: userId },
+      where: whereClause,
       include: {
         _count: { select: { registrations: true } },
       },
@@ -140,16 +161,19 @@ export const getApprovedTournaments = async (req: Request, res: Response) => {
 // ─── CLUB: Get Registrations for a Tournament ────────────────────────────────
 export const getTournamentRegistrations = async (req: Request, res: Response) => {
   const { userId, role } = (req as any).user;
-  const { id } = req.params;
+  const id = req.params.id as string;
 
-  if (role !== "CLUB") {
+  const isClub = role === "CLUB";
+  const isOfficial = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN"].includes(role);
+
+  if (!isClub && !isOfficial) {
     return res.status(403).json({ error: "Access denied" });
   }
 
   try {
     const tournament = await prisma.tournament.findUnique({ where: { id } });
     if (!tournament) return res.status(404).json({ error: "Tournament not found" });
-    if (tournament.clubId !== userId) return res.status(403).json({ error: "This tournament does not belong to your club" });
+    if (tournament.clubId !== userId && tournament.officialId !== userId) return res.status(403).json({ error: "This tournament does not belong to you" });
 
     const registrations = await prisma.tournamentRegistration.findMany({
       where: { tournamentId: id },
@@ -171,10 +195,14 @@ export const getTournamentRegistrations = async (req: Request, res: Response) =>
 // ─── CLUB: Approve or Reject a Registration ──────────────────────────────────
 export const updateRegistrationStatus = async (req: Request, res: Response) => {
   const { userId, role } = (req as any).user;
-  const { id: tournamentId, regId } = req.params;
+  const tournamentId = req.params.id as string;
+  const regId = req.params.regId as string;
   const { status } = req.body;
 
-  if (role !== "CLUB") {
+  const isClub = role === "CLUB";
+  const isOfficial = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN"].includes(role);
+
+  if (!isClub && !isOfficial) {
     return res.status(403).json({ error: "Access denied" });
   }
 
@@ -185,7 +213,7 @@ export const updateRegistrationStatus = async (req: Request, res: Response) => {
   try {
     const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
     if (!tournament) return res.status(404).json({ error: "Tournament not found" });
-    if (tournament.clubId !== userId) return res.status(403).json({ error: "This tournament does not belong to your club" });
+    if (tournament.clubId !== userId && tournament.officialId !== userId) return res.status(403).json({ error: "This tournament does not belong to you" });
 
     const registration = await prisma.tournamentRegistration.update({
       where: { id: regId },
@@ -194,7 +222,7 @@ export const updateRegistrationStatus = async (req: Request, res: Response) => {
     });
 
     // Notify the player of the decision
-    sendNotificationToUser(registration.player.id, {
+    sendNotificationToUser(registration.playerId, {
       type: "TOURNAMENT_REG_UPDATE",
       message: status === "APPROVED"
         ? `Your registration for "${tournament.title}" has been approved by the club!`
@@ -213,10 +241,13 @@ export const updateRegistrationStatus = async (req: Request, res: Response) => {
 // ─── CLUB: Update Tournament ─────────────────────────────────────────────────
 export const updateTournament = async (req: Request, res: Response) => {
   const { userId, role } = (req as any).user;
-  const { id } = req.params;
+  const id = req.params.id as string;
 
-  if (role !== "CLUB") {
-    return res.status(403).json({ error: "Only clubs can update tournaments" });
+  const isClub = role === "CLUB";
+  const isOfficial = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN"].includes(role);
+
+  if (!isClub && !isOfficial) {
+    return res.status(403).json({ error: "Only clubs and officials can update tournaments" });
   }
 
   const { title, dateFrom, dateTo, location, description, entryFee, totalSlots, ageFrom, ageTo, gender, allowBPL, beltEligibility, level } = req.body;
@@ -224,7 +255,7 @@ export const updateTournament = async (req: Request, res: Response) => {
   try {
     const tournament = await prisma.tournament.findUnique({ where: { id } });
     if (!tournament) return res.status(404).json({ error: "Tournament not found" });
-    if (tournament.clubId !== userId) return res.status(403).json({ error: "This tournament does not belong to your club" });
+    if (tournament.clubId !== userId && tournament.officialId !== userId) return res.status(403).json({ error: "This tournament does not belong to you" });
 
     const updated = await prisma.tournament.update({
       where: { id },
@@ -255,16 +286,19 @@ export const updateTournament = async (req: Request, res: Response) => {
 // ─── CLUB: Delete Tournament ──────────────────────────────────────────────────
 export const deleteTournament = async (req: Request, res: Response) => {
   const { userId, role } = (req as any).user;
-  const { id } = req.params;
+  const id = req.params.id as string;
 
-  if (role !== "CLUB") {
-    return res.status(403).json({ error: "Only clubs can delete tournaments" });
+  const isClub = role === "CLUB";
+  const isOfficial = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN"].includes(role);
+
+  if (!isClub && !isOfficial) {
+    return res.status(403).json({ error: "Only clubs and officials can delete tournaments" });
   }
 
   try {
     const tournament = await prisma.tournament.findUnique({ where: { id } });
     if (!tournament) return res.status(404).json({ error: "Tournament not found" });
-    if (tournament.clubId !== userId) return res.status(403).json({ error: "This tournament does not belong to your club" });
+    if (tournament.clubId !== userId && tournament.officialId !== userId) return res.status(403).json({ error: "This tournament does not belong to you" });
 
     // Delete registrations first (FK constraint)
     await prisma.tournamentRegistration.deleteMany({ where: { tournamentId: id } });
@@ -377,12 +411,14 @@ export const createTournamentPaymentOrder = async (req: Request, res: Response) 
         },
       });
 
-      sendNotificationToUser(tournament.clubId, {
-        type: "NEW_TOURNAMENT_REGISTRATION",
-        message: `A player has registered for your tournament "${tournament.title}". Review and approve in Tournaments.`,
-        tournamentId,
-        createdAt: new Date().toISOString(),
-      });
+      if (tournament.clubId) {
+        sendNotificationToUser(tournament.clubId, {
+          type: "NEW_TOURNAMENT_REGISTRATION",
+          message: `A player has registered for your tournament "${tournament.title}". Review and approve in Tournaments.`,
+          tournamentId,
+          createdAt: new Date().toISOString(),
+        });
+      }
 
       return res.json({ isFree: true, message: "Registered successfully for free tournament.", registration });
     }
@@ -451,12 +487,14 @@ export const verifyTournamentPayment = async (req: Request, res: Response) => {
     });
 
     // Notify the club that a new player registered
-    sendNotificationToUser(tournament.clubId, {
-      type: "NEW_TOURNAMENT_REGISTRATION",
-      message: `A player has paid and registered for your tournament "${tournament.title}". Review and approve in Tournaments.`,
-      tournamentId,
-      createdAt: new Date().toISOString(),
-    });
+    if (tournament.clubId) {
+      sendNotificationToUser(tournament.clubId, {
+        type: "NEW_TOURNAMENT_REGISTRATION",
+        message: `A player has paid and registered for your tournament "${tournament.title}". Review and approve in Tournaments.`,
+        tournamentId,
+        createdAt: new Date().toISOString(),
+      });
+    }
 
     return res.status(201).json({
       message: "Payment verified. Registration submitted for club approval.",
@@ -481,7 +519,7 @@ export const getAdminTournaments = async (req: Request, res: Response) => {
       whereClause = { 
         status: "PENDING",
         stateApproval: "PENDING",
-        level: { in: ["NATIONAL", "STATE", "ZONAL", "DISTRICT"] }
+        level: { in: ["NATIONAL", "STATE", "ZONE", "DISTRICT"] }
       };
     } else if (role === "SUPER_ADMIN") {
       whereClause = { 
@@ -492,7 +530,7 @@ export const getAdminTournaments = async (req: Request, res: Response) => {
       whereClause = {
         status: "PENDING",
         ceoApproval: "PENDING",
-        level: { in: ["NATIONAL", "STATE", "ZONAL"] }
+        level: { in: ["NATIONAL", "STATE", "ZONE"] }
       };
     } else {
       return res.status(403).json({ error: "Access denied" });
@@ -516,7 +554,7 @@ export const getAdminTournaments = async (req: Request, res: Response) => {
 // ─── ADMIN: Approve or Reject Tournament ────────────────────────────────────
 export const approveTournament = async (req: Request, res: Response) => {
   const { role } = (req as any).user;
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { status, remark } = req.body;
 
   if (!["APPROVED", "REJECTED"].includes(status)) {
@@ -556,19 +594,25 @@ export const approveTournament = async (req: Request, res: Response) => {
     });
 
     if (dataToUpdate.status === "APPROVED") {
-      sendNotificationToUser(tournament.clubId, {
-        type: "TOURNAMENT_APPROVED",
-        message: `Your tournament "${tournament.title}" has been fully approved and is now live!`,
-        tournamentId: id,
-        createdAt: new Date().toISOString(),
-      });
+      const notifyId = tournament.clubId || tournament.officialId;
+      if (notifyId) {
+        sendNotificationToUser(notifyId, {
+          type: "TOURNAMENT_APPROVED",
+          message: `Your tournament "${tournament.title}" has been fully approved and is now live!`,
+          tournamentId: id,
+          createdAt: new Date().toISOString(),
+        });
+      }
     } else if (dataToUpdate.status === "REJECTED") {
-      sendNotificationToUser(tournament.clubId, {
-        type: "TOURNAMENT_REJECTED",
-        message: `Your tournament "${tournament.title}" was rejected. Reason: ${remark}`,
-        tournamentId: id,
-        createdAt: new Date().toISOString(),
-      });
+      const notifyId = tournament.clubId || tournament.officialId;
+      if (notifyId) {
+        sendNotificationToUser(notifyId, {
+          type: "TOURNAMENT_REJECTED",
+          message: `Your tournament "${tournament.title}" was rejected. Reason: ${remark}`,
+          tournamentId: id,
+          createdAt: new Date().toISOString(),
+        });
+      }
     }
 
     return res.json({ message: `Tournament ${status.toLowerCase()} successfully`, tournament: updated });

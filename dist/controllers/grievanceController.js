@@ -99,4 +99,38 @@ export const replyToGrievance = async (req, res) => {
         return res.status(500).json({ error: "Internal Server Error" });
     }
 };
+export const closeGrievance = async (req, res) => {
+    try {
+        const id = String(req.params.id);
+        const { remark } = req.body;
+        const grievance = await prisma.grievance.update({
+            where: { id },
+            data: {
+                remark,
+                status: "CLOSED"
+            }
+        });
+        try {
+            const { sendNotificationToUser } = await import("../lib/ws.js");
+            sendNotificationToUser(grievance.userId, {
+                type: "GRIEVANCE_CLOSED",
+                grievanceId: grievance.id,
+                subject: grievance.subject,
+                remark: grievance.remark,
+                message: `Admin has closed your grievance regarding: "${grievance.subject}"`,
+            });
+        }
+        catch (wsErr) {
+            console.error("WS notification error:", wsErr);
+        }
+        return res.status(200).json({
+            message: "Grievance closed successfully",
+            grievance
+        });
+    }
+    catch (error) {
+        console.error("Close Grievance error:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};
 //# sourceMappingURL=grievanceController.js.map
