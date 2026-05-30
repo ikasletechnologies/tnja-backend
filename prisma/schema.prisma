@@ -324,6 +324,7 @@ model Tournament {
   officialId         String?
   official           Member?                  @relation(fields: [officialId], references: [id])
   registrations      TournamentRegistration[]
+  draws              TournamentDraw[]
   createdAt          DateTime                 @default(now())
   updatedAt          DateTime                 @updatedAt
 }
@@ -368,3 +369,18 @@ model Grievance {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+model TournamentDraw {
+  id             String     @id @default(uuid())
+  tournamentId   String
+  tournament     Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  ageGroup       String
+  gender         String
+  weightCategory String
+  rounds         Json
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([tournamentId, ageGroup, gender, weightCategory])
+}
+

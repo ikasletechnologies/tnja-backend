@@ -621,3 +621,68 @@ export const approveTournament = async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+// ─── ANY AUTHORIZED: Get Tournament By Id ────────────────────────────────────
+export const getTournamentById = async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id },
+      include: {
+        club: { select: { name: true, district: { select: { name: true } } } }
+      }
+    });
+    if (!tournament) return res.status(404).json({ error: "Tournament not found" });
+    return res.json(tournament);
+  } catch (error) {
+    console.error("Error fetching tournament by ID:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// ─── ANY AUTHORIZED: Get Tournament Draws ────────────────────────────────────
+export const getTournamentDraws = async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  try {
+    const draws = await prisma.tournamentDraw.findMany({
+      where: { tournamentId: id }
+    });
+    return res.json(draws);
+  } catch (error) {
+    console.error("Error fetching draws:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// ─── ADMIN/CLUB: Save Tournament Draw ────────────────────────────────────────
+export const saveTournamentDraw = async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const { ageGroup, gender, weightCategory, rounds } = req.body;
+
+  try {
+    const draw = await prisma.tournamentDraw.upsert({
+      where: {
+        tournamentId_ageGroup_gender_weightCategory: {
+          tournamentId: id,
+          ageGroup,
+          gender,
+          weightCategory,
+        }
+      },
+      update: {
+        rounds
+      },
+      create: {
+        tournamentId: id,
+        ageGroup,
+        gender,
+        weightCategory,
+        rounds
+      }
+    });
+    return res.json({ message: "Draw saved successfully", draw });
+  } catch (error) {
+    console.error("Error saving draw:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
