@@ -6,7 +6,7 @@ import { getClubs } from "../controllers/clubController.js";
 import { getDistricts, getTaluksByDistrict, getTalukDetails } from "../controllers/locationController.js";
 import { authenticateJWT, authorizeAdmin, authorize } from "../middleware/authMiddleware.js";
 import { createEvent, getActiveEvents, getAdminEvents, applyForEvent, createEventPaymentOrder, verifyEventPayment } from "../controllers/eventController.js";
-import { createTournament, getClubTournaments, getTournamentRegistrations, updateRegistrationStatus, updateTournament, deleteTournament, getPlayerTournaments, createTournamentPaymentOrder, verifyTournamentPayment, getAdminTournaments, approveTournament, getApprovedTournaments, getTournamentById, getTournamentDraws, saveTournamentDraw } from "../controllers/tournamentController.js";
+import { createTournament, getClubTournaments, getTournamentRegistrations, updateRegistrationStatus, sendRegistrationReply, getRegistrationMessages, updateTournament, deleteTournament, getPlayerTournaments, createTournamentPaymentOrder, verifyTournamentPayment, getAdminTournaments, getAdminApprovedTournaments, approveTournament, sendTournamentReply, getApprovedTournaments, getTournamentById, getTournamentDraws, saveTournamentDraw } from "../controllers/tournamentController.js";
 
 const router = Router();
 
@@ -33,16 +33,20 @@ router.post("/tournaments/player/verify", authenticateJWT, verifyTournamentPayme
 
 // --- Admin Tournaments ---
 router.get("/tournaments/admin", authenticateJWT, authorize(["SUPER_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"]), getAdminTournaments);
+router.get("/tournaments/admin/approved", authenticateJWT, authorize(["SUPER_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"]), getAdminApprovedTournaments);
 
 // --- Parameterized Routes (MUST BE LAST) ---
 router.get("/tournaments/:id/registrations", authenticateJWT, getTournamentRegistrations);
 router.patch("/tournaments/:id/registrations/:regId", authenticateJWT, updateRegistrationStatus);
+router.post("/tournaments/:id/registrations/:regId/reply", authenticateJWT, sendRegistrationReply);
+router.get("/tournaments/:id/registrations/:regId/messages", authenticateJWT, getRegistrationMessages);
 router.get("/tournaments/:id", authenticateJWT, getTournamentById);
 router.get("/tournaments/:id/draws", authenticateJWT, getTournamentDraws);
 router.post("/tournaments/:id/draws", authenticateJWT, saveTournamentDraw);
 router.put("/tournaments/:id", authenticateJWT, updateTournament);
 router.delete("/tournaments/:id", authenticateJWT, deleteTournament);
 router.patch("/tournaments/:id/approve", authenticateJWT, authorize(["SUPER_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"]), approveTournament);
+router.post("/tournaments/:id/reply", authenticateJWT, authorize(["SUPER_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"]), sendTournamentReply);
 
 router.get("/districts", getDistricts);
 router.get("/districts/:districtId/taluks", getTaluksByDistrict);

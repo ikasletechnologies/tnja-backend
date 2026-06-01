@@ -342,8 +342,19 @@ model TournamentRegistration {
   weight       String?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
+  messages     TournamentRegistrationMessage[]
 
   @@unique([tournamentId, playerId])
+}
+
+model TournamentRegistrationMessage {
+  id             String                 @id @default(uuid())
+  registrationId String
+  registration   TournamentRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  senderRole     String                 // "CLUB" | "OFFICIAL" | "SYSTEM"
+  senderName     String
+  message        String
+  createdAt      DateTime               @default(now())
 }
 
 model GlobalSettings {
