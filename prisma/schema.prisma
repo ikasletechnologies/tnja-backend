@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 enum Status {
@@ -277,6 +278,7 @@ model Event {
   approvedAt      DateTime?
   isPaid          Boolean     @default(false)
   entryFee        Float       @default(0)
+  meetingLink     String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   registrations   EventRegistration[]
@@ -324,6 +326,8 @@ model Tournament {
   officialId         String?
   official           Member?                  @relation(fields: [officialId], references: [id])
   registrations      TournamentRegistration[]
+  draws              TournamentDraw[]
+  messages           TournamentMessage[]
   createdAt          DateTime                 @default(now())
   updatedAt          DateTime                 @updatedAt
 }
@@ -341,8 +345,19 @@ model TournamentRegistration {
   weight       String?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
+  messages     TournamentRegistrationMessage[]
 
   @@unique([tournamentId, playerId])
+}
+
+model TournamentRegistrationMessage {
+  id             String                 @id @default(uuid())
+  registrationId String
+  registration   TournamentRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  senderRole     String                 // "CLUB" | "OFFICIAL" | "SYSTEM"
+  senderName     String
+  message        String
+  createdAt      DateTime               @default(now())
 }
 
 model GlobalSettings {
@@ -365,6 +380,33 @@ model Grievance {
   status      Status   @default(PENDING)
   reply       String?
   remark      String?
+  images      String[] @default([])
+  documents   String[] @default([])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+model TournamentDraw {
+  id             String     @id @default(uuid())
+  tournamentId   String
+  tournament     Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  ageGroup       String
+  gender         String
+  weightCategory String
+  rounds         Json
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([tournamentId, ageGroup, gender, weightCategory])
+}
+
+model TournamentMessage {
+  id             String     @id @default(uuid())
+  tournamentId   String
+  tournament     Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  senderRole     String     // e.g. "SUPER_ADMIN", "CLUB", "DISTRICT_PRESIDENT", etc.
+  senderName     String
+  message        String
+  createdAt      DateTime   @default(now())
+}
+

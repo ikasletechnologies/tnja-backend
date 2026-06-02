@@ -9,6 +9,16 @@ export const createGrievance = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
+    // Extract files from request
+    const files = (req as any).files as Express.Multer.File[] || [];
+    const images = files
+      .filter(f => f.fieldname === "images")
+      .map(f => `${req.protocol}://${req.get("host")}/uploads/${f.filename}`);
+      
+    const documents = files
+      .filter(f => f.fieldname === "documents")
+      .map(f => `${req.protocol}://${req.get("host")}/uploads/${f.filename}`);
+
     const grievance = await prisma.grievance.create({
       data: {
         userId,
@@ -17,7 +27,9 @@ export const createGrievance = async (req: Request, res: Response) => {
         role,
         subject,
         description,
-        status: "PENDING"
+        status: "PENDING",
+        images,
+        documents
       }
     });
 

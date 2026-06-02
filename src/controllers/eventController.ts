@@ -9,7 +9,7 @@ const razorpay = new Razorpay({
 });
 
 export const createEvent = async (req: Request, res: Response) => {
-  const { title, description, date, location, level, participantType, districtId, zoneId, isPaid, entryFee } = req.body;
+  const { title, description, date, location, level, participantType, districtId, zoneId, isPaid, entryFee, meetingLink } = req.body;
   const { userId, role } = (req as any).user;
 
   try {
@@ -46,6 +46,7 @@ export const createEvent = async (req: Request, res: Response) => {
         status: "PENDING",
         isPaid: !!isPaid,
         entryFee: isPaid ? Number(entryFee) || 0 : 0,
+        meetingLink: meetingLink || null,
       },
     });
 
@@ -292,5 +293,26 @@ export const verifyEventPayment = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error verifying event payment:", error);
     return res.status(500).json({ error: "Payment verification failed" });
+  }
+};
+
+export const getEventSections = async (req: Request, res: Response) => {
+  try {
+    const sections = [
+      { name: "Skill test" },
+      { name: "Meeting" },
+      { name: "Seminar" },
+      { name: "Training camp" },
+      { name: "Sport's event" },
+      { name: "Charity event" },
+      { name: "Contest" },
+      { name: "Seminar (Online)" },
+      { name: "Conference" },
+      { name: "Challenge" }
+    ];
+    return res.json(sections);
+  } catch (error) {
+    console.error("Error fetching event sections:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 };

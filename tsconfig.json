@@ -41,5 +41,5 @@
     "moduleDetection": "force",
     "skipLibCheck": true,
   },
-  "exclude": ["node_modules", "dist", "prisma.config.ts", "scratch", "prisma", "update_validity.ts"]
+  "exclude": ["node_modules", "dist", "prisma.config.ts", "scratch", "prisma", "update_validity.ts", "fix-ceo-approval.ts"]
 }

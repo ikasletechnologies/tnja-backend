@@ -1,12 +1,12 @@
 import { Router } from "express";
 import { registerStudent, registerCoach, registerClub, registerMember } from "../controllers/registrationController.js";
-import { updateApplicationStatus, getApplicationDetails, getPendingApplications, getDashboardStats, getLocationAnalytics, createPaymentOrder, verifyPayment, getGlobalSettings, updateGlobalSettings, promoteMember } from "../controllers/adminController.js";
+import { updateApplicationStatus, getApplicationDetails, getPendingApplications, getDashboardStats, getLocationAnalytics, createPaymentOrder, verifyPayment, getGlobalSettings, updateGlobalSettings, promoteMember, forceCreateStudent, forceCreateClub, forceCreateMember } from "../controllers/adminController.js";
 import { getAllUsers, updateUserCredentials, updateUserProfile, getPublicCoaches, getPublicMembers } from "../controllers/userManagementController.js";
 import { getClubs } from "../controllers/clubController.js";
 import { getDistricts, getTaluksByDistrict, getTalukDetails } from "../controllers/locationController.js";
 import { authenticateJWT, authorizeAdmin, authorize } from "../middleware/authMiddleware.js";
-import { createEvent, getActiveEvents, getAdminEvents, applyForEvent, createEventPaymentOrder, verifyEventPayment } from "../controllers/eventController.js";
-import { createTournament, getClubTournaments, getTournamentRegistrations, updateRegistrationStatus, updateTournament, deleteTournament, getPlayerTournaments, createTournamentPaymentOrder, verifyTournamentPayment, getAdminTournaments, approveTournament, getApprovedTournaments } from "../controllers/tournamentController.js";
+import { createEvent, getActiveEvents, getAdminEvents, applyForEvent, createEventPaymentOrder, verifyEventPayment, getEventSections } from "../controllers/eventController.js";
+import { createTournament, getClubTournaments, getTournamentRegistrations, updateRegistrationStatus, sendRegistrationReply, getRegistrationMessages, updateTournament, deleteTournament, getPlayerTournaments, getPlayerPublicMatches, createTournamentPaymentOrder, verifyTournamentPayment, getAdminTournaments, getAdminApprovedTournaments, approveTournament, sendTournamentReply, getApprovedTournaments, getTournamentById, getTournamentDraws, saveTournamentDraw, getTournamentMessages } from "../controllers/tournamentController.js";
 
 const router = Router();
 
@@ -16,6 +16,7 @@ router.get("/events/active", authenticateJWT, getActiveEvents);
 router.get("/events/admin", authenticateJWT, authorizeAdmin, getAdminEvents);
 router.post("/events/create-payment-order", authenticateJWT, createEventPaymentOrder);
 router.post("/events/verify-payment", authenticateJWT, verifyEventPayment);
+router.get("/events/sections", authenticateJWT, getEventSections);
 
 // ── Tournament Routes ──────────────────────────────────────────────────────
 // Club
@@ -26,18 +27,29 @@ router.post("/tournaments/official/create", authenticateJWT, authorize(["DISTRIC
 router.get("/tournaments/official/my", authenticateJWT, authorize(["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN"]), getClubTournaments); // Reusing getClubTournaments since we can modify it
 
 router.get("/tournaments/approved", authenticateJWT, getApprovedTournaments);
-router.get("/tournaments/:id/registrations", authenticateJWT, getTournamentRegistrations);
-router.patch("/tournaments/:id/registrations/:regId", authenticateJWT, updateRegistrationStatus);
-router.put("/tournaments/:id", authenticateJWT, updateTournament);
-router.delete("/tournaments/:id", authenticateJWT, deleteTournament);
 // Player
 router.get("/tournaments/player", authenticateJWT, getPlayerTournaments);
-router.post("/tournaments/create-payment-order", authenticateJWT, createTournamentPaymentOrder);
-router.post("/tournaments/verify-payment", authenticateJWT, verifyTournamentPayment);
+router.get("/tournaments/player/matches", authenticateJWT, getPlayerPublicMatches);
+router.post("/tournaments/player/pay", authenticateJWT, createTournamentPaymentOrder);
+router.post("/tournaments/player/verify", authenticateJWT, verifyTournamentPayment);
 
 // --- Admin Tournaments ---
 router.get("/tournaments/admin", authenticateJWT, authorize(["SUPER_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"]), getAdminTournaments);
+router.get("/tournaments/admin/approved", authenticateJWT, authorize(["SUPER_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"]), getAdminApprovedTournaments);
+
+// --- Parameterized Routes (MUST BE LAST) ---
+router.get("/tournaments/:id/registrations", authenticateJWT, getTournamentRegistrations);
+router.patch("/tournaments/:id/registrations/:regId", authenticateJWT, updateRegistrationStatus);
+router.post("/tournaments/:id/registrations/:regId/reply", authenticateJWT, sendRegistrationReply);
+router.get("/tournaments/:id/registrations/:regId/messages", authenticateJWT, getRegistrationMessages);
+router.get("/tournaments/:id", authenticateJWT, getTournamentById);
+router.get("/tournaments/:id/draws", authenticateJWT, getTournamentDraws);
+router.post("/tournaments/:id/draws", authenticateJWT, saveTournamentDraw);
+router.put("/tournaments/:id", authenticateJWT, updateTournament);
+router.delete("/tournaments/:id", authenticateJWT, deleteTournament);
 router.patch("/tournaments/:id/approve", authenticateJWT, authorize(["SUPER_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"]), approveTournament);
+router.post("/tournaments/:id/reply", authenticateJWT, authorize(["SUPER_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "CLUB"]), sendTournamentReply);
+router.get("/tournaments/:id/messages", authenticateJWT, getTournamentMessages);
 
 router.get("/districts", getDistricts);
 router.get("/districts/:districtId/taluks", getTaluksByDistrict);
@@ -60,6 +72,11 @@ router.get("/admin/stats", authenticateJWT, authorizeAdmin, getDashboardStats);
 router.get("/admin/location-analytics", authenticateJWT, authorizeAdmin, getLocationAnalytics);
 router.post("/application/create-order", authenticateJWT, createPaymentOrder);
 router.post("/application/verify-payment", authenticateJWT, verifyPayment);
+
+// Super Admin Direct Creation
+router.post("/admin/create-student", authenticateJWT, authorize(["SUPER_ADMIN", "CEO"]), forceCreateStudent);
+router.post("/admin/create-club", authenticateJWT, authorize(["SUPER_ADMIN", "CEO"]), forceCreateClub);
+router.post("/admin/create-member", authenticateJWT, authorize(["SUPER_ADMIN", "CEO"]), forceCreateMember);
 
 router.get("/settings/global", getGlobalSettings);
 router.patch("/settings/global", authenticateJWT, authorizeAdmin, updateGlobalSettings);

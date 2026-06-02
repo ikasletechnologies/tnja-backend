@@ -964,3 +964,244 @@ export const getLocationAnalytics = async (req: Request, res: Response) => {
   }
 };
 
+// ──────────────────────────────────────────────────────────────────────────────
+// POST /api/admin/create-student – Force create a student
+// ──────────────────────────────────────────────────────────────────────────────
+export const forceCreateStudent = async (req: Request, res: Response) => {
+  const { role } = (req as any).user;
+  if (role !== "SUPER_ADMIN" && role !== "CEO") {
+    return res.status(403).json({ error: "Only Super Admin can force create players" });
+  }
+
+  const { 
+    fullName, email, mobileNumber, districtId, talukId, gender, dob, aadhaarNumber,
+    bloodGroup, address, city, state, addressPincode, nationality, annualIncome, 
+    schoolName, grade, areaOfInterest, areaOfStudy, preferLocation, clubId
+  } = req.body;
+
+  try {
+    const existing = await prisma.student.findFirst({
+      where: {
+        OR: [
+          { email },
+          { mobileNumber },
+          { aadhaarNumber }
+        ]
+      }
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: "Player with this email, mobile or Aadhaar already exists" });
+    }
+
+    const { raw, hashed } = await generatePassword();
+    const permanentId = generatePermanentId("STU");
+    const tempId = `TEMP-STU-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+
+    const student = await prisma.student.create({
+      data: {
+        fullName,
+        email,
+        mobileNumber,
+        districtId,
+        talukId,
+        gender,
+        dob: new Date(dob),
+        aadhaarNumber,
+        tempId,
+        permanentId,
+        password: hashed,
+        status: "APPROVED",
+        isPaid: true,
+        mustChangePassword: true,
+        age: new Date().getFullYear() - new Date(dob).getFullYear(),
+        pincode: addressPincode || "000000",
+        bloodGroup,
+        address,
+        city,
+        state,
+        addressPincode,
+        nationality,
+        annualIncome: Number(annualIncome),
+        schoolName,
+        grade,
+        areaOfInterest,
+        areaOfStudy,
+        preferLocation,
+        clubId: clubId || null
+      }
+    });
+
+    try {
+      await sendApprovalEmail({
+        toEmail: student.email,
+        toName: student.fullName,
+        tempId: student.tempId,
+        permanentId: student.permanentId!,
+        password: raw,
+        role: "Student",
+      });
+    } catch (mailErr) {
+      console.error("[Mailer] Failed to send approval email:", mailErr);
+    }
+
+    return res.status(201).json({ message: "Player created successfully", data: student });
+  } catch (error) {
+    console.error("[forceCreateStudent]", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// POST /api/admin/create-club – Force create a club
+// ──────────────────────────────────────────────────────────────────────────────
+export const forceCreateClub = async (req: Request, res: Response) => {
+  const { role } = (req as any).user;
+  if (role !== "SUPER_ADMIN" && role !== "CEO") {
+    return res.status(403).json({ error: "Only Super Admin can force create clubs" });
+  }
+
+  const { 
+    name, email, mobileNumber, districtId, talukId, 
+    address1, address2, pincode, president, secretary, coach 
+  } = req.body;
+
+  try {
+    const existing = await prisma.club.findFirst({
+      where: {
+        OR: [
+          { email },
+          { mobileNumber }
+        ]
+      }
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: "Club with this email or mobile number already exists" });
+    }
+
+    const { raw, hashed } = await generatePassword();
+    const permanentId = generatePermanentId("CLB");
+    const tempId = `TEMP-CLB-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+
+    const club = await prisma.club.create({
+      data: {
+        name,
+        email,
+        mobileNumber,
+        districtId,
+        talukId,
+        tempId,
+        permanentId,
+        password: hashed,
+        status: "APPROVED",
+        isPaid: true,
+        mustChangePassword: true,
+        pincode,
+        address1,
+        address2: address2 || null,
+        president,
+        secretary,
+        coach,
+      }
+    });
+
+    try {
+      await sendApprovalEmail({
+        toEmail: club.email,
+        toName: club.name,
+        tempId: club.tempId!,
+        permanentId: club.permanentId!,
+        password: raw,
+        role: "Club",
+      });
+    } catch (mailErr) {
+      console.error("[Mailer] Failed to send approval email:", mailErr);
+    }
+
+    return res.status(201).json({ message: "Club created successfully", data: club });
+  } catch (error) {
+    console.error("[forceCreateClub]", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// POST /api/admin/create-member – Force create a member
+// ──────────────────────────────────────────────────────────────────────────────
+export const forceCreateMember = async (req: Request, res: Response) => {
+  const { role } = (req as any).user;
+  if (role !== "SUPER_ADMIN" && role !== "CEO") {
+    return res.status(403).json({ error: "Only Super Admin can force create members" });
+  }
+
+  const { 
+    fullName, email, mobileNumber, districtId, talukId, gender, dob, aadhaarNumber,
+    fatherName, bloodGroup, addressLine1, addressLine2, city, addressPincode
+  } = req.body;
+
+  try {
+    const existing = await prisma.member.findFirst({
+      where: {
+        OR: [
+          { email },
+          { mobileNumber },
+          { aadhaarNumber }
+        ]
+      }
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: "Member with this email, mobile or Aadhaar already exists" });
+    }
+
+    const { raw, hashed } = await generatePassword();
+    const permanentId = generatePermanentId("MEM");
+    const tempId = `TEMP-MEM-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+
+    const member = await prisma.member.create({
+      data: {
+        fullName,
+        email,
+        mobileNumber,
+        districtId,
+        talukId,
+        gender,
+        dob: new Date(dob),
+        aadhaarNumber,
+        tempId,
+        permanentId,
+        password: hashed,
+        status: "APPROVED",
+        isPaid: true,
+        mustChangePassword: true,
+        pincode: addressPincode || "000000",
+        fatherName,
+        bloodGroup,
+        addressLine1,
+        addressLine2: addressLine2 || null,
+        city,
+        addressPincode,
+      }
+    });
+
+    try {
+      await sendApprovalEmail({
+        toEmail: member.email,
+        toName: member.fullName,
+        tempId: member.tempId,
+        permanentId: member.permanentId!,
+        password: raw,
+        role: "Member",
+      });
+    } catch (mailErr) {
+      console.error("[Mailer] Failed to send approval email:", mailErr);
+    }
+
+    return res.status(201).json({ message: "Member created successfully", data: member });
+  } catch (error) {
+    console.error("[forceCreateMember]", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
