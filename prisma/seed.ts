@@ -352,7 +352,7 @@ async function main() {
         areaOfStudy: "Science",
         preferLocation: "Chennai",
         status: "APPROVED" as Status,
-        isPaid: false,
+        isPaid: true,
         password: hashedPwd,
         wins: 5,
         losses: 1,
@@ -416,7 +416,7 @@ async function main() {
         areaOfStudy: "Arts",
         preferLocation: "Madurai",
         status: "APPROVED" as Status,
-        isPaid: false,
+        isPaid: true,
         password: hashedPwd,
         wins: 7,
         losses: 2,
@@ -512,7 +512,7 @@ async function main() {
         areaOfStudy: "Arts",
         preferLocation: "Madurai",
         status: "APPROVED" as Status,
-        isPaid: false,
+        isPaid: true,
         password: hashedPwd,
         wins: 6,
         losses: 6,
@@ -559,17 +559,22 @@ async function main() {
       ? await prisma.taluk.findFirst({ where: { name: "Madurai North", districtId: maduraiDistrict.id } })
       : null;
 
+    // Fetch clubs to link players
+    const chennaiClub = await prisma.club.findFirst({ where: { email: "tnja@example.com" } });
+    const maduraiClub = await prisma.club.findFirst({ where: { email: "maduraimartial@example.com" } });
+
     for (const playerData of playersToSeed) {
       const isMadurai = playerData.city === "Madurai";
       const districtId = isMadurai && maduraiDistrict ? maduraiDistrict.id : chennaiDistrict.id;
       const talukId = isMadurai && maduraiNorthTaluk ? maduraiNorthTaluk.id : mylaporeTaluk.id;
+      const clubId = isMadurai ? (maduraiClub?.id ?? null) : (chennaiClub?.id ?? null);
 
       const student = await prisma.student.upsert({
         where: { tempId: playerData.tempId },
-        update: { ...playerData, districtId, talukId },
-        create: { ...playerData, districtId, talukId }
+        update: { ...playerData, districtId, talukId, clubId },
+        create: { ...playerData, districtId, talukId, clubId }
       });
-      console.log(`Upserted Player: ${student.fullName} (${student.gender}, ${student.city})`);
+      console.log(`Upserted Player: ${student.fullName} (${student.gender}, ${student.city}) → Club: ${clubId ? "linked" : "none"}`);
     }
   }
 

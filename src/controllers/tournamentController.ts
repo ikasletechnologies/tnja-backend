@@ -431,6 +431,72 @@ export const getPlayerTournaments = async (req: Request, res: Response) => {
   }
 };
 
+// ─── PLAYER: Get District / State / National Matches ─────────────────────────
+// District matches: level=DISTRICT, club in player's district
+// State matches:    level=STATE, approved
+// National matches: level=NATIONAL, approved
+export const getPlayerPublicMatches = async (req: Request, res: Response) => {
+  const { userId, role } = (req as any).user;
+
+  if (role !== "PLAYER" && role !== "STUDENT") {
+    return res.status(403).json({ error: "Only players can access this endpoint" });
+  }
+
+  try {
+    const player = await prisma.student.findUnique({
+      where: { id: userId },
+      select: { districtId: true, isPaid: true, isBPL: true },
+    });
+
+    if (!player) return res.status(404).json({ error: "Player not found" });
+
+    // District-level: only from clubs in same district
+    const districtTournaments = await prisma.tournament.findMany({
+      where: {
+        status: "APPROVED",
+        level: "DISTRICT",
+        club: { districtId: player.districtId },
+      },
+      include: {
+        _count: { select: { registrations: true } },
+        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true } },
+        club: { select: { name: true, district: { select: { name: true } } } },
+      },
+      orderBy: { date: "asc" },
+    });
+
+    // State & National: open to all players
+    const stateNationalTournaments = await prisma.tournament.findMany({
+      where: {
+        status: "APPROVED",
+        level: { in: ["STATE", "NATIONAL"] },
+      },
+      include: {
+        _count: { select: { registrations: true } },
+        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true } },
+        club: { select: { name: true, district: { select: { name: true } } } },
+      },
+      orderBy: { date: "asc" },
+    });
+
+    const mapTournament = (t: any) => ({
+      ...t,
+      registrationCount: t._count.registrations,
+      myRegistration: t.registrations[0] || null,
+      registrations: undefined,
+      _count: undefined,
+    });
+
+    return res.json({
+      district: districtTournaments.map(mapTournament),
+      stateAndNational: stateNationalTournaments.map(mapTournament),
+    });
+  } catch (error) {
+    console.error("Error fetching player public matches:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 // ─── PLAYER: Create Tournament Payment Order ────────────────────────────────
 export const createTournamentPaymentOrder = async (req: Request, res: Response) => {
   const { userId, role } = (req as any).user;
@@ -447,7 +513,7 @@ export const createTournamentPaymentOrder = async (req: Request, res: Response) 
   try {
     const player = await prisma.student.findUnique({
       where: { id: userId },
-      select: { clubId: true, isPaid: true, isBPL: true },
+      select: { clubId: true, districtId: true, isPaid: true, isBPL: true },
     });
 
     if (!player) return res.status(404).json({ error: "Player not found" });
@@ -455,11 +521,26 @@ export const createTournamentPaymentOrder = async (req: Request, res: Response) 
       return res.status(403).json({ error: "Complete your membership payment before joining a tournament" });
     }
 
-    const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      include: { club: { select: { districtId: true } } },
+    });
     if (!tournament) return res.status(404).json({ error: "Tournament not found" });
-    if (tournament.clubId !== player.clubId) {
-      return res.status(403).json({ error: "This tournament is not for your club" });
+
+    // ── Access restriction based on tournament level ──────────────────────
+    if (tournament.level === "DISTRICT") {
+      // District match: player must be from the same district as the organising club
+      const tournamentDistrictId = tournament.club?.districtId;
+      if (!tournamentDistrictId || tournamentDistrictId !== player.districtId) {
+        return res.status(403).json({ error: "This district match is only open to players from the same district" });
+      }
+    } else if (tournament.level === "CLUB") {
+      // Club tournament: player must belong to the same club
+      if (tournament.clubId !== player.clubId) {
+        return res.status(403).json({ error: "This tournament is only for members of the organising club" });
+      }
     }
+    // STATE and NATIONAL: no restriction — any player can register
 
     // Check slots
     const regCount = await prisma.tournamentRegistration.count({ where: { tournamentId } });
@@ -487,8 +568,9 @@ export const createTournamentPaymentOrder = async (req: Request, res: Response) 
         },
       });
 
-      if (tournament.clubId) {
-        sendNotificationToUser(tournament.clubId, {
+      const freOrganiserId = tournament.clubId || tournament.officialId;
+      if (freOrganiserId) {
+        sendNotificationToUser(freOrganiserId, {
           type: "NEW_TOURNAMENT_REGISTRATION",
           message: `A player has registered for your tournament "${tournament.title}". Review and approve in Tournaments.`,
           tournamentId,
@@ -562,9 +644,10 @@ export const verifyTournamentPayment = async (req: Request, res: Response) => {
       },
     });
 
-    // Notify the club that a new player registered
-    if (tournament.clubId) {
-      sendNotificationToUser(tournament.clubId, {
+    // Notify the organiser (club or official) that a new player registered
+    const organiserId = tournament.clubId || tournament.officialId;
+    if (organiserId) {
+      sendNotificationToUser(organiserId, {
         type: "NEW_TOURNAMENT_REGISTRATION",
         message: `A player has paid and registered for your tournament "${tournament.title}". Review and approve in Tournaments.`,
         tournamentId,
@@ -573,7 +656,7 @@ export const verifyTournamentPayment = async (req: Request, res: Response) => {
     }
 
     return res.status(201).json({
-      message: "Payment verified. Registration submitted for club approval.",
+      message: "Payment verified. Registration submitted for approval.",
       registration,
     });
   } catch (error) {
