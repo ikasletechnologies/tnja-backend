@@ -154,6 +154,82 @@ export const getProfile = async (req, res) => {
         return res.status(500).json({ error: "Internal Server Error" });
     }
 };
+export const updateProfile = async (req, res) => {
+    const { userId, role } = req.user;
+    const updates = req.body;
+    try {
+        let updatedUser = null;
+        if (role === "SUPER_ADMIN") {
+            return res.status(403).json({ error: "Cannot update Super Admin profile from this endpoint" });
+        }
+        if (role === "PLAYER") {
+            updatedUser = await prisma.student.update({
+                where: { id: userId },
+                data: {
+                    fullName: updates.fullName !== undefined ? updates.fullName : undefined,
+                    fatherName: updates.fatherName !== undefined ? updates.fatherName : undefined,
+                    bloodGroup: updates.bloodGroup !== undefined ? updates.bloodGroup : undefined,
+                    gender: updates.gender !== undefined ? updates.gender : undefined,
+                    height: updates.height !== undefined ? updates.height : undefined,
+                    weight: updates.weight !== undefined ? updates.weight : undefined,
+                    mobileNumber: updates.mobileNumber !== undefined ? updates.mobileNumber : undefined,
+                    // Add other common editable fields if necessary
+                    address: updates.address !== undefined ? updates.address : undefined,
+                    city: updates.city !== undefined ? updates.city : undefined,
+                    state: updates.state !== undefined ? updates.state : undefined,
+                    addressPincode: updates.addressPincode !== undefined ? updates.addressPincode : undefined,
+                }
+            });
+        }
+        else if (role === "COACH") {
+            updatedUser = await prisma.coachReferee.update({
+                where: { id: userId },
+                data: {
+                    fullName: updates.fullName !== undefined ? updates.fullName : undefined,
+                    fatherName: updates.fatherName !== undefined ? updates.fatherName : undefined,
+                    bloodGroup: updates.bloodGroup !== undefined ? updates.bloodGroup : undefined,
+                    gender: updates.gender !== undefined ? updates.gender : undefined,
+                    mobileNumber: updates.mobileNumber !== undefined ? updates.mobileNumber : undefined,
+                }
+            });
+        }
+        else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role)) {
+            updatedUser = await prisma.member.update({
+                where: { id: userId },
+                data: {
+                    fullName: updates.fullName !== undefined ? updates.fullName : undefined,
+                    fatherName: updates.fatherName !== undefined ? updates.fatherName : undefined,
+                    bloodGroup: updates.bloodGroup !== undefined ? updates.bloodGroup : undefined,
+                    mobileNumber: updates.mobileNumber !== undefined ? updates.mobileNumber : undefined,
+                }
+            });
+        }
+        else if (role === "CLUB") {
+            updatedUser = await prisma.club.update({
+                where: { id: userId },
+                data: {
+                    name: updates.fullName !== undefined ? updates.fullName : undefined, // Assuming club uses name
+                    mobileNumber: updates.mobileNumber !== undefined ? updates.mobileNumber : undefined,
+                    president: updates.president !== undefined ? updates.president : undefined,
+                    secretary: updates.secretary !== undefined ? updates.secretary : undefined,
+                    coach: updates.coach !== undefined ? updates.coach : undefined,
+                }
+            });
+        }
+        if (!updatedUser) {
+            return res.status(404).json({ error: "User not found or role unhandled" });
+        }
+        const { password: _, ...safeData } = updatedUser;
+        return res.json({
+            message: "Profile updated successfully",
+            user: safeData
+        });
+    }
+    catch (error) {
+        console.error("Update profile error:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};
 export const changePassword = async (req, res) => {
     const { currentPassword, newPassword } = req.body;
     const { userId, role } = req.user;

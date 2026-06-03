@@ -67,6 +67,7 @@ export const getAllUsers = async (req, res) => {
                 where,
                 select: {
                     id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, districtId: true,
+                    validUntil: true,
                     district: { select: { name: true } }, taluk: { select: { name: true } },
                     profilePhoto: true, aadhaarProof: true, incomeProof: true, bplProof: true,
                     wins: true, losses: true, draws: true, coachId: true,
@@ -77,6 +78,7 @@ export const getAllUsers = async (req, res) => {
                 where,
                 select: {
                     id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, districtId: true,
+                    validUntil: true,
                     district: { select: { name: true } }, taluk: { select: { name: true } },
                     profilePhoto: true
                 },
@@ -85,13 +87,14 @@ export const getAllUsers = async (req, res) => {
                 where,
                 select: {
                     id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, role: true, createdAt: true, districtId: true,
+                    validUntil: true,
                     district: { select: { name: true } }, taluk: { select: { name: true } },
                     profilePhoto: true, aadhaarFront: true, aadhaarBack: true
                 },
             }),
             prisma.club.findMany({
                 where,
-                select: { id: true, name: true, email: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, districtId: true, district: { select: { name: true } }, taluk: { select: { name: true } } },
+                select: { id: true, name: true, email: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, districtId: true, validUntil: true, district: { select: { name: true } }, taluk: { select: { name: true } } },
             }),
         ]);
         const allUsers = [

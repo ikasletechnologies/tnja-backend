@@ -6,7 +6,7 @@ const razorpay = new Razorpay({
     key_secret: process.env.RAZORPAY_KEY_SECRET || "",
 });
 export const createEvent = async (req, res) => {
-    const { title, description, date, location, level, participantType, districtId, zoneId, isPaid, entryFee } = req.body;
+    const { title, description, date, location, level, participantType, districtId, zoneId, isPaid, entryFee, meetingLink } = req.body;
     const { userId, role } = req.user;
     try {
         // Only CLUB role or admin roles can propose events
@@ -38,6 +38,7 @@ export const createEvent = async (req, res) => {
                 status: "PENDING",
                 isPaid: !!isPaid,
                 entryFee: isPaid ? Number(entryFee) || 0 : 0,
+                meetingLink: meetingLink || null,
             },
         });
         return res.status(201).json({ message: "Event proposed successfully", event: newEvent });
@@ -266,6 +267,27 @@ export const verifyEventPayment = async (req, res) => {
     catch (error) {
         console.error("Error verifying event payment:", error);
         return res.status(500).json({ error: "Payment verification failed" });
+    }
+};
+export const getEventSections = async (req, res) => {
+    try {
+        const sections = [
+            { name: "Skill test" },
+            { name: "Meeting" },
+            { name: "Seminar" },
+            { name: "Training camp" },
+            { name: "Sport's event" },
+            { name: "Charity event" },
+            { name: "Contest" },
+            { name: "Seminar (Online)" },
+            { name: "Conference" },
+            { name: "Challenge" }
+        ];
+        return res.json(sections);
+    }
+    catch (error) {
+        console.error("Error fetching event sections:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
     }
 };
 //# sourceMappingURL=eventController.js.map

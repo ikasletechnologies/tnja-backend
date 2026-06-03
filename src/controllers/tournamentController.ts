@@ -445,7 +445,12 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
   try {
     const player = await prisma.student.findUnique({
       where: { id: userId },
-      select: { districtId: true, isPaid: true, isBPL: true },
+      select: { 
+        districtId: true, 
+        isPaid: true, 
+        isBPL: true,
+        district: { select: { zoneName: true } }
+      },
     });
 
     if (!player) return res.status(404).json({ error: "Player not found" });
@@ -456,6 +461,25 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
         status: "APPROVED",
         level: "DISTRICT",
         club: { districtId: player.districtId },
+      },
+      include: {
+        _count: { select: { registrations: true } },
+        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true } },
+        club: { select: { name: true, district: { select: { name: true } } } },
+      },
+      orderBy: { date: "asc" },
+    });
+
+    // Zonal-level: level=ZONE
+    const zonalTournaments = await prisma.tournament.findMany({
+      where: {
+        status: "APPROVED",
+        level: "ZONE",
+        club: {
+          district: {
+            zoneName: player.district?.zoneName ?? ""
+          }
+        }
       },
       include: {
         _count: { select: { registrations: true } },
@@ -489,6 +513,7 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
 
     return res.json({
       district: districtTournaments.map(mapTournament),
+      zonal: zonalTournaments.map(mapTournament),
       stateAndNational: stateNationalTournaments.map(mapTournament),
     });
   } catch (error) {

@@ -25,6 +25,7 @@ enum Gender {
 model District {
   id        String   @id @default(uuid())
   name      String   @unique
+  zoneName  String?
   taluks    Taluk[]
   students  Student[]
   coaches   CoachReferee[]

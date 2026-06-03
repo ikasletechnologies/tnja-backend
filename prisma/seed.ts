@@ -63,8 +63,8 @@ async function main() {
   for (const locationData of tnLocations) {
     const district = await prisma.district.upsert({
       where: { name: locationData.name },
-      update: {},
-      create: { name: locationData.name }
+      update: { zoneName: locationData.zone },
+      create: { name: locationData.name, zoneName: locationData.zone }
     });
 
     console.log(`Processing District: ${locationData.name}`);

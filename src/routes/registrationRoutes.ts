@@ -7,6 +7,7 @@ import { getDistricts, getTaluksByDistrict, getTalukDetails } from "../controlle
 import { authenticateJWT, authorizeAdmin, authorize } from "../middleware/authMiddleware.js";
 import { createEvent, getActiveEvents, getAdminEvents, applyForEvent, createEventPaymentOrder, verifyEventPayment, getEventSections } from "../controllers/eventController.js";
 import { createTournament, getClubTournaments, getTournamentRegistrations, updateRegistrationStatus, sendRegistrationReply, getRegistrationMessages, updateTournament, deleteTournament, getPlayerTournaments, getPlayerPublicMatches, createTournamentPaymentOrder, verifyTournamentPayment, getAdminTournaments, getAdminApprovedTournaments, approveTournament, sendTournamentReply, getApprovedTournaments, getTournamentById, getTournamentDraws, saveTournamentDraw, getTournamentMessages } from "../controllers/tournamentController.js";
+import scoreboardOptions from "../data/scoreboardOptions.json" with { type: "json" };
 
 const router = Router();
 
@@ -50,6 +51,10 @@ router.delete("/tournaments/:id", authenticateJWT, deleteTournament);
 router.patch("/tournaments/:id/approve", authenticateJWT, authorize(["SUPER_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"]), approveTournament);
 router.post("/tournaments/:id/reply", authenticateJWT, authorize(["SUPER_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "CLUB"]), sendTournamentReply);
 router.get("/tournaments/:id/messages", authenticateJWT, getTournamentMessages);
+
+router.get("/scoreboard/options", (req, res) => {
+  return res.json(scoreboardOptions);
+});
 
 router.get("/districts", getDistricts);
 router.get("/districts/:districtId/taluks", getTaluksByDistrict);
