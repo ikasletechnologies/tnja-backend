@@ -31,6 +31,13 @@ interface ApprovalMailOptions {
 export async function sendApprovalEmail(opts: ApprovalMailOptions) {
   const { toEmail, toName, tempId, permanentId, password, role } = opts;
 
+  const idLabel = role === "Student" ? "Player ID" :
+                  role === "Coach" ? "Coach ID" :
+                  role === "Club" ? "Club ID" : "Member ID";
+  const tempIdLabel = role === "Student" ? "Temporary Player ID" :
+                      role === "Coach" ? "Temporary Coach ID" :
+                      role === "Club" ? "Temporary Club ID" : "Temporary Member ID";
+
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -78,11 +85,11 @@ export async function sendApprovalEmail(opts: ApprovalMailOptions) {
         <div class="credentials">
           <table>
             <tr>
-              <td>Temporary ID</td>
+              <td>${tempIdLabel}</td>
               <td>${tempId}</td>
             </tr>
             <tr>
-              <td>Permanent ID</td>
+              <td>${idLabel}</td>
               <td><strong>${permanentId}</strong></td>
             </tr>
             <tr>
@@ -196,6 +203,13 @@ export async function sendPaymentRequestEmail(opts: {
 }) {
   const { toEmail, toName, tempId, password, role } = opts;
 
+  const idLabel = role === "Player" ? "Player ID" :
+                  role === "Coach" ? "Coach ID" :
+                  role === "Club" ? "Club ID" : "Member ID";
+  const tempIdLabel = role === "Player" ? "Temporary Player ID" :
+                      role === "Coach" ? "Temporary Coach ID" :
+                      role === "Club" ? "Temporary Club ID" : "Temporary Member ID";
+
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -232,13 +246,13 @@ export async function sendPaymentRequestEmail(opts: {
         <h2> Good News!</h2>
         <p>Dear <strong>${toName}</strong>,</p>
         <p>Your <strong>${role}</strong> application has been <strong>APPROVED</strong> by the TNJA Admin.</p>
-        <p>To finalize your registration and receive your <strong>Permanent ID</strong>, please log in to the portal and complete the membership payment.</p>
+        <p>To finalize your registration and receive your <strong>${idLabel}</strong>, please log in to the portal and complete the membership payment.</p>
         
         <div class="action">
           <p style="margin-bottom:12px; font-weight:700; color:#1e3a8a;">Your Login Credentials:</p>
           <table>
             <tr>
-              <td>Temporary ID</td>
+              <td>${tempIdLabel}</td>
               <td><strong>${tempId}</strong></td>
             </tr>
             <tr>
@@ -248,7 +262,7 @@ export async function sendPaymentRequestEmail(opts: {
           </table>
         </div>
 
-        <p>Once the payment is successful, your Permanent ID and final credentials will be issued immediately.</p>
+        <p>Once the payment is successful, your ${idLabel} and final credentials will be issued immediately.</p>
         <p>Regards,<br/><strong>TNJA Admin Team</strong></p>
       </div>
       <div class="footer">
@@ -397,4 +411,104 @@ export async function sendResetPasswordEmail(opts: {
   });
 
   console.log(`[Mailer] Password reset email sent to ${toEmail}`);
+}
+
+export async function sendEventRegistrationEmail(opts: {
+  toEmail: string;
+  toName: string;
+  eventName: string;
+  eventDate: string;
+  eventLocation: string;
+  amountPaid: number;
+  paymentId: string;
+}) {
+  const { toEmail, toName, eventName, eventDate, eventLocation, amountPaid, paymentId } = opts;
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+    body { margin:0; font-family:'Roboto',sans-serif; background:#f1f5f9; color:#333; }
+    .wrapper { padding: 40px 20px; }
+    .container { max-width:600px; margin:auto; background:#fff; border-radius:16px; overflow:hidden;
+                 box-shadow:0 8px 32px rgba(0,0,0,0.12); }
+    .header { background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);
+              padding:36px 40px; text-align:center; }
+    .header h1 { color:#fff; margin:0; font-size:22px; }
+    .body { padding:36px 40px; }
+    .body h2 { color:#0f172a; margin-top:0; }
+    .body p  { color:#475569; line-height:1.7; }
+    .receipt { background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px;
+               padding:20px 24px; margin:24px 0; }
+    .receipt table { width:100%; border-collapse:collapse; }
+    .receipt td { padding:10px 0; border-bottom:1px solid #f1f5f9; font-size:15px; }
+    .receipt td:first-child { font-weight:700; color:#0f172a; width:45%; }
+    .receipt tr:last-child td { border-bottom:none; }
+    .footer { background:#f8fafc; padding:20px 40px; text-align:center;
+              border-top:1px solid #e2e8f0; color:#94a3b8; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="header">
+        <h1>Tamil Nadu Judo Association</h1>
+        <p style="color:#94a3b8; margin:6px 0 0;">Event Application & Receipt</p>
+      </div>
+      <div class="body">
+        <h2>Event Registration Successful!</h2>
+        <p>Dear <strong>${toName}</strong>,</p>
+        <p>Your registration for the event <strong>${eventName}</strong> has been successfully processed and approved.</p>
+        <p>Here is your official payment receipt and registration details:</p>
+        
+        <div class="receipt">
+          <table>
+            <tr>
+              <td>Event Name</td>
+              <td>${eventName}</td>
+            </tr>
+            <tr>
+              <td>Event Date</td>
+              <td>${eventDate}</td>
+            </tr>
+            <tr>
+              <td>Location</td>
+              <td>${eventLocation}</td>
+            </tr>
+            <tr>
+              <td>Amount Paid</td>
+              <td><strong>₹ ${amountPaid}</strong></td>
+            </tr>
+            <tr>
+              <td>Payment ID</td>
+              <td><code>${paymentId}</code></td>
+            </tr>
+            <tr>
+              <td>Registration Status</td>
+              <td><span style="color:#16a34a; font-weight:bold;">APPROVED</span></td>
+            </tr>
+          </table>
+        </div>
+
+        <p>Thank you for your participation. We wish you the very best for the event!</p>
+        <p>Regards,<br/><strong>TNJA Admin Team</strong></p>
+      </div>
+      <div class="footer">
+        © ${new Date().getFullYear()} Tamil Nadu Judo Association. All rights reserved.
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  await transporter.sendMail({
+    from: `"${SMTP_FROM_NAME}" <${SMTP_USER}>`,
+    to: `"${toName}" <${toEmail}>`,
+    subject: `TNJA Event Registration & Receipt: ${eventName}`,
+    html,
+  });
+
+  console.log(`[Mailer] Event registration receipt email sent to ${toEmail} for event ${eventName}`);
 }

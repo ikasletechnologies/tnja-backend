@@ -58,7 +58,7 @@ export const login = async (req: Request, res: Response) => {
     // ── Club ──────────────────────────────────────────────────────────────────
     if (!user) {
       user = await prisma.club.findFirst({
-        where: { OR: [{ email: identifier }, { permanentId: identifier }] },
+        where: { OR: [{ email: identifier }, { permanentId: identifier }, { tempId: identifier }] },
       });
       if (user) role = "CLUB";
     }
@@ -93,7 +93,7 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Incorrect password" });
     }
 
-    const isMemberRole = ["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "DISTRICT_ADMIN"].includes(role);
+    const isMemberRole = ["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role);
     const tokenPayload: any = { userId: user.id, role: role };
     if (isMemberRole && user.districtId) {
       tokenPayload.districtId = user.districtId;
@@ -109,13 +109,13 @@ export const login = async (req: Request, res: Response) => {
       message: "Login successful",
       user: {
         id: user.id,
-        fullName: user.fullName,
+        fullName: user.fullName || user.name,
         email: user.email,
         status: user.status,
         tempId: user.tempId,
         permanentId: user.permanentId,
         districtId: user.districtId,
-        mustChangePassword: user.mustChangePassword
+        mustChangePassword: user.permanentId ? user.mustChangePassword : false
       },
       role,
       token,
@@ -143,14 +143,14 @@ export const getProfile = async (req: any, res: Response) => {
     if (role === "PLAYER") {
       userData = await prisma.student.findUnique({
         where: { id: userId },
-        include: { district: true, taluk: true, club: true }
+        include: { district: true, taluk: true, club: true, coach: true }
       });
     } else if (role === "COACH") {
       userData = await prisma.coachReferee.findUnique({
         where: { id: userId },
         include: { district: true, taluk: true, club: true }
       });
-    } else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "DISTRICT_ADMIN"].includes(role)) {
+    } else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role)) {
       userData = await prisma.member.findUnique({
         where: { id: userId },
         include: { district: true, taluk: true }
@@ -180,6 +180,86 @@ export const getProfile = async (req: any, res: Response) => {
   }
 };
 
+export const updateProfile = async (req: any, res: Response) => {
+  const { userId, role } = req.user;
+  const updates = req.body;
+
+  try {
+    let updatedUser: any = null;
+
+    if (role === "SUPER_ADMIN") {
+      return res.status(403).json({ error: "Cannot update Super Admin profile from this endpoint" });
+    }
+
+    if (role === "PLAYER") {
+      updatedUser = await prisma.student.update({
+        where: { id: userId },
+        data: {
+          fullName: updates.fullName !== undefined ? updates.fullName : undefined,
+          fatherName: updates.fatherName !== undefined ? updates.fatherName : undefined,
+          bloodGroup: updates.bloodGroup !== undefined ? updates.bloodGroup : undefined,
+          gender: updates.gender !== undefined ? updates.gender : undefined,
+          height: updates.height !== undefined ? updates.height : undefined,
+          weight: updates.weight !== undefined ? updates.weight : undefined,
+          mobileNumber: updates.mobileNumber !== undefined ? updates.mobileNumber : undefined,
+          // Add other common editable fields if necessary
+          address: updates.address !== undefined ? updates.address : undefined,
+          city: updates.city !== undefined ? updates.city : undefined,
+          state: updates.state !== undefined ? updates.state : undefined,
+          addressPincode: updates.addressPincode !== undefined ? updates.addressPincode : undefined,
+        }
+      });
+    } else if (role === "COACH") {
+      updatedUser = await prisma.coachReferee.update({
+        where: { id: userId },
+        data: {
+          fullName: updates.fullName !== undefined ? updates.fullName : undefined,
+          fatherName: updates.fatherName !== undefined ? updates.fatherName : undefined,
+          bloodGroup: updates.bloodGroup !== undefined ? updates.bloodGroup : undefined,
+          gender: updates.gender !== undefined ? updates.gender : undefined,
+          mobileNumber: updates.mobileNumber !== undefined ? updates.mobileNumber : undefined,
+        }
+      });
+    } else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role)) {
+      updatedUser = await prisma.member.update({
+        where: { id: userId },
+        data: {
+          fullName: updates.fullName !== undefined ? updates.fullName : undefined,
+          fatherName: updates.fatherName !== undefined ? updates.fatherName : undefined,
+          bloodGroup: updates.bloodGroup !== undefined ? updates.bloodGroup : undefined,
+          mobileNumber: updates.mobileNumber !== undefined ? updates.mobileNumber : undefined,
+        }
+      });
+    } else if (role === "CLUB") {
+      updatedUser = await prisma.club.update({
+        where: { id: userId },
+        data: {
+          name: updates.fullName !== undefined ? updates.fullName : undefined, // Assuming club uses name
+          mobileNumber: updates.mobileNumber !== undefined ? updates.mobileNumber : undefined,
+          president: updates.president !== undefined ? updates.president : undefined,
+          secretary: updates.secretary !== undefined ? updates.secretary : undefined,
+          coach: updates.coach !== undefined ? updates.coach : undefined,
+        }
+      });
+    }
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: "User not found or role unhandled" });
+    }
+
+    const { password: _, ...safeData } = updatedUser;
+
+    return res.json({
+      message: "Profile updated successfully",
+      user: safeData
+    });
+
+  } catch (error) {
+    console.error("Update profile error:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 export const changePassword = async (req: any, res: Response) => {
   const { currentPassword, newPassword } = req.body;
   const { userId, role } = req.user;
@@ -188,13 +268,18 @@ export const changePassword = async (req: any, res: Response) => {
     return res.status(400).json({ error: "Current and new passwords are required" });
   }
 
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  if (!passwordRegex.test(newPassword)) {
+    return res.status(400).json({ error: "Password must contain at least 8 characters, one uppercase, one lowercase, one number, and one special character." });
+  }
+
   try {
     let user: any = null;
     let model: any = null;
 
     if (role === "PLAYER") model = prisma.student;
     else if (role === "COACH") model = prisma.coachReferee;
-    else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "DISTRICT_ADMIN"].includes(role)) model = prisma.member;
+    else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role)) model = prisma.member;
     else if (role === "CLUB") model = prisma.club;
     else return res.status(403).json({ error: "Super Admin password cannot be changed via this endpoint" });
 
@@ -292,6 +377,11 @@ export const resetPassword = async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Token and new password are required" });
   }
 
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  if (!passwordRegex.test(newPassword)) {
+    return res.status(400).json({ error: "Password must contain at least 8 characters, one uppercase, one lowercase, one number, and one special character." });
+  }
+
   try {
     let user: any = null;
     let modelName: string = "";
@@ -332,6 +422,70 @@ export const resetPassword = async (req: Request, res: Response) => {
 
   } catch (error) {
     console.error("Reset password error:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const trackStatus = async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+
+  if (!id) {
+    return res.status(400).json({ error: "Tracking ID is required" });
+  }
+
+  try {
+    let user: any = null;
+    let role = "";
+
+    // Check Student
+    user = await prisma.student.findFirst({
+      where: { OR: [{ tempId: id }, { permanentId: id }] },
+      include: { district: true }
+    });
+    if (user) role = "PLAYER";
+
+    // Check Coach
+    if (!user) {
+      user = await prisma.coachReferee.findFirst({
+        where: { OR: [{ tempId: id }, { permanentId: id }] },
+        include: { district: true }
+      });
+      if (user) role = "COACH";
+    }
+
+    // Check Member
+    if (!user) {
+      user = await prisma.member.findFirst({
+        where: { OR: [{ tempId: id }, { permanentId: id }] },
+        include: { district: true }
+      });
+      if (user) role = user.role;
+    }
+
+    // Check Club
+    if (!user) {
+      user = await prisma.club.findFirst({
+        where: { OR: [{ tempId: id }, { permanentId: id }] },
+        include: { district: true }
+      });
+      if (user) role = "CLUB";
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: "No application found with this Temporary ID." });
+    }
+
+    const { password, ...safeUser } = user;
+    
+    return res.json({
+      user: {
+        ...safeUser,
+        fullName: safeUser.fullName || safeUser.name || safeUser.clubName,
+        role: role
+      }
+    });
+  } catch (error) {
+    console.error("Track status error:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };

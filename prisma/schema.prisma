@@ -11,6 +11,8 @@ enum Status {
   REJECTED
   APPROVED
   REPLAY
+  CLOSED
+  NOT_REQUIRED
 }
 
 enum Gender {
@@ -22,6 +24,7 @@ enum Gender {
 model District {
   id        String   @id @default(uuid())
   name      String   @unique
+  zoneName  String?
   taluks    Taluk[]
   students  Student[]
   coaches   CoachReferee[]
@@ -44,6 +47,7 @@ model Taluk {
 
 model Club {
   id               String         @id @default(uuid())
+  tempId           String?        @unique
   name             String
   districtId       String?
   district         District?      @relation(fields: [districtId], references: [id])
@@ -76,10 +80,12 @@ model Club {
   resetPasswordToken String?
   resetPasswordExpires DateTime?
   isPaid           Boolean        @default(false)
+  validUntil       DateTime?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   students         Student[]
   coaches          CoachReferee[]
+  tournaments      Tournament[]
 }
 
 model Student {
@@ -127,6 +133,13 @@ model Student {
   resetPasswordToken    String?
   resetPasswordExpires  DateTime?
   isPaid                Boolean       @default(false)
+  validUntil            DateTime?
+  wins                  Int           @default(0)
+  losses                Int           @default(0)
+  draws                 Int           @default(0)
+  coachId               String?
+  coach                 CoachReferee? @relation("CoachStudents", fields: [coachId], references: [id])
+  tournamentRegs        TournamentRegistration[]
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
 }
@@ -161,6 +174,7 @@ model CoachReferee {
   addressDept           String
   clubId                String?
   club                  Club?    @relation(fields: [clubId], references: [id])
+  students              Student[] @relation("CoachStudents")
   password              String
   status                Status   @default(PENDING)
   rejectionRemark       String?
@@ -170,6 +184,7 @@ model CoachReferee {
   resetPasswordToken    String?
   resetPasswordExpires  DateTime?
   isPaid                Boolean  @default(false)
+  validUntil            DateTime?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
@@ -182,6 +197,7 @@ enum MemberRole {
   ZONE_SECRETARY
   STATE_PRESIDENT
   STATE_SECRETARY
+  CEO
 }
 
 model Member {
@@ -222,24 +238,126 @@ model Member {
   resetPasswordToken    String?
   resetPasswordExpires  DateTime?
   isPaid                Boolean  @default(false)
+  validUntil            DateTime?
   password              String
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+  tournaments           Tournament[]
+}
+
+enum EventLevel {
+  DISTRICT
+  ZONE
+  STATE
+  NATIONAL
+}
+
+enum EventParticipantType {
+  ALL
+  STUDENT
+  COACH
+  MEMBER
+  CLUB
 }
 
 model Event {
-  id              String   @id @default(uuid())
+  id              String      @id @default(uuid())
   title           String
   description     String
   date            DateTime
   location        String
-  districtId      String
-  district        District @relation(fields: [districtId], references: [id])
-  createdBy       String   // ID of the person who created it
-  status          Status   @default(PENDING)
+  level           EventLevel  @default(DISTRICT)
+  participantType EventParticipantType @default(ALL)
+  districtId      String?
+  district        District?   @relation(fields: [districtId], references: [id])
+  zoneId          String?
+  createdBy       String      // ID of the person who created it
+  status          Status      @default(PENDING)
   rejectionRemark String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  approvedBy      String?
+  approvedAt      DateTime?
+  isPaid          Boolean     @default(false)
+  entryFee        Float       @default(0)
+  meetingLink     String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  registrations   EventRegistration[]
+}
+
+model EventRegistration {
+  id        String   @id @default(uuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id])
+  userId    String
+  role      String   // STUDENT, COACH, MEMBER, CLUB
+  status    Status   @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([eventId, userId])
+}
+
+model Tournament {
+  id                 String                   @id @default(uuid())
+  title              String
+  date               DateTime                 // This acts as dateFrom
+  dateTo             DateTime?
+  location           String
+  description        String
+  entryFee           Float                    @default(0)
+  totalSlots         Int                      @default(32)
+  ageFrom            Int                      @default(0)
+  ageTo              Int                      @default(100)
+  gender             String                   @default("BOTH")
+  allowBPL           Boolean                  @default(false)
+  beltEligibility    String?
+  level              EventLevel               @default(DISTRICT)
+  
+  districtApproval   Status                   @default(PENDING)
+  stateApproval      Status                   @default(PENDING)
+  superAdminApproval Status                   @default(PENDING)
+  ceoApproval        Status                   @default(PENDING)
+  
+  status             Status                   @default(PENDING)
+  rejectionRemark    String?
+  
+  clubId             String?
+  club               Club?                    @relation(fields: [clubId], references: [id])
+  officialId         String?
+  official           Member?                  @relation(fields: [officialId], references: [id])
+  registrations      TournamentRegistration[]
+  draws              TournamentDraw[]
+  messages           TournamentMessage[]
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+}
+
+model TournamentRegistration {
+  id           String     @id @default(uuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id])
+  playerId     String
+  player       Student    @relation(fields: [playerId], references: [id])
+  status       Status     @default(PENDING)
+  isPaid       Boolean    @default(false)
+  paymentId    String?
+  height       String?
+  weight       String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  messages     TournamentRegistrationMessage[]
+
+  @@unique([tournamentId, playerId])
+}
+
+model TournamentRegistrationMessage {
+  id             String                 @id @default(uuid())
+  registrationId String
+  registration   TournamentRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  senderRole     String                 // "CLUB" | "OFFICIAL" | "SYSTEM"
+  senderName     String
+  message        String
+  createdAt      DateTime               @default(now())
 }
 
 model GlobalSettings {
@@ -261,6 +379,34 @@ model Grievance {
   description String
   status      Status   @default(PENDING)
   reply       String?
+  remark      String?
+  images      String[] @default([])
+  documents   String[] @default([])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+model TournamentDraw {
+  id             String     @id @default(uuid())
+  tournamentId   String
+  tournament     Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  ageGroup       String
+  gender         String
+  weightCategory String
+  rounds         Json
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([tournamentId, ageGroup, gender, weightCategory])
+}
+
+model TournamentMessage {
+  id             String     @id @default(uuid())
+  tournamentId   String
+  tournament     Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  senderRole     String     // e.g. "SUPER_ADMIN", "CLUB", "DISTRICT_PRESIDENT", etc.
+  senderName     String
+  message        String
+  createdAt      DateTime   @default(now())
+}
+

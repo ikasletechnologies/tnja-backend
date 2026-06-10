@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import prisma from "../lib/prisma.js";
 import { studentRegistrationSchema, coachRegistrationSchema, clubRegistrationSchema, memberRegistrationSchema } from "../validation/registrationSchema.js";
 import crypto from "crypto";
+import { sendClubRegistrationEmail } from "../lib/mailer.js";
 // Helper to generate IDs
 const generateTempId = (prefix) => {
     return `${prefix}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
@@ -152,15 +153,29 @@ export const registerClub = async (req, res) => {
             return res.status(400).json({ error: "Club with this email or mobile number already exists" });
         }
         const { clubName, ...rest } = validatedData;
+        const tempId = generateTempId("TEMP-CLB");
         const club = await prisma.club.create({
             data: {
                 ...rest,
-                name: clubName
+                name: clubName,
+                tempId,
+                status: "PENDING"
             }
         });
+        // Send receipt email to club
+        try {
+            await sendClubRegistrationEmail({
+                toEmail: club.email,
+                toName: club.name
+            });
+        }
+        catch (mailErr) {
+            console.error("[Mailer] Failed to send club registration receipt:", mailErr);
+        }
         return res.status(201).json({
-            message: "Club registration successful.",
-            clubId: club.id
+            message: "Club registration successful. Application is pending Super Admin approval.",
+            clubId: club.id,
+            tempId: club.tempId
         });
     }
     catch (error) {

@@ -175,10 +175,13 @@ export const registerClub = async (req: Request, res: Response) => {
 
     const { clubName, ...rest } = validatedData;
     
+    const tempId = generateTempId("TEMP-CLB");
+    
     const club = await prisma.club.create({
       data: {
         ...rest,
         name: clubName,
+        tempId,
         status: "PENDING"
       }
     });
@@ -195,7 +198,8 @@ export const registerClub = async (req: Request, res: Response) => {
 
     return res.status(201).json({
       message: "Club registration successful. Application is pending Super Admin approval.",
-      clubId: club.id
+      clubId: club.id,
+      tempId: club.tempId
     });
 
   } catch (error: any) {

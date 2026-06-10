@@ -40,6 +40,7 @@
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
+    "resolveJsonModule": true
   },
-  "exclude": ["node_modules", "dist", "prisma.config.ts", "scratch", "prisma"]
+  "exclude": ["node_modules", "dist", "prisma.config.ts", "scratch", "prisma", "update_validity.ts", "fix-ceo-approval.ts"]
 }

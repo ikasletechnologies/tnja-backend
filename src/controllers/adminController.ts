@@ -14,9 +14,30 @@ const generatePermanentId = (prefix: string) => {
   return `${prefix}-${Date.now().toString().slice(-6)}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
 };
 
-/** Generate a readable 8-char password and return both raw + hashed */
+/** Generate a readable 8-char password that meets security requirements and return both raw + hashed */
 const generatePassword = async () => {
-  const raw = crypto.randomBytes(4).toString("hex"); // e.g. "a3f91bc2"
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const num = "0123456789";
+  const special = "@$!%*?&";
+  
+  const allChars = upper + lower + num + special;
+  
+  let raw = "";
+  // Ensure at least one of each required type
+  raw += upper[Math.floor(Math.random() * upper.length)];
+  raw += lower[Math.floor(Math.random() * lower.length)];
+  raw += num[Math.floor(Math.random() * num.length)];
+  raw += special[Math.floor(Math.random() * special.length)];
+  
+  // Fill the rest up to 8 characters
+  for (let i = 4; i < 8; i++) {
+    raw += allChars[Math.floor(Math.random() * allChars.length)];
+  }
+  
+  // Shuffle the password
+  raw = raw.split('').sort(() => 0.5 - Math.random()).join('');
+
   const hashed = await bcrypt.hash(raw, 10);
   return { raw, hashed };
 };
@@ -31,24 +52,28 @@ export const getPendingApplications = async (req: Request, res: Response) => {
   try {
     console.log(`[getPendingApplications] User: ${role}, District: ${districtId}, Type: ${type}`);
 
-    // Basic permissions: MEMBER can ONLY see STUDENT applications
-    if (role === "MEMBER" && type !== "STUDENT" && type !== "") {
-      return res.status(403).json({ error: "District Admins can only view player applications" });
+    // Basic permissions: Standard MEMBER role is not allowed to view pending applications
+    const allowedRoles = [
+      "SUPER_ADMIN",
+      "STATE_PRESIDENT",
+      "STATE_SECRETARY",
+      "ZONE_PRESIDENT",
+      "ZONE_SECRETARY",
+      "DISTRICT_PRESIDENT",
+      "DISTRICT_SECRETARY",
+      "CEO"
+    ];
+
+    if (!allowedRoles.includes(role)) {
+      return res.status(403).json({ error: "You do not have permission to view pending applications" });
     }
 
     // Common where clause for filtering
     const whereClause: any = { status: "PENDING" };
     
-    // TEMPORARY: Logging the check but not enforcing district filter to debug
     const districtRestrictedRoles = [
-      "MEMBER", 
-      "DISTRICT_ADMIN", 
       "DISTRICT_PRESIDENT", 
-      "DISTRICT_SECRETARY", 
-      "ZONE_PRESIDENT", 
-      "ZONE_SECRETARY", 
-      "STATE_PRESIDENT", 
-      "STATE_SECRETARY"
+      "DISTRICT_SECRETARY"
     ];
 
     if (districtRestrictedRoles.includes(role) && districtId) {
@@ -71,7 +96,7 @@ export const getPendingApplications = async (req: Request, res: Response) => {
 
     if (type === "COACH") {
       const coaches = await prisma.coachReferee.findMany({
-        where: { status: "PENDING" },
+        where: whereClause,
         include: { district: true, taluk: true, club: true },
         orderBy: { createdAt: "desc" },
       });
@@ -80,7 +105,7 @@ export const getPendingApplications = async (req: Request, res: Response) => {
 
     if (type === "CLUB") {
       const clubs = await prisma.club.findMany({
-        where: { status: "PENDING" },
+        where: whereClause,
         include: { district: true, taluk: true },
         orderBy: { createdAt: "desc" },
       });
@@ -89,19 +114,111 @@ export const getPendingApplications = async (req: Request, res: Response) => {
 
     if (type === "MEMBER") {
       const members = await prisma.member.findMany({
-        where: { status: "PENDING" },
+        where: whereClause,
         include: { district: true, taluk: true },
         orderBy: { createdAt: "desc" },
       });
       return res.json({ type: "MEMBER", data: members });
     }
 
+    if (type === "EVENT") {
+      const eventWhere: any = { status: "PENDING" };
+
+      if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
+        eventWhere.level = "DISTRICT";
+        if (districtId) {
+          eventWhere.districtId = districtId;
+        }
+      } else if (["ZONE_PRESIDENT", "ZONE_SECRETARY"].includes(role)) {
+        eventWhere.level = "ZONE";
+        if (districtId) {
+          eventWhere.zoneId = districtId;
+        }
+      }
+
+      console.log(`[DEBUG] Fetching events with whereClause:`, JSON.stringify(eventWhere));
+      const events = await prisma.event.findMany({
+        where: eventWhere,
+        include: { district: true },
+        orderBy: { createdAt: "desc" },
+      });
+      return res.json({ type: "EVENT", data: events });
+    }
+
+    if (type === "EVENT_REGISTRATION") {
+      const regWhere: any = { status: "PENDING" };
+
+      if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
+        regWhere.event = {
+          level: "DISTRICT",
+          districtId: districtId || undefined
+        };
+      } else if (["ZONE_PRESIDENT", "ZONE_SECRETARY"].includes(role)) {
+        regWhere.event = {
+          level: "ZONE",
+          zoneId: districtId || undefined
+        };
+      }
+
+      const registrations = await prisma.eventRegistration.findMany({
+        where: regWhere,
+        include: { 
+          event: { include: { district: true } }
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      const detailedRegistrations = await Promise.all(registrations.map(async (reg) => {
+        let userDetails: any = null;
+        if (reg.role === "STUDENT") {
+          userDetails = await prisma.student.findUnique({ where: { id: reg.userId }, select: { fullName: true, email: true, tempId: true } });
+        } else if (reg.role === "COACH") {
+          userDetails = await prisma.coachReferee.findUnique({ where: { id: reg.userId }, select: { fullName: true, email: true, tempId: true } });
+        } else if (reg.role === "MEMBER") {
+          userDetails = await prisma.member.findUnique({ where: { id: reg.userId }, select: { fullName: true, email: true, tempId: true } });
+        } else if (reg.role === "CLUB") {
+          userDetails = await prisma.club.findUnique({ where: { id: reg.userId }, select: { name: true, email: true, tempId: true } });
+        }
+        return {
+          ...reg,
+          applicantName: userDetails ? (userDetails.fullName || userDetails.name) : "Unknown",
+          applicantEmail: userDetails ? userDetails.email : "Unknown",
+          applicantTempId: userDetails ? userDetails.tempId : null
+        };
+      }));
+
+      return res.json({ type: "EVENT_REGISTRATION", data: detailedRegistrations });
+    }
+
     // Return all pending counts if no type specified
-    const [studentCount, coachCount, memberCount, clubCount] = await Promise.all([
+    const eventCountWhere: any = { status: "PENDING" };
+    const regWhere: any = { status: "PENDING" };
+
+    if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
+      eventCountWhere.level = "DISTRICT";
+      if (districtId) eventCountWhere.districtId = districtId;
+
+      regWhere.event = {
+        level: "DISTRICT",
+        districtId: districtId || undefined
+      };
+    } else if (["ZONE_PRESIDENT", "ZONE_SECRETARY"].includes(role)) {
+      eventCountWhere.level = "ZONE";
+      if (districtId) eventCountWhere.zoneId = districtId;
+
+      regWhere.event = {
+        level: "ZONE",
+        zoneId: districtId || undefined
+      };
+    }
+
+    const [studentCount, coachCount, memberCount, clubCount, eventCount, regCount] = await Promise.all([
       prisma.student.count({ where: whereClause }),
       prisma.coachReferee.count({ where: whereClause }),
       prisma.member.count({ where: whereClause }),
       prisma.club.count({ where: whereClause }),
+      prisma.event.count({ where: eventCountWhere }),
+      prisma.eventRegistration.count({ where: regWhere }),
     ]);
 
     return res.json({
@@ -110,6 +227,8 @@ export const getPendingApplications = async (req: Request, res: Response) => {
         COACH: coachCount,
         MEMBER: memberCount,
         CLUB: clubCount,
+        EVENT: eventCount,
+        EVENT_REGISTRATION: regCount,
       },
     });
   } catch (error) {
@@ -128,18 +247,28 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
   // status: 'APPROVED' | 'REJECTED'
 
   try {
-    const districtRestrictedRoles = ["MEMBER", "DISTRICT_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"];
-    const auditor = role === "SUPER_ADMIN" ? "Super Admin" : null;
-    let auditorInfo = auditor;
+    const allowedRoles = [
+      "SUPER_ADMIN",
+      "STATE_PRESIDENT",
+      "STATE_SECRETARY",
+      "ZONE_PRESIDENT",
+      "ZONE_SECRETARY",
+      "DISTRICT_PRESIDENT",
+      "DISTRICT_SECRETARY",
+      "CEO"
+    ];
 
-    if (role !== "SUPER_ADMIN") {
-      const member = await prisma.member.findUnique({ where: { id: (req as any).user.userId } });
-      auditorInfo = member ? `${member.fullName} (${role})` : role;
+    if (!allowedRoles.includes(role)) {
+      return res.status(403).json({ error: "You do not have permission to manage applications" });
     }
 
-    // Basic permissions: Standard MEMBER can ONLY update 'student' applications
-    if (role === "MEMBER" && type !== "student") {
-      return res.status(403).json({ error: "District Admins can only approve player applications" });
+    const districtRestrictedRoles = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"];
+    const auditor = (role === "SUPER_ADMIN" || role === "CEO") ? role : null;
+    let auditorInfo = auditor;
+
+    if (role !== "SUPER_ADMIN" && role !== "CEO") {
+      const member = await prisma.member.findUnique({ where: { id: (req as any).user.userId } });
+      auditorInfo = member ? `${member.fullName} (${role})` : role;
     }
 
     // ── STUDENT ──────────────────────────────────────────────────────────────
@@ -166,6 +295,11 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
           updateData.password = hashed;
           updateData.mustChangePassword = true;
           updateData.isPaid = true; // BPL counts as paid/waived
+          
+          // Set membership validity to 1 year from approval
+          const nextYear = new Date();
+          nextYear.setFullYear(nextYear.getFullYear() + 1);
+          updateData.validUntil = nextYear;
 
           const updated = await prisma.student.update({ where: { id }, data: updateData });
 
@@ -194,7 +328,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
               approvedAt: new Date(),
               isPaid: false,
               password: hashed,
-              mustChangePassword: true
+              mustChangePassword: false
             } 
           });
 
@@ -211,7 +345,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
             console.error("[Mailer] Failed to send payment request email:", mailErr);
           }
 
-          return res.json({ message: "Student application APPROVED. Payment required for Permanent ID.", data: updated });
+          return res.json({ message: "Student application APPROVED. Payment required for Player ID.", data: updated });
         }
       }
 
@@ -252,7 +386,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
             approvedAt: new Date(),
             isPaid: false,
             password: hashed,
-            mustChangePassword: true
+            mustChangePassword: false
           } 
         });
 
@@ -268,7 +402,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
           console.error("[Mailer] Failed to send coach payment request email:", mailErr);
         }
 
-        return res.json({ message: "Coach APPROVED. Payment required for Permanent ID.", data: updated });
+        return res.json({ message: "Coach APPROVED. Payment required for Coach ID.", data: updated });
       }
 
       if (status === "REJECTED") {
@@ -308,7 +442,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
             approvedAt: new Date(),
             isPaid: false,
             password: hashed,
-            mustChangePassword: true
+            mustChangePassword: false
           } 
         });
 
@@ -324,7 +458,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
           console.error("[Mailer] Failed to send member payment request email:", mailErr);
         }
 
-        return res.json({ message: "Member APPROVED. Payment required for Permanent ID.", data: updated });
+        return res.json({ message: "Member APPROVED. Payment required for Member ID.", data: updated });
       }
 
       if (status === "REJECTED") {
@@ -364,7 +498,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
             approvedAt: new Date(),
             isPaid: false,
             password: hashed,
-            mustChangePassword: true
+            mustChangePassword: false
           } 
         });
 
@@ -372,7 +506,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
           await sendPaymentRequestEmail({
             toEmail: club.email,
             toName: club.name,
-            tempId: club.id, // Clubs use UUID as tempId
+            tempId: club.tempId || club.id,
             password: raw,
             role: "Club"
           });
@@ -380,7 +514,7 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
           console.error("[Mailer] Failed to send club payment request email:", mailErr);
         }
 
-        return res.json({ message: "Club APPROVED. Payment required for Permanent ID.", data: updated });
+        return res.json({ message: "Club APPROVED. Payment required for Club ID.", data: updated });
       }
 
       if (status === "REJECTED") {
@@ -399,6 +533,79 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
       }
     }
 
+    // ── EVENT ─────────────────────────────────────────────────────────────────
+    if (type === "event") {
+      const eventItem = await prisma.event.findUnique({ where: { id } });
+      if (!eventItem) return res.status(404).json({ error: "Event not found" });
+
+      if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
+        if (eventItem.level !== "DISTRICT") {
+          return res.status(403).json({ error: "District officers can only manage district-level events" });
+        }
+        if (districtId && eventItem.districtId !== districtId) {
+          return res.status(403).json({ error: "You can only manage events in your own district" });
+        }
+      }
+
+      if (["ZONE_PRESIDENT", "ZONE_SECRETARY"].includes(role)) {
+        if (eventItem.level !== "ZONE") {
+          return res.status(403).json({ error: "Zone officers can only manage zone-level events" });
+        }
+        if (districtId && eventItem.zoneId !== districtId) {
+          return res.status(403).json({ error: "You can only manage events in your own zone" });
+        }
+      }
+
+      const updateData: any = { 
+        status, 
+        rejectionRemark: status === "REJECTED" ? remark || "Rejected" : null,
+        approvedBy: status === "APPROVED" ? auditorInfo : null,
+        approvedAt: status === "APPROVED" ? new Date() : null
+      };
+
+      const updated = await prisma.event.update({
+        where: { id },
+        data: updateData
+      });
+
+      return res.json({ message: `Event ${status.toLowerCase()} successfully`, data: updated });
+    }
+
+    // ── EVENT REGISTRATION ───────────────────────────────────────────────────
+    if (type === "event_registration") {
+      const reg = await prisma.eventRegistration.findUnique({ 
+        where: { id },
+        include: { event: true }
+      });
+      if (!reg) return res.status(404).json({ error: "Event registration not found" });
+
+      const eventItem = reg.event;
+
+      if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
+        if (eventItem.level !== "DISTRICT") {
+          return res.status(403).json({ error: "District officers can only manage registrations for district-level events" });
+        }
+        if (districtId && eventItem.districtId !== districtId) {
+          return res.status(403).json({ error: "You can only manage registrations in your own district" });
+        }
+      }
+
+      if (["ZONE_PRESIDENT", "ZONE_SECRETARY"].includes(role)) {
+        if (eventItem.level !== "ZONE") {
+          return res.status(403).json({ error: "Zone officers can only manage registrations for zone-level events" });
+        }
+        if (districtId && eventItem.zoneId !== districtId) {
+          return res.status(403).json({ error: "You can only manage registrations in your own zone" });
+        }
+      }
+
+      const updated = await prisma.eventRegistration.update({
+        where: { id },
+        data: { status }
+      });
+
+      return res.json({ message: `Registration ${status.toLowerCase()} successfully`, data: updated });
+    }
 
     return res.status(400).json({ error: "Invalid application type" });
 
@@ -433,6 +640,12 @@ export const getApplicationDetails = async (req: Request, res: Response) => {
     });
     if (member) return res.json({ type: "member", data: member });
 
+    const eventItem = await prisma.event.findUnique({
+      where: { id: tempId },
+      include: { district: true },
+    });
+    if (eventItem) return res.json({ type: "event", data: eventItem });
+
     return res.status(404).json({ error: "Application not found with this Temporary ID" });
   } catch (error) {
     return res.status(500).json({ error: "Internal Server Error" });
@@ -446,14 +659,8 @@ export const getDashboardStats = async (req: Request, res: Response) => {
   const { role, districtId } = (req as any).user;
   const filter: any = {};
   const districtRestrictedRoles = [
-    "MEMBER", 
-    "DISTRICT_ADMIN", 
     "DISTRICT_PRESIDENT", 
-    "DISTRICT_SECRETARY", 
-    "ZONE_PRESIDENT", 
-    "ZONE_SECRETARY", 
-    "STATE_PRESIDENT", 
-    "STATE_SECRETARY"
+    "DISTRICT_SECRETARY"
   ];
 
   if (districtRestrictedRoles.includes(role) && districtId) {
@@ -555,10 +762,11 @@ export const createPaymentOrder = async (req: Request, res: Response) => {
 
     if (!record) return res.status(404).json({ error: `${type} not found` });
 
+    const receiptId = (record.tempId || record.id).substring(0, 30);
     const options = {
       amount: calculatedAmount * 100, // amount in the smallest currency unit (paise)
       currency: "INR",
-      receipt: `receipt_${record.tempId || record.id}`,
+      receipt: `rcpt_${receiptId}`,
     };
 
     const order = await razorpay.orders.create(options);
@@ -610,11 +818,17 @@ export const verifyPayment = async (req: Request, res: Response) => {
     // Process success
     const permanentId = generatePermanentId(prefix);
 
+    // Set membership validity to 1 year from payment
+    const nextYear = new Date();
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
+
     const updated = await updateFn({
       where: { id },
       data: {
         isPaid: true,
-        permanentId
+        permanentId,
+        mustChangePassword: true,
+        validUntil: nextYear
       }
     });
 
@@ -670,10 +884,10 @@ export const updateGlobalSettings = async (req: Request, res: Response) => {
 // PATCH /api/member/promote      – promote a member to a specific role
 // ──────────────────────────────────────────────────────────────────────────────
 export const promoteMember = async (req: Request, res: Response) => {
-  const { memberId, role } = req.body;
+  const { memberId, role, districtId } = req.body;
   const { role: requesterRole } = (req as any).user;
 
-  if (requesterRole !== "SUPER_ADMIN") {
+  if (requesterRole !== "SUPER_ADMIN" && requesterRole !== "CEO") {
     return res.status(403).json({ error: "Only Super Admin can promote members" });
   }
 
@@ -684,7 +898,8 @@ export const promoteMember = async (req: Request, res: Response) => {
     "ZONE_PRESIDENT",
     "ZONE_SECRETARY",
     "STATE_PRESIDENT",
-    "STATE_SECRETARY"
+    "STATE_SECRETARY",
+    "CEO"
   ];
 
   if (!validRoles.includes(role)) {
@@ -697,7 +912,10 @@ export const promoteMember = async (req: Request, res: Response) => {
 
     const updated = await prisma.member.update({
       where: { id: memberId },
-      data: { role: role as any }
+      data: { 
+        role: role as any,
+        ...(districtId && { districtId })
+      }
     });
 
     return res.json({ message: `Member promoted to ${role} successfully`, data: updated });
@@ -714,7 +932,7 @@ export const getLocationAnalytics = async (req: Request, res: Response) => {
   const { role, districtId } = (req as any).user;
   const filter: any = {};
   
-  if (["DISTRICT_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY"].includes(role) && districtId) {
+  if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role) && districtId) {
     filter.districtId = districtId;
   }
 
@@ -742,6 +960,247 @@ export const getLocationAnalytics = async (req: Request, res: Response) => {
     return res.json(analytics);
   } catch (error) {
     console.error("[getLocationAnalytics]", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// POST /api/admin/create-student – Force create a student
+// ──────────────────────────────────────────────────────────────────────────────
+export const forceCreateStudent = async (req: Request, res: Response) => {
+  const { role } = (req as any).user;
+  if (role !== "SUPER_ADMIN" && role !== "CEO") {
+    return res.status(403).json({ error: "Only Super Admin can force create players" });
+  }
+
+  const { 
+    fullName, email, mobileNumber, districtId, talukId, gender, dob, aadhaarNumber,
+    bloodGroup, address, city, state, addressPincode, nationality, annualIncome, 
+    schoolName, grade, areaOfInterest, areaOfStudy, preferLocation, clubId
+  } = req.body;
+
+  try {
+    const existing = await prisma.student.findFirst({
+      where: {
+        OR: [
+          { email },
+          { mobileNumber },
+          { aadhaarNumber }
+        ]
+      }
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: "Player with this email, mobile or Aadhaar already exists" });
+    }
+
+    const { raw, hashed } = await generatePassword();
+    const permanentId = generatePermanentId("STU");
+    const tempId = `TEMP-STU-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+
+    const student = await prisma.student.create({
+      data: {
+        fullName,
+        email,
+        mobileNumber,
+        districtId,
+        talukId,
+        gender,
+        dob: new Date(dob),
+        aadhaarNumber,
+        tempId,
+        permanentId,
+        password: hashed,
+        status: "APPROVED",
+        isPaid: true,
+        mustChangePassword: true,
+        age: new Date().getFullYear() - new Date(dob).getFullYear(),
+        pincode: addressPincode || "000000",
+        bloodGroup,
+        address,
+        city,
+        state,
+        addressPincode,
+        nationality,
+        annualIncome: Number(annualIncome),
+        schoolName,
+        grade,
+        areaOfInterest,
+        areaOfStudy,
+        preferLocation,
+        clubId: clubId || null
+      }
+    });
+
+    try {
+      await sendApprovalEmail({
+        toEmail: student.email,
+        toName: student.fullName,
+        tempId: student.tempId,
+        permanentId: student.permanentId!,
+        password: raw,
+        role: "Student",
+      });
+    } catch (mailErr) {
+      console.error("[Mailer] Failed to send approval email:", mailErr);
+    }
+
+    return res.status(201).json({ message: "Player created successfully", data: student });
+  } catch (error) {
+    console.error("[forceCreateStudent]", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// POST /api/admin/create-club – Force create a club
+// ──────────────────────────────────────────────────────────────────────────────
+export const forceCreateClub = async (req: Request, res: Response) => {
+  const { role } = (req as any).user;
+  if (role !== "SUPER_ADMIN" && role !== "CEO") {
+    return res.status(403).json({ error: "Only Super Admin can force create clubs" });
+  }
+
+  const { 
+    name, email, mobileNumber, districtId, talukId, 
+    address1, address2, pincode, president, secretary, coach 
+  } = req.body;
+
+  try {
+    const existing = await prisma.club.findFirst({
+      where: {
+        OR: [
+          { email },
+          { mobileNumber }
+        ]
+      }
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: "Club with this email or mobile number already exists" });
+    }
+
+    const { raw, hashed } = await generatePassword();
+    const permanentId = generatePermanentId("CLB");
+    const tempId = `TEMP-CLB-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+
+    const club = await prisma.club.create({
+      data: {
+        name,
+        email,
+        mobileNumber,
+        districtId,
+        talukId,
+        tempId,
+        permanentId,
+        password: hashed,
+        status: "APPROVED",
+        isPaid: true,
+        mustChangePassword: true,
+        pincode,
+        address1,
+        address2: address2 || null,
+        president,
+        secretary,
+        coach,
+      }
+    });
+
+    try {
+      await sendApprovalEmail({
+        toEmail: club.email,
+        toName: club.name,
+        tempId: club.tempId!,
+        permanentId: club.permanentId!,
+        password: raw,
+        role: "Club",
+      });
+    } catch (mailErr) {
+      console.error("[Mailer] Failed to send approval email:", mailErr);
+    }
+
+    return res.status(201).json({ message: "Club created successfully", data: club });
+  } catch (error) {
+    console.error("[forceCreateClub]", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// POST /api/admin/create-member – Force create a member
+// ──────────────────────────────────────────────────────────────────────────────
+export const forceCreateMember = async (req: Request, res: Response) => {
+  const { role } = (req as any).user;
+  if (role !== "SUPER_ADMIN" && role !== "CEO") {
+    return res.status(403).json({ error: "Only Super Admin can force create members" });
+  }
+
+  const { 
+    fullName, email, mobileNumber, districtId, talukId, gender, dob, aadhaarNumber,
+    fatherName, bloodGroup, addressLine1, addressLine2, city, addressPincode
+  } = req.body;
+
+  try {
+    const existing = await prisma.member.findFirst({
+      where: {
+        OR: [
+          { email },
+          { mobileNumber },
+          { aadhaarNumber }
+        ]
+      }
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: "Member with this email, mobile or Aadhaar already exists" });
+    }
+
+    const { raw, hashed } = await generatePassword();
+    const permanentId = generatePermanentId("MEM");
+    const tempId = `TEMP-MEM-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+
+    const member = await prisma.member.create({
+      data: {
+        fullName,
+        email,
+        mobileNumber,
+        districtId,
+        talukId,
+        gender,
+        dob: new Date(dob),
+        aadhaarNumber,
+        tempId,
+        permanentId,
+        password: hashed,
+        status: "APPROVED",
+        isPaid: true,
+        mustChangePassword: true,
+        pincode: addressPincode || "000000",
+        fatherName,
+        bloodGroup,
+        addressLine1,
+        addressLine2: addressLine2 || null,
+        city,
+        addressPincode,
+      }
+    });
+
+    try {
+      await sendApprovalEmail({
+        toEmail: member.email,
+        toName: member.fullName,
+        tempId: member.tempId,
+        permanentId: member.permanentId!,
+        password: raw,
+        role: "Member",
+      });
+    } catch (mailErr) {
+      console.error("[Mailer] Failed to send approval email:", mailErr);
+    }
+
+    return res.status(201).json({ message: "Member created successfully", data: member });
+  } catch (error) {
+    console.error("[forceCreateMember]", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };

@@ -11,6 +11,10 @@ export const authenticateJWT = (req: AuthRequest, res: Response, next: NextFunct
   if (authHeader) {
     const token = authHeader.split(" ")[1];
 
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Token missing from header" });
+    }
+
     jwt.verify(token, process.env.JWT_SECRET || "fallback", (err, user) => {
       if (err) {
         return res.status(403).json({ error: "Forbidden: Invalid token" });
@@ -27,14 +31,13 @@ export const authenticateJWT = (req: AuthRequest, res: Response, next: NextFunct
 export const authorizeAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
   const adminRoles = [
     "SUPER_ADMIN", 
-    "DISTRICT_ADMIN", 
     "DISTRICT_PRESIDENT", 
     "DISTRICT_SECRETARY", 
     "ZONE_PRESIDENT", 
     "ZONE_SECRETARY", 
     "STATE_PRESIDENT", 
     "STATE_SECRETARY",
-    "MEMBER" // Some members act as district admins
+    "CEO"
   ];
 
   if (req.user && adminRoles.includes(req.user.role)) {

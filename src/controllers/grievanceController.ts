@@ -9,6 +9,16 @@ export const createGrievance = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
+    // Extract files from request
+    const files = (req as any).files as Express.Multer.File[] || [];
+    const images = files
+      .filter(f => f.fieldname === "images")
+      .map(f => `${req.protocol}://${req.get("host")}/uploads/${f.filename}`);
+      
+    const documents = files
+      .filter(f => f.fieldname === "documents")
+      .map(f => `${req.protocol}://${req.get("host")}/uploads/${f.filename}`);
+
     const grievance = await prisma.grievance.create({
       data: {
         userId,
@@ -17,9 +27,24 @@ export const createGrievance = async (req: Request, res: Response) => {
         role,
         subject,
         description,
-        status: "PENDING"
+        status: "PENDING",
+        images,
+        documents
       }
     });
+
+    try {
+      const { sendNotificationToAdmins } = await import("../lib/ws.js");
+      sendNotificationToAdmins({
+        type: "NEW_GRIEVANCE",
+        grievanceId: grievance.id,
+        userName: grievance.userName,
+        subject: grievance.subject,
+        message: `New grievance submitted by ${grievance.userName}: "${grievance.subject}"`,
+      });
+    } catch (wsErr) {
+      console.error("WS notify admins error:", wsErr);
+    }
 
     return res.status(201).json({
       message: "Grievance submitted successfully",
@@ -33,7 +58,7 @@ export const createGrievance = async (req: Request, res: Response) => {
 
 export const getMyGrievances = async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = String(req.params.userId);
     const grievances = await prisma.grievance.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" }
@@ -61,7 +86,7 @@ export const getAllGrievances = async (req: Request, res: Response) => {
 
 export const replyToGrievance = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { reply } = req.body;
 
     const grievance = await prisma.grievance.update({
@@ -72,12 +97,61 @@ export const replyToGrievance = async (req: Request, res: Response) => {
       }
     });
 
+    try {
+      const { sendNotificationToUser } = await import("../lib/ws.js");
+      sendNotificationToUser(grievance.userId, {
+        type: "GRIEVANCE_REPLY",
+        grievanceId: grievance.id,
+        subject: grievance.subject,
+        reply: grievance.reply,
+        message: `Admin has replied to your grievance regarding: "${grievance.subject}"`,
+      });
+    } catch (wsErr) {
+      console.error("WS notification error:", wsErr);
+    }
+
     return res.status(200).json({
       message: "Reply sent successfully",
       grievance
     });
   } catch (error: any) {
     console.error("Reply to Grievance error:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const closeGrievance = async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const { remark } = req.body;
+
+    const grievance = await prisma.grievance.update({
+      where: { id },
+      data: {
+        remark,
+        status: "CLOSED" 
+      }
+    });
+
+    try {
+      const { sendNotificationToUser } = await import("../lib/ws.js");
+      sendNotificationToUser(grievance.userId, {
+        type: "GRIEVANCE_CLOSED",
+        grievanceId: grievance.id,
+        subject: grievance.subject,
+        remark: grievance.remark,
+        message: `Admin has closed your grievance regarding: "${grievance.subject}"`,
+      });
+    } catch (wsErr) {
+      console.error("WS notification error:", wsErr);
+    }
+
+    return res.status(200).json({
+      message: "Grievance closed successfully",
+      grievance
+    });
+  } catch (error: any) {
+    console.error("Close Grievance error:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
