@@ -321,6 +321,7 @@ model Tournament {
   status             Status                   @default(PENDING)
   rejectionRemark    String?
   
+  zoneId             String?
   clubId             String?
   club               Club?                    @relation(fields: [clubId], references: [id])
   officialId         String?

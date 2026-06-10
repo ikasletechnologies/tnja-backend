@@ -61,14 +61,46 @@ export const getActiveEvents = async (req, res) => {
             targetParticipant = "CLUB";
         else if (role === "MEMBER")
             targetParticipant = "MEMBER";
+        // Fetch the user's district and zone name
+        let userDistrict = null;
+        if (userId) {
+            let userDetails = null;
+            if (role === "STUDENT" || role === "PLAYER") {
+                userDetails = await prisma.student.findUnique({ where: { id: userId }, include: { district: true } });
+            }
+            else if (role === "COACH") {
+                userDetails = await prisma.coachReferee.findUnique({ where: { id: userId }, include: { district: true } });
+            }
+            else if (role === "CLUB") {
+                userDetails = await prisma.club.findUnique({ where: { id: userId }, include: { district: true } });
+            }
+            else {
+                userDetails = await prisma.member.findUnique({ where: { id: userId }, include: { district: true } });
+            }
+            userDistrict = userDetails?.district || null;
+        }
+        const isAdmin = ["SUPER_ADMIN", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "CEO"].includes(role);
+        const whereClause = { status: "APPROVED" };
+        if (!isAdmin) {
+            const geoConditions = userDistrict
+                ? [
+                    { level: { in: ["STATE", "NATIONAL"] } },
+                    { AND: [{ level: "DISTRICT" }, { districtId: userDistrict.id }] },
+                    { AND: [{ level: "ZONE" }, { zoneId: userDistrict.zoneName }] }
+                ]
+                : [{ level: { in: ["STATE", "NATIONAL"] } }];
+            whereClause.OR = [
+                {
+                    AND: [
+                        { participantType: { in: ["ALL", targetParticipant] } },
+                        { OR: geoConditions }
+                    ]
+                },
+                { createdBy: userId || "" }
+            ];
+        }
         const events = await prisma.event.findMany({
-            where: {
-                status: "APPROVED",
-                // Admins can see all, otherwise only see 'ALL' or specific target
-                participantType: ["SUPER_ADMIN", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "CEO"].includes(role)
-                    ? undefined
-                    : { in: ["ALL", targetParticipant] }
-            },
+            where: whereClause,
             include: {
                 district: { select: { name: true } },
                 registrations: {

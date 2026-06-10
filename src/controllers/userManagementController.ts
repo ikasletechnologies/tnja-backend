@@ -208,3 +208,77 @@ export const updateUserCredentials = async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+// ─── COACH: Get My Students with Performance Data ───────────────────────────
+export const getCoachStudents = async (req: Request, res: Response) => {
+  const { userId, role } = (req as any).user;
+
+  if (role !== "COACH") {
+    return res.status(403).json({ error: "Only coaches can access this endpoint" });
+  }
+
+  try {
+    // Fetch all students under this coach
+    const students = await prisma.student.findMany({
+      where: { coachId: userId, status: "APPROVED" },
+      select: {
+        id: true,
+        fullName: true,
+        age: true,
+        gender: true,
+        profilePhoto: true,
+        wins: true,
+        losses: true,
+        draws: true,
+        permanentId: true,
+        tempId: true,
+      },
+      orderBy: { fullName: "asc" },
+    });
+
+    // Calculate performance metrics for each student
+    const studentsWithPerformance = students.map((student) => {
+      const totalMatches = student.wins + student.losses + student.draws;
+      const winRate = totalMatches > 0 ? Math.round((student.wins / totalMatches) * 100) : 0;
+
+      return {
+        id: student.id,
+        fullName: student.fullName,
+        age: student.age,
+        gender: student.gender,
+        profilePhoto: student.profilePhoto,
+        permanentId: student.permanentId,
+        tempId: student.tempId,
+        performance: {
+          wins: student.wins,
+          losses: student.losses,
+          draws: student.draws,
+          totalMatches,
+          winRate,
+        },
+      };
+    });
+
+    // Get tournament participation count for each student
+    const studentsWithTournaments = await Promise.all(
+      studentsWithPerformance.map(async (student) => {
+        const tournamentCount = await prisma.tournamentRegistration.count({
+          where: { playerId: student.id },
+        });
+
+        return {
+          ...student,
+          tournamentCount,
+        };
+      })
+    );
+
+    return res.json({
+      totalStudents: studentsWithTournaments.length,
+      students: studentsWithTournaments,
+    });
+  } catch (error) {
+    console.error("Error fetching coach students:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};

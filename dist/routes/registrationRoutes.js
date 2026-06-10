@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { registerStudent, registerCoach, registerClub, registerMember } from "../controllers/registrationController.js";
 import { updateApplicationStatus, getApplicationDetails, getPendingApplications, getDashboardStats, getLocationAnalytics, createPaymentOrder, verifyPayment, getGlobalSettings, updateGlobalSettings, promoteMember, forceCreateStudent, forceCreateClub, forceCreateMember } from "../controllers/adminController.js";
-import { getAllUsers, updateUserCredentials, updateUserProfile, getPublicCoaches, getPublicMembers } from "../controllers/userManagementController.js";
+import { getAllUsers, updateUserCredentials, updateUserProfile, getPublicCoaches, getPublicMembers, getCoachStudents } from "../controllers/userManagementController.js";
 import { getClubs } from "../controllers/clubController.js";
 import { getDistricts, getTaluksByDistrict, getTalukDetails } from "../controllers/locationController.js";
 import { authenticateJWT, authorizeAdmin, authorize } from "../middleware/authMiddleware.js";
@@ -78,5 +78,7 @@ router.get("/users/all", authenticateJWT, authorizeAdmin, getAllUsers);
 router.patch("/users/credentials", authenticateJWT, authorizeAdmin, updateUserCredentials);
 router.patch("/users/profile", authenticateJWT, authorize(["SUPER_ADMIN", "CEO"]), updateUserProfile);
 router.patch("/member/promote", authenticateJWT, authorizeAdmin, promoteMember);
+// ── Coach Dashboard ────────────────────────────────────────────────────────
+router.get("/coach/students", authenticateJWT, getCoachStudents);
 export default router;
 //# sourceMappingURL=registrationRoutes.js.map
