@@ -20,43 +20,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Backend API ──────────────────────────────
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: tnja_api
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      DATABASE_URL: postgresql://tnja:tnja@postgres:5432/tnja
-      PORT: 5000
-      NODE_ENV: development
-    ports:
-      - '5000:5000'
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - tnja_uploads:/app/uploads
-
-  # ── Frontend (Next.js) ──────────────────────
-  frontend:
-    build:
-      context: ../tnja-frontend
-      dockerfile: Dockerfile
-    container_name: tnja_frontend
-    restart: unless-stopped
-    env_file: ../tnja-frontend/.env
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:5000/api
-    ports:
-      - '3000:3000'
-    depends_on:
-      - api
+  # ── Backend API removed ──────────────────────────────
+  # ── Frontend (Next.js) removed ──────────────────────
 
 volumes:
   tnja_pgdata:
-    driver: local
-  tnja_uploads:
     driver: local

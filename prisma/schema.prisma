@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum Status {
@@ -247,6 +246,7 @@ model Member {
 }
 
 enum EventLevel {
+  CLUB
   DISTRICT
   ZONE
   STATE

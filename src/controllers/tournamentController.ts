@@ -1081,12 +1081,13 @@ const autoAdvanceWinner = (rounds: any[]): any[] => {
 
         if (nextMatchIdx < nextRound.length) {
           const nextMatch = nextRound[nextMatchIdx];
+          const isWinnerA = match.winnerId === match.slotA.playerId;
           const winnerSlot = {
             playerId: match.winnerId,
-            playerName: isFirstSlot ? match.slotA.playerName : match.slotB.playerName,
-            club: isFirstSlot ? match.slotA.club : match.slotB.club,
+            playerName: isWinnerA ? match.slotA.playerName : match.slotB.playerName,
+            club: isWinnerA ? match.slotA.club : match.slotB.club,
             isBye: false,
-            seedNumber: isFirstSlot ? match.slotA.seedNumber : match.slotB.seedNumber,
+            seedNumber: isWinnerA ? match.slotA.seedNumber : match.slotB.seedNumber,
           };
 
           // Update the appropriate slot (A or B) if it's TBD
