@@ -547,7 +547,7 @@ export const createTournamentPaymentOrder = async (req, res) => {
     try {
         const player = await prisma.student.findUnique({
             where: { id: userId },
-            select: { clubId: true, districtId: true, isPaid: true, isBPL: true },
+            select: { clubId: true, districtId: true, isPaid: true, isBPL: true, age: true, gender: true },
         });
         if (!player)
             return res.status(404).json({ error: "Player not found" });
@@ -575,6 +575,16 @@ export const createTournamentPaymentOrder = async (req, res) => {
             }
         }
         // STATE and NATIONAL: no restriction — any player can register
+        // ── Age and Gender validation ───────────────────────────────────────────
+        if (tournament.ageFrom && player.age < tournament.ageFrom) {
+            return res.status(403).json({ error: `You must be at least ${tournament.ageFrom} years old to join this tournament.` });
+        }
+        if (tournament.ageTo && player.age > tournament.ageTo) {
+            return res.status(403).json({ error: `You must be at most ${tournament.ageTo} years old to join this tournament.` });
+        }
+        if (tournament.gender && tournament.gender !== "BOTH" && tournament.gender !== player.gender) {
+            return res.status(403).json({ error: `This tournament is restricted to ${tournament.gender} players only.` });
+        }
         // Check slots
         const regCount = await prisma.tournamentRegistration.count({ where: { tournamentId } });
         if (regCount >= tournament.totalSlots) {
