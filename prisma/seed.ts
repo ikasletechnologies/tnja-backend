@@ -181,6 +181,12 @@ async function main() {
         const isFemale = i > 10;
         const playerEmail = `player_${distPrefix}_${cat.age}y_${isFemale ? 'f' : 'm'}_${i}@example.com`;
         
+        const distStr = districtCounter.toString().padStart(2, '0');
+        const catIdxStr = categories.indexOf(cat).toString();
+        const genStr = isFemale ? '1' : '0';
+        const iStr = i.toString().padStart(2, '0');
+        const uniqueSuffix = `${distStr}${catIdxStr}${genStr}${iStr}`;
+
         const student = await prisma.student.upsert({
           where: { email: playerEmail },
           update: {
@@ -196,9 +202,9 @@ async function main() {
             dob: cat.dob,
             age: cat.age,
             bloodGroup: "B+",
-            mobileNumber: `8333${pIndex.toString().padStart(6, '0')}`,
+            mobileNumber: `8333${uniqueSuffix}`,
             email: playerEmail,
-            aadhaarNumber: `3333${pIndex.toString().padStart(8, '0')}`,
+            aadhaarNumber: `333300${uniqueSuffix}`,
             address: `Player Address ${i}`,
             city: locationData.name,
             state: "Tamil Nadu",
@@ -219,27 +225,23 @@ async function main() {
         });
         
         // Register to tournament to store weight
-        const regCheck = await prisma.tournamentRegistration.findUnique({
+        await prisma.tournamentRegistration.upsert({
           where: {
             tournamentId_playerId: {
               tournamentId: tournament.id,
               playerId: student.id
             }
+          },
+          update: {},
+          create: {
+            tournamentId: tournament.id,
+            playerId: student.id,
+            status: "APPROVED",
+            isPaid: true,
+            weight: cat.weight,
+            height: "160cm"
           }
         });
-        
-        if (!regCheck) {
-          await prisma.tournamentRegistration.create({
-            data: {
-              tournamentId: tournament.id,
-              playerId: student.id,
-              status: "APPROVED",
-              isPaid: true,
-              weight: cat.weight,
-              height: "160cm"
-            }
-          });
-        }
         playerCounter++;
       }
     }
