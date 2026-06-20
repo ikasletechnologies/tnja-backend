@@ -2,6 +2,7 @@ import prisma from "../lib/prisma.js";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import { sendNotificationToUser } from "../lib/ws.js";
+import { sendEventRegistrationEmail, sendNewTournamentAnnouncement } from "../lib/mailer.js";
 // ─── HELPER: Calculate Age Group ────────────────────────────────────────────
 const getAgeGroup = (age) => {
     if (age >= 6 && age <= 11)
@@ -260,7 +261,7 @@ export const updateRegistrationStatus = async (req, res) => {
         const registration = await prisma.tournamentRegistration.update({
             where: { id: regId },
             data: { status },
-            include: { player: { select: { id: true, fullName: true } } },
+            include: { player: { select: { id: true, fullName: true, email: true } } },
         });
         const defaultMsg = status === "APPROVED"
             ? `Your registration for "${tournament.title}" has been approved by the club!`
@@ -281,6 +282,22 @@ export const updateRegistrationStatus = async (req, res) => {
             tournamentId,
             createdAt: new Date().toISOString(),
         });
+        if (status === "APPROVED" && registration.player.email) {
+            try {
+                await sendEventRegistrationEmail({
+                    toEmail: registration.player.email,
+                    toName: registration.player.fullName,
+                    eventName: tournament.title,
+                    eventDate: new Date(tournament.date).toLocaleDateString("en-IN"),
+                    eventLocation: tournament.location,
+                    amountPaid: tournament.entryFee,
+                    paymentId: registration.paymentId || "Free/BPL Registration",
+                });
+            }
+            catch (err) {
+                console.error("Failed to send approval email:", err);
+            }
+        }
         return res.json({ message: `Registration ${status.toLowerCase()} successfully`, registration });
     }
     catch (error) {
@@ -848,9 +865,9 @@ export const approveTournament = async (req, res) => {
         }
         const updated = await prisma.tournament.update({ where: { id }, data: dataToUpdate });
         const notifyId = tournament.clubId || tournament.officialId;
-        if (notifyId) {
-            const customMsg = message?.trim();
-            if (dataToUpdate.status === "APPROVED") {
+        if (dataToUpdate.status === "APPROVED") {
+            if (notifyId) {
+                const customMsg = message?.trim();
                 sendNotificationToUser(notifyId, {
                     type: "TOURNAMENT_APPROVED",
                     message: customMsg || `Your tournament "${tournament.title}" has been approved and is now live!`,
@@ -858,14 +875,54 @@ export const approveTournament = async (req, res) => {
                     createdAt: new Date().toISOString(),
                 });
             }
-            else {
-                sendNotificationToUser(notifyId, {
-                    type: "TOURNAMENT_REJECTED",
-                    message: customMsg || `Your tournament "${tournament.title}" was rejected. Reason: ${rejectionText}`,
-                    tournamentId: id,
-                    createdAt: new Date().toISOString(),
-                });
-            }
+            // Background task to send announcement emails to eligible players
+            (async () => {
+                try {
+                    const playerWhereClause = { status: "APPROVED" };
+                    if (tournament.level === "DISTRICT" && tournament.clubId) {
+                        const club = await prisma.club.findUnique({ where: { id: tournament.clubId }, select: { districtId: true } });
+                        if (club?.districtId) {
+                            playerWhereClause.districtId = club.districtId;
+                        }
+                    }
+                    else if (tournament.level === "ZONE" && tournament.zoneId) {
+                        playerWhereClause.district = { zoneName: tournament.zoneId };
+                    }
+                    else if (tournament.level === "CLUB" && tournament.clubId) {
+                        playerWhereClause.clubId = tournament.clubId;
+                    }
+                    if (tournament.gender !== "BOTH") {
+                        playerWhereClause.gender = tournament.gender;
+                    }
+                    const eligiblePlayers = await prisma.student.findMany({
+                        where: playerWhereClause,
+                        select: { email: true, fullName: true },
+                    });
+                    for (const player of eligiblePlayers) {
+                        if (player.email) {
+                            await sendNewTournamentAnnouncement({
+                                toEmail: player.email,
+                                toName: player.fullName,
+                                tournamentTitle: tournament.title,
+                                tournamentDate: new Date(tournament.date).toLocaleDateString("en-IN"),
+                                tournamentLevel: tournament.level
+                            }).catch(err => console.error("Failed to send announcement to", player.email, err));
+                        }
+                    }
+                }
+                catch (err) {
+                    console.error("Error sending bulk announcement emails:", err);
+                }
+            })();
+        }
+        else if (status === "REJECTED" && notifyId) {
+            const customMsg = message?.trim();
+            sendNotificationToUser(notifyId, {
+                type: "TOURNAMENT_REJECTED",
+                message: customMsg || `Your tournament "${tournament.title}" was rejected. Reason: ${rejectionText}`,
+                tournamentId: id,
+                createdAt: new Date().toISOString(),
+            });
         }
         return res.json({ message: `Tournament ${status.toLowerCase()} successfully`, tournament: updated });
     }

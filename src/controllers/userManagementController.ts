@@ -55,7 +55,7 @@ export const getPublicMembers = async (req: Request, res: Response) => {
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
     const { role: requesterRole, districtId: requesterDistrictId } = (req as any).user;
-    const { role, status, districtId, talukId, search } = req.query;
+    const { role, status, districtId, talukId, search, gender } = req.query;
 
     const allowedRoles = ["SUPER_ADMIN", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "CEO"];
     if (!allowedRoles.includes(requesterRole)) {
@@ -98,8 +98,9 @@ export const getAllUsers = async (req: Request, res: Response) => {
     } : {};
 
     // 3. Role filter logic (determining which queries to run)
+    const genderFilter = gender ? { gender: String(gender) } : {};
     let fetchStudents = true, fetchCoaches = true, fetchMembers = true, fetchClubs = true;
-    let memberRoleFilter: string | undefined = undefined;
+    let memberRoleFilter: string | string[] | undefined = undefined;
 
     if (role) {
       const qRole = String(role);
@@ -108,7 +109,10 @@ export const getAllUsers = async (req: Request, res: Response) => {
       fetchClubs = qRole === "CLUB";
       
       const memberRoles = ["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"];
-      if (memberRoles.includes(qRole)) {
+      if (qRole === "MEMBER") {
+        fetchMembers = true;
+        memberRoleFilter = memberRoles; // Return all member roles when "MEMBER" is requested
+      } else if (memberRoles.includes(qRole)) {
         fetchMembers = true;
         memberRoleFilter = qRole;
       } else {
@@ -118,7 +122,7 @@ export const getAllUsers = async (req: Request, res: Response) => {
 
     const [students, coaches, members, clubs] = await Promise.all([
       fetchStudents ? prisma.student.findMany({
-        where: { ...baseWhere, ...commonSearch },
+        where: { ...baseWhere, ...commonSearch, ...genderFilter },
         select: { 
           id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, districtId: true, 
           validUntil: true, district: { select: { name: true } }, taluk: { select: { name: true } },
@@ -128,7 +132,7 @@ export const getAllUsers = async (req: Request, res: Response) => {
       }) : Promise.resolve([]),
       
       fetchCoaches ? prisma.coachReferee.findMany({
-        where: { ...baseWhere, ...commonSearch },
+        where: { ...baseWhere, ...commonSearch, ...genderFilter },
         select: { 
           id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, districtId: true, 
           validUntil: true, district: { select: { name: true } }, taluk: { select: { name: true } }, profilePhoto: true
@@ -136,7 +140,7 @@ export const getAllUsers = async (req: Request, res: Response) => {
       }) : Promise.resolve([]),
       
       fetchMembers ? prisma.member.findMany({
-        where: { ...baseWhere, ...commonSearch, ...(memberRoleFilter ? { role: memberRoleFilter as any } : {}) },
+        where: { ...baseWhere, ...commonSearch, ...(memberRoleFilter ? { role: Array.isArray(memberRoleFilter) ? { in: memberRoleFilter as any[] } : (memberRoleFilter as any) } : {}), ...genderFilter },
         select: { 
           id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, role: true, createdAt: true, districtId: true, 
           validUntil: true, district: { select: { name: true } }, taluk: { select: { name: true } }, profilePhoto: true, aadhaarFront: true, aadhaarBack: true
