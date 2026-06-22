@@ -37,6 +37,9 @@ export const downloadCertificate = async (req: Request, res: Response) => {
     const { player, tournament, placement } = registration;
 
     // Create a new PDF document
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([842, 595]); // A4 landscape size
+
     // Set up fonts
     const serifFont = await pdfDoc.embedFont(StandardFonts.TimesRoman);
     const serifBoldFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);

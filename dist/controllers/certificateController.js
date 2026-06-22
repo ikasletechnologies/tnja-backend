@@ -30,18 +30,93 @@ export const downloadCertificate = async (req, res) => {
         const { player, tournament, placement } = registration;
         // Create a new PDF document
         const pdfDoc = await PDFDocument.create();
-        const page = pdfDoc.addPage([842, 595]); // A4 Landscape
-        const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-        const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const page = pdfDoc.addPage([842, 595]); // A4 landscape size
+        // Set up fonts
+        const serifFont = await pdfDoc.embedFont(StandardFonts.TimesRoman);
+        const serifBoldFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
+        const sansFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const sansBoldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
         const { width, height } = page.getSize();
-        // Embed and draw TNJA Logo & Organization Heading
-        let currentY = height - 40; // Start near the top
+        // Colors
+        const black = rgb(0.1, 0.1, 0.1);
+        const gold = rgb(0.85, 0.73, 0.35);
+        const darkGray = rgb(0.4, 0.4, 0.4);
+        const lightGray = rgb(0.97, 0.97, 0.97);
+        // Fill background with light gray texture color
+        page.drawRectangle({
+            x: 0, y: 0,
+            width, height,
+            color: lightGray,
+        });
+        // ─── BACKGROUND SHAPES (Black & Gold) ───────────────────────────────────
+        // Top Left Corner
+        // Main black triangle
+        page.drawSvgPath(`M 0,${height} L 240,${height} L 0,${height - 240} Z`, { color: black });
+        // Thin gold stripe
+        page.drawSvgPath(`M 0,${height - 250} L 250,${height} L 270,${height} L 0,${height - 270} Z`, { color: gold });
+        // Thin black stripe
+        page.drawSvgPath(`M 0,${height - 280} L 280,${height} L 295,${height} L 0,${height - 295} Z`, { color: black });
+        // Main Black Title Bar (Slanted edges)
+        // Left edge slants from (140, height-110) to (210, height-40)
+        // Right edge slants from (730, height-110) to (800, height-40)
+        page.drawSvgPath(`M 140,${height - 110} L 730,${height - 110} L 800,${height - 40} L 210,${height - 40} Z`, { color: black });
+        // Thin black line below the title bar
+        page.drawSvgPath(`M 120,${height - 120} L 600,${height - 120} L 605,${height - 125} L 115,${height - 125} Z`, { color: black });
+        // Top Right Corner
+        // Gold trapezoid area
+        page.drawSvgPath(`M 740,${height - 110} L 842,${height - 110} L 842,${height - 40} L 810,${height - 40} Z`, { color: gold });
+        // Black thin stripe
+        page.drawSvgPath(`M 810,${height - 110} L 842,${height - 110} L 842,${height - 78} Z`, { color: black });
+        page.drawSvgPath(`M 825,${height - 40} L 842,${height - 40} L 842,${height - 57} Z`, { color: black });
+        // Bottom Black Bar
+        page.drawRectangle({
+            x: 0, y: 0,
+            width: width, height: 40,
+            color: black,
+        });
+        // Bottom Gold Strip
+        page.drawRectangle({
+            x: 0, y: 40,
+            width: width, height: 5,
+            color: gold,
+        });
+        // ─── TEXT CONTENT ───────────────────────────────────────────────────────
+        let certificateTitle = "CERTIFICATE OF PARTICIPATION";
+        let placementText = "PARTICIPANT";
+        if (placement === "FIRST") {
+            certificateTitle = "CERTIFICATE OF ACHIEVEMENT";
+            placementText = "1ST PLACE CHAMPION";
+        }
+        else if (placement === "SECOND") {
+            certificateTitle = "CERTIFICATE OF ACHIEVEMENT";
+            placementText = "2ND PLACE WINNER";
+        }
+        else if (placement === "THIRD") {
+            certificateTitle = "CERTIFICATE OF ACHIEVEMENT";
+            placementText = "3RD PLACE WINNER";
+        }
+        // Top Header Title (Inside Black Bar)
+        const titleWidth = serifFont.widthOfTextAtSize(certificateTitle, 36);
+        page.drawText(certificateTitle, {
+            x: width / 2 - titleWidth / 2,
+            y: height - 90,
+            size: 36,
+            font: serifFont,
+            color: gold,
+        });
+        // Logo & Watermark
+        let currentY = height - 160;
         try {
             const logoPath = path.join(process.cwd(), "assets", "Logo.png");
             if (fs.existsSync(logoPath)) {
                 const logoImageBytes = fs.readFileSync(logoPath);
                 const logoImage = await pdfDoc.embedPng(logoImageBytes);
-                const logoDims = logoImage.scale(0.55); // Adjust scale as needed
+                // Draw Faint Watermark
+                const wmDims = logoImage.scale(1.5);
+                // We can't set opacity directly in drawImage easily in all pdf-lib versions without graphics state,
+                // so we'll just skip watermark if it's too dark, or draw the logo as normal.
+                // Draw Main Logo
+                const logoDims = logoImage.scale(0.3);
                 currentY -= logoDims.height;
                 page.drawImage(logoImage, {
                     x: width / 2 - logoDims.width / 2,
@@ -49,131 +124,111 @@ export const downloadCertificate = async (req, res) => {
                     width: logoDims.width,
                     height: logoDims.height,
                 });
-                currentY -= 35; // Space below logo
-                const orgName = "TAMIL NADU JUDO ASSOCIATION";
-                const orgNameWidth = font.widthOfTextAtSize(orgName, 26);
-                page.drawText(orgName, {
-                    x: width / 2 - orgNameWidth / 2,
-                    y: currentY,
-                    size: 26,
-                    font,
-                    color: rgb(0.1, 0.4, 0.8), // Dark blue
-                });
-                currentY -= 50; // Space below org name
+                currentY -= 40; // Space below logo
             }
         }
         catch (err) {
             console.error("Error loading logo for certificate:", err);
         }
-        // Draw border
-        page.drawRectangle({
-            x: 30,
-            y: 30,
-            width: width - 60,
-            height: height - 60,
-            borderColor: rgb(0.2, 0.2, 0.8),
-            borderWidth: 5,
-        });
-        let certificateTitle = "CERTIFICATE OF PARTICIPATION";
-        let placementText = "has actively participated in";
-        let color = rgb(0.3, 0.3, 0.3);
-        if (placement === "FIRST") {
-            certificateTitle = "CERTIFICATE OF ACHIEVEMENT";
-            placementText = "has won FIRST PLACE in";
-            color = rgb(0.85, 0.65, 0.13); // Gold
-        }
-        else if (placement === "SECOND") {
-            certificateTitle = "CERTIFICATE OF ACHIEVEMENT";
-            placementText = "has won SECOND PLACE in";
-            color = rgb(0.75, 0.75, 0.75); // Silver
-        }
-        else if (placement === "THIRD") {
-            certificateTitle = "CERTIFICATE OF ACHIEVEMENT";
-            placementText = "has won THIRD PLACE in";
-            color = rgb(0.8, 0.5, 0.2); // Bronze
-        }
-        // Title
-        const titleWidth = font.widthOfTextAtSize(certificateTitle, 40);
-        page.drawText(certificateTitle, {
-            x: width / 2 - titleWidth / 2,
+        // "THIS CERTIFIES THAT"
+        const certThat = "THIS CERTIFIES THAT";
+        const certThatWidth = serifFont.widthOfTextAtSize(certThat, 14);
+        page.drawText(certThat, {
+            x: width / 2 - certThatWidth / 2,
             y: currentY,
-            size: 40,
-            font,
-            color,
-        });
-        currentY -= 45;
-        // Subtitle
-        const subtitle = "This is to certify that";
-        const subWidth = regularFont.widthOfTextAtSize(subtitle, 20);
-        page.drawText(subtitle, {
-            x: width / 2 - subWidth / 2,
-            y: currentY,
-            size: 20,
-            font: regularFont,
+            size: 14,
+            font: serifFont,
+            color: darkGray,
         });
         currentY -= 60;
         // Player Name
-        const nameWidth = font.widthOfTextAtSize(player.fullName, 36);
-        page.drawText(player.fullName, {
+        const nameWidth = serifFont.widthOfTextAtSize(player.fullName.toUpperCase(), 48);
+        page.drawText(player.fullName.toUpperCase(), {
             x: width / 2 - nameWidth / 2,
             y: currentY,
-            size: 36,
-            font,
-            color: rgb(0, 0, 0),
+            size: 48,
+            font: serifFont,
+            color: black,
         });
-        currentY -= 50;
-        // Placement Text
-        const placeWidth = regularFont.widthOfTextAtSize(placementText, 20);
+        currentY -= 40;
+        // "HAS MET OR SURPASSED..."
+        const reqText1 = "HAS MET OR SURPASSED ALL OF THE NECESSARY REQUIREMENTS";
+        const reqText2 = "TO BE PROMOTED TO";
+        const reqWidth1 = serifBoldFont.widthOfTextAtSize(reqText1, 11);
+        const reqWidth2 = serifBoldFont.widthOfTextAtSize(reqText2, 11);
+        page.drawText(reqText1, {
+            x: width / 2 - reqWidth1 / 2,
+            y: currentY,
+            size: 11,
+            font: serifBoldFont,
+            color: darkGray,
+        });
+        currentY -= 16;
+        page.drawText(reqText2, {
+            x: width / 2 - reqWidth2 / 2,
+            y: currentY,
+            size: 11,
+            font: serifBoldFont,
+            color: darkGray,
+        });
+        currentY -= 45;
+        // Placement / Rank
+        const placeWidth = serifFont.widthOfTextAtSize(placementText, 32);
         page.drawText(placementText, {
             x: width / 2 - placeWidth / 2,
             y: currentY,
-            size: 20,
-            font: regularFont,
+            size: 32,
+            font: serifFont,
+            color: black,
         });
-        currentY -= 50;
-        // Tournament Name
-        const tNameWidth = font.widthOfTextAtSize(tournament.title, 30);
-        page.drawText(tournament.title, {
+        currentY -= 30;
+        // Tournament Name (Small text below placement)
+        const tNameText = tournament.title;
+        const tNameWidth = serifFont.widthOfTextAtSize(tNameText, 12);
+        page.drawText(tNameText, {
             x: width / 2 - tNameWidth / 2,
             y: currentY,
-            size: 30,
-            font,
-            color: rgb(0.1, 0.4, 0.8),
+            size: 12,
+            font: serifFont,
+            color: rgb(0.6, 0.6, 0.6),
         });
-        currentY -= 40;
-        // Date
-        const dateText = `Held on ${new Date(tournament.date).toLocaleDateString("en-IN")}`;
-        const dateWidth = regularFont.widthOfTextAtSize(dateText, 18);
-        page.drawText(dateText, {
-            x: width / 2 - dateWidth / 2,
-            y: currentY,
-            size: 18,
-            font: regularFont,
-        });
-        // Signatures
+        // ─── FOOTER (Columns) ───────────────────────────────────────────────────
+        const footerY = 90;
+        // Column 1: Date
+        const dateLabel = "DATE";
+        const dateVal = new Date(tournament.date).toLocaleDateString("en-US");
+        const dateLabelWidth = serifFont.widthOfTextAtSize(dateLabel, 12);
+        const dateValWidth = serifFont.widthOfTextAtSize(dateVal, 14);
+        page.drawText(dateLabel, { x: 180 - dateLabelWidth / 2, y: footerY + 20, size: 12, font: serifFont, color: black });
+        page.drawText(dateVal, { x: 180 - dateValWidth / 2, y: footerY, size: 14, font: serifFont, color: darkGray });
+        // Column 2: Rank / Category
+        const rankLabel = "RANK";
+        const rankVal = "TOP LEVEL"; // Or use placement text
+        const rankLabelWidth = serifFont.widthOfTextAtSize(rankLabel, 12);
+        const rankValWidth = serifFont.widthOfTextAtSize(rankVal, 14);
+        page.drawText(rankLabel, { x: width / 2 - rankLabelWidth / 2, y: footerY + 20, size: 12, font: serifFont, color: black });
+        page.drawText(rankVal, { x: width / 2 - rankValWidth / 2, y: footerY, size: 14, font: serifFont, color: darkGray });
+        // Column 3: Signature
+        const sigLabel = "CHIEF INSTRUCTOR";
+        const sigLabelWidth = serifFont.widthOfTextAtSize(sigLabel, 12);
         page.drawLine({
-            start: { x: 150, y: 100 },
-            end: { x: 300, y: 100 },
+            start: { x: width - 250, y: footerY + 15 },
+            end: { x: width - 90, y: footerY + 15 },
             thickness: 1,
-            color: rgb(0, 0, 0),
+            color: black,
         });
-        page.drawText("Authorized Signature", {
-            x: 170,
-            y: 80,
-            size: 14,
-            font: regularFont,
-        });
-        page.drawLine({
-            start: { x: width - 300, y: 100 },
-            end: { x: width - 150, y: 100 },
-            thickness: 1,
-            color: rgb(0, 0, 0),
-        });
-        page.drawText("Tournament Official", {
-            x: width - 280,
-            y: 80,
-            size: 14,
-            font: regularFont,
+        // Draw a script-like font if we had one, but we'll just write Tamil Nadu Judo Assoc
+        page.drawText("TNJA Official", { x: width - 210, y: footerY + 25, size: 24, font: serifFont, color: black });
+        page.drawText(sigLabel, { x: width - 170 - sigLabelWidth / 2, y: footerY - 5, size: 12, font: serifFont, color: black });
+        // Bottom Bar Text
+        const footerDisclaimer = "Tamil Nadu Judo Association Teaches Traditional Martial Arts Training As Well As Life Long Leadership And Personal Development Training";
+        const fDiscWidth = sansFont.widthOfTextAtSize(footerDisclaimer, 9);
+        page.drawText(footerDisclaimer, {
+            x: width / 2 - fDiscWidth / 2,
+            y: 16,
+            size: 9,
+            font: sansFont,
+            color: gold,
         });
         const pdfBytes = await pdfDoc.save();
         res.setHeader("Content-Type", "application/pdf");
