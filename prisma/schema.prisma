@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 enum Status {
@@ -19,6 +20,13 @@ enum Gender {
   MALE
   FEMALE
   OTHER
+}
+
+enum Placement {
+  FIRST
+  SECOND
+  THIRD
+  PARTICIPATION
 }
 
 model District {
@@ -345,6 +353,7 @@ model TournamentRegistration {
   paymentId    String?
   height       String?
   weight       String?
+  placement    Placement? @default(PARTICIPATION)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
   messages     TournamentRegistrationMessage[]

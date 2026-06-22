@@ -471,15 +471,15 @@ export const getPlayerTournaments = async (req: Request, res: Response) => {
     if (!player.clubId) return res.json([]); // Player not linked to a club
 
     const tournaments = await prisma.tournament.findMany({
-      where: { clubId: player.clubId, status: "APPROVED" },
+      where: { clubId: player.clubId, status: { in: ["APPROVED", "CLOSED"] } },
       include: {
         _count: { select: { registrations: true } },
         registrations: {
           where: { playerId: userId },
-          select: { id: true, status: true, isPaid: true },
+          select: { id: true, status: true, isPaid: true, placement: true },
         },
       },
-      orderBy: { date: "asc" },
+      orderBy: { date: "desc" },
     });
 
     const result = tournaments.map((t) => ({
@@ -525,7 +525,7 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
     // District-level: only from clubs in same district, matching player's gender
     const districtTournaments = await prisma.tournament.findMany({
       where: {
-        status: "APPROVED",
+        status: { in: ["APPROVED", "CLOSED"] },
         level: "DISTRICT",
         club: { districtId: player.districtId },
         OR: [
@@ -535,16 +535,16 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
       },
       include: {
         _count: { select: { registrations: true } },
-        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true } },
+        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true } },
         club: { select: { name: true, district: { select: { name: true } } } },
       },
-      orderBy: { date: "asc" },
+      orderBy: { date: "desc" },
     });
 
     // Zonal-level: level=ZONE, match tournament's zoneId with player's zone, matching player's gender
     const zonalTournaments = await prisma.tournament.findMany({
       where: {
-        status: "APPROVED",
+        status: { in: ["APPROVED", "CLOSED"] },
         level: "ZONE",
         zoneId: player.district?.zoneName ?? "",
         OR: [
@@ -554,16 +554,16 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
       },
       include: {
         _count: { select: { registrations: true } },
-        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true } },
+        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true } },
         club: { select: { name: true, district: { select: { name: true } } } },
       },
-      orderBy: { date: "asc" },
+      orderBy: { date: "desc" },
     });
 
     // State & National: open to all players, but must match gender
     const stateNationalTournaments = await prisma.tournament.findMany({
       where: {
-        status: "APPROVED",
+        status: { in: ["APPROVED", "CLOSED"] },
         level: { in: ["STATE", "NATIONAL"] },
         OR: [
           { gender: "BOTH" },
@@ -572,10 +572,10 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
       },
       include: {
         _count: { select: { registrations: true } },
-        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true } },
+        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true } },
         club: { select: { name: true, district: { select: { name: true } } } },
       },
-      orderBy: { date: "asc" },
+      orderBy: { date: "desc" },
     });
 
     const mapTournament = (t: any) => ({
@@ -1207,6 +1207,57 @@ export const saveTournamentDraw = async (req: Request, res: Response) => {
     return res.json({ message: "Draw saved successfully", draw });
   } catch (error) {
     console.error("Error saving draw:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// ─── ADMIN/CLUB/OFFICIAL: Submit Final Results ───────────────────────────────
+export const submitTournamentResults = async (req: Request, res: Response) => {
+  const { userId, role } = (req as any).user;
+  const id = req.params.id as string;
+  const { results } = req.body; // Array of { playerId: string, placement: "FIRST" | "SECOND" | "THIRD" | "PARTICIPATION" }
+
+  const isClub = role === "CLUB";
+  const isOfficial = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN"].includes(role);
+
+  if (!isClub && !isOfficial) {
+    return res.status(403).json({ error: "Only clubs and officials can submit results" });
+  }
+
+  try {
+    const tournament = await prisma.tournament.findUnique({ where: { id } });
+    if (!tournament) return res.status(404).json({ error: "Tournament not found" });
+    if (tournament.clubId !== userId && tournament.officialId !== userId) return res.status(403).json({ error: "This tournament does not belong to you" });
+
+    // Ensure all players are registered in this tournament
+    const playerIds = results.map((r: any) => r.playerId);
+    const validRegistrations = await prisma.tournamentRegistration.findMany({
+      where: { tournamentId: id, playerId: { in: playerIds } },
+    });
+
+    if (validRegistrations.length !== playerIds.length) {
+      return res.status(400).json({ error: "One or more players are not registered in this tournament" });
+    }
+
+    // Use a transaction to update placements
+    await prisma.$transaction(
+      results.map((r: any) =>
+        prisma.tournamentRegistration.update({
+          where: { tournamentId_playerId: { tournamentId: id, playerId: r.playerId } },
+          data: { placement: r.placement },
+        })
+      )
+    );
+
+    // Also close the tournament
+    await prisma.tournament.update({
+      where: { id },
+      data: { status: "CLOSED" },
+    });
+
+    return res.json({ message: "Results submitted successfully. Tournament is now closed." });
+  } catch (error) {
+    console.error("Error submitting results:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
