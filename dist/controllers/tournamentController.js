@@ -215,12 +215,16 @@ export const getTournamentRegistrations = async (req, res) => {
             where: { tournamentId: id },
             include: {
                 player: {
-                    select: { id: true, fullName: true, permanentId: true, tempId: true, email: true, gender: true },
+                    select: { id: true, fullName: true, permanentId: true, tempId: true, email: true, gender: true, age: true },
                 },
             },
             orderBy: { createdAt: "asc" },
         });
-        return res.json(registrations);
+        const formattedRegistrations = registrations.map(reg => ({
+            ...reg,
+            ageGroup: getAgeGroup(reg.player.age)
+        }));
+        return res.json(formattedRegistrations);
     }
     catch (error) {
         console.error("Error fetching tournament registrations:", error);
