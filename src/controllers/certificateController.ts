@@ -21,7 +21,7 @@ export const downloadCertificate = async (req: Request, res: Response) => {
         },
       },
       include: {
-        player: { select: { fullName: true } },
+        player: { select: { fullName: true, age: true, gender: true } },
         tournament: { select: { title: true, date: true, status: true } },
       },
     });
@@ -235,9 +235,19 @@ export const downloadCertificate = async (req: Request, res: Response) => {
     page.drawText(dateLabel, { x: 180 - dateLabelWidth/2, y: footerY + 20, size: 12, font: serifFont, color: black });
     page.drawText(dateVal, { x: 180 - dateValWidth/2, y: footerY, size: 14, font: serifFont, color: darkGray });
 
-    // Column 2: Rank / Category
-    const rankLabel = "RANK";
-    const rankVal = "TOP LEVEL"; // Or use placement text
+    // Column 2: Category
+    const rankLabel = "CATEGORY";
+    
+    // Calculate Age Group
+    let ageGroup = "SENIOR";
+    const age = player.age;
+    if (age >= 10 && age <= 14) ageGroup = "SUB-JUNIOR";
+    else if (age >= 15 && age <= 17) ageGroup = "CADET";
+    else if (age >= 18 && age <= 20) ageGroup = "JUNIOR";
+    else if (age >= 21 && age <= 34) ageGroup = "SENIOR";
+    else if (age >= 35) ageGroup = "VETERAN";
+
+    const rankVal = `${ageGroup} ${player.gender === "FEMALE" ? "GIRLS" : "BOYS"} - ${registration.weight || ""}KG`;
     const rankLabelWidth = serifFont.widthOfTextAtSize(rankLabel, 12);
     const rankValWidth = serifFont.widthOfTextAtSize(rankVal, 14);
 

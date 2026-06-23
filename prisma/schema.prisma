@@ -183,6 +183,7 @@ model CoachReferee {
   clubId                String?
   club                  Club?    @relation(fields: [clubId], references: [id])
   students              Student[] @relation("CoachStudents")
+  tournamentRegs        TournamentRegistration[]
   password              String
   status                Status   @default(PENDING)
   rejectionRemark       String?
@@ -315,6 +316,7 @@ model Tournament {
   description        String
   entryFee           Float                    @default(0)
   totalSlots         Int                      @default(32)
+  numberOfMats       Int                      @default(1)
   ageFrom            Int                      @default(0)
   ageTo              Int                      @default(100)
   gender             String                   @default("BOTH")
@@ -348,6 +350,8 @@ model TournamentRegistration {
   tournament   Tournament @relation(fields: [tournamentId], references: [id])
   playerId     String
   player       Student    @relation(fields: [playerId], references: [id])
+  coachId      String?
+  coach        CoachReferee? @relation(fields: [coachId], references: [id])
   status       Status     @default(PENDING)
   isPaid       Boolean    @default(false)
   paymentId    String?
@@ -402,13 +406,15 @@ model TournamentDraw {
   tournamentId   String
   tournament     Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   ageGroup       String
+  exactAge       Int        @default(0)
   gender         String
   weightCategory String
+  matNumber      Int        @default(1)
   rounds         Json
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  @@unique([tournamentId, ageGroup, gender, weightCategory])
+  @@unique([tournamentId, ageGroup, exactAge, gender, weightCategory])
 }
 
 model TournamentMessage {
