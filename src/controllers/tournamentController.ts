@@ -7,9 +7,11 @@ import { sendEventRegistrationEmail, sendNewTournamentAnnouncement } from "../li
 
 // ─── HELPER: Calculate Age Group ────────────────────────────────────────────
 const getAgeGroup = (age: number): string => {
-  if (age >= 6 && age <= 11) return "6-11";
-  if (age >= 12 && age <= 18) return "12-18";
-  return "18+";
+  if (age <= 14) return "Sub-Junior (10-14 yrs)";
+  if (age <= 17) return "Cadet (15-17 yrs)";
+  if (age <= 20) return "Junior (18-20 yrs)";
+  if (age < 35) return "Senior (21-34 yrs)";
+  return "Veteran (35+ yrs)";
 };
 
 // ─── HELPER: Get Weight Category ────────────────────────────────────────────
@@ -1177,10 +1179,28 @@ const autoAdvanceWinner = (rounds: any[]): any[] => {
 
 // ─── ADMIN/CLUB: Save Tournament Draw ────────────────────────────────────────
 export const saveTournamentDraw = async (req: Request, res: Response) => {
+  const { userId, role } = (req as any).user;
   const id = req.params.id as string;
   const { ageGroup, gender, weightCategory, rounds } = req.body;
 
+  const isClub = role === "CLUB";
+  const isOfficial = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN"].includes(role);
+
+  if (!isClub && !isOfficial) {
+    return res.status(403).json({ error: "Only clubs and officials can save draws" });
+  }
+
+  if (!ageGroup || !gender || !weightCategory || !rounds) {
+    return res.status(400).json({ error: "Missing required draw parameters" });
+  }
+
   try {
+    const tournament = await prisma.tournament.findUnique({ where: { id } });
+    if (!tournament) return res.status(404).json({ error: "Tournament not found" });
+    if (tournament.clubId !== userId && tournament.officialId !== userId) {
+      return res.status(403).json({ error: "This tournament does not belong to you" });
+    }
+
     // Auto-advance winners to next round
     const updatedRounds = autoAdvanceWinner(JSON.parse(JSON.stringify(rounds)));
 
