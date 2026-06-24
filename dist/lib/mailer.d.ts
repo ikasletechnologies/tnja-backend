@@ -23,6 +23,15 @@ export declare function sendPaymentRequestEmail(opts: {
 export declare function sendClubRegistrationEmail(opts: {
     toEmail: string;
     toName: string;
+    tempId?: string;
+    password?: string;
+}): Promise<void>;
+export declare function sendRegistrationReceiptEmail(opts: {
+    toEmail: string;
+    toName: string;
+    role: string;
+    tempId: string;
+    password?: string;
 }): Promise<void>;
 export declare function sendResetPasswordEmail(opts: {
     toEmail: string;

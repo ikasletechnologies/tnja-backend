@@ -555,6 +555,84 @@ export const updateApplicationStatus = async (req, res) => {
     }
 };
 // ──────────────────────────────────────────────────────────────────────────────
+// POST /api/admin/request-changes - change status to REPLAY and log
+// ──────────────────────────────────────────────────────────────────────────────
+export const requestChanges = async (req, res) => {
+    const { id, type, remark } = req.body;
+    const { role, districtId } = req.user;
+    try {
+        const allowedRoles = [
+            "SUPER_ADMIN", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT",
+            "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "CEO"
+        ];
+        if (!allowedRoles.includes(role)) {
+            return res.status(403).json({ error: "You do not have permission to manage applications" });
+        }
+        if (!remark) {
+            return res.status(400).json({ error: "Remark/Reason is required when requesting changes." });
+        }
+        const updateData = { status: "REPLAY", rejectionRemark: remark };
+        let tempIdToLog = "";
+        let roleToLog = "";
+        if (type === "student") {
+            const student = await prisma.student.findUnique({ where: { id } });
+            if (!student)
+                return res.status(404).json({ error: "Student not found" });
+            await prisma.student.update({ where: { id }, data: updateData });
+            tempIdToLog = student.tempId;
+            roleToLog = "PLAYER";
+        }
+        else if (type === "coach") {
+            const coach = await prisma.coachReferee.findUnique({ where: { id } });
+            if (!coach)
+                return res.status(404).json({ error: "Coach not found" });
+            await prisma.coachReferee.update({ where: { id }, data: updateData });
+            tempIdToLog = coach.tempId;
+            roleToLog = "COACH";
+        }
+        else if (type === "member") {
+            const member = await prisma.member.findUnique({ where: { id } });
+            if (!member)
+                return res.status(404).json({ error: "Member not found" });
+            await prisma.member.update({ where: { id }, data: updateData });
+            tempIdToLog = member.tempId;
+            roleToLog = "MEMBER";
+        }
+        else if (type === "club") {
+            const club = await prisma.club.findUnique({ where: { id } });
+            if (!club)
+                return res.status(404).json({ error: "Club not found" });
+            await prisma.club.update({ where: { id }, data: updateData });
+            tempIdToLog = club.tempId || club.id;
+            roleToLog = "CLUB";
+        }
+        else {
+            return res.status(400).json({ error: "Invalid application type for requesting changes" });
+        }
+        // Log the request changes action
+        try {
+            await prisma.applicationLog.create({
+                data: {
+                    userId: tempIdToLog,
+                    role: roleToLog,
+                    action: "CHANGES_REQUESTED",
+                    remark: remark
+                }
+            });
+        }
+        catch (logErr) {
+            console.error("Failed to log changes requested:", logErr);
+        }
+        // Optionally: send an email here using a specialized mailer function
+        // For now, they can log in to check their status and see the remark
+        return res.json({ message: "Changes requested successfully. Status set to REPLAY." });
+    }
+    catch (error) {
+        console.error("[requestChanges]", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+// ──────────────────────────────────────────────────────────────────────────────
 // GET /api/application/:tempId  – get full details of an application
 // ──────────────────────────────────────────────────────────────────────────────
 export const getApplicationDetails = async (req, res) => {

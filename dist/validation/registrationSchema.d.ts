@@ -84,6 +84,7 @@ export declare const clubRegistrationSchema: z.ZodObject<{
     age12to18Female: z.ZodUnion<[z.ZodPipe<z.ZodString, z.ZodTransform<number, string>>, z.ZodNumber]>;
     age16AboveMale: z.ZodUnion<[z.ZodPipe<z.ZodString, z.ZodTransform<number, string>>, z.ZodNumber]>;
     age16AboveFemale: z.ZodUnion<[z.ZodPipe<z.ZodString, z.ZodTransform<number, string>>, z.ZodNumber]>;
+    profilePhoto: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
 }, z.core.$strip>;
 export declare const memberRegistrationSchema: z.ZodObject<{
     districtId: z.ZodString;

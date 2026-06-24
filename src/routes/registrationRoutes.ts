@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { registerStudent, registerCoach, registerClub, registerMember } from "../controllers/registrationController.js";
-import { updateApplicationStatus, getApplicationDetails, getPendingApplications, getDashboardStats, getLocationAnalytics, createPaymentOrder, verifyPayment, getGlobalSettings, updateGlobalSettings, promoteMember, forceCreateStudent, forceCreateClub, forceCreateMember } from "../controllers/adminController.js";
+import { registerStudent, registerCoach, registerClub, registerMember, resubmitApplication } from "../controllers/registrationController.js";
+import { updateApplicationStatus, requestChanges, getApplicationDetails, getPendingApplications, getDashboardStats, getLocationAnalytics, createPaymentOrder, verifyPayment, getGlobalSettings, updateGlobalSettings, promoteMember, forceCreateStudent, forceCreateClub, forceCreateMember } from "../controllers/adminController.js";
 import { getAllUsers, updateUserCredentials, updateUserProfile, getPublicCoaches, getPublicMembers, getCoachStudents } from "../controllers/userManagementController.js";
 import { getClubs } from "../controllers/clubController.js";
 import { getDistricts, getTaluksByDistrict, getTalukDetails } from "../controllers/locationController.js";
@@ -69,12 +69,14 @@ router.post("/register/student", registerStudent);
 router.post("/register/coach", registerCoach);
 router.post("/register/club", registerClub);
 router.post("/register/member", registerMember);
+router.post("/resubmit-application", authenticateJWT, resubmitApplication);
 
 // Admin / Super-admin routes
 const ALL_ADMIN_ROLES = ["SUPER_ADMIN", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"];
 
 router.get("/applications/pending", authenticateJWT, authorize(ALL_ADMIN_ROLES), getPendingApplications);   // ?type=STUDENT|COACH|MEMBER|CLUB
 router.patch("/application/status", authenticateJWT, authorize(ALL_ADMIN_ROLES), updateApplicationStatus);
+router.post("/admin/request-changes", authenticateJWT, authorize(ALL_ADMIN_ROLES), requestChanges);
 router.get("/application/:tempId", authenticateJWT, authorize(ALL_ADMIN_ROLES), getApplicationDetails);
 router.get("/admin/stats", authenticateJWT, authorizeAdmin, getDashboardStats);
 router.get("/admin/location-analytics", authenticateJWT, authorizeAdmin, getLocationAnalytics);

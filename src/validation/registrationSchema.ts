@@ -90,6 +90,7 @@ export const clubRegistrationSchema = z.object({
   age12to18Female: stringToNumber,
   age16AboveMale: stringToNumber,
   age16AboveFemale: stringToNumber,
+  profilePhoto: z.string().optional().or(z.literal("")),
 });
 
 export const memberRegistrationSchema = z.object({

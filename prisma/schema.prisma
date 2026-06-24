@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum Status {
@@ -57,6 +58,7 @@ model Club {
   id               String         @id @default(uuid())
   tempId           String?        @unique
   name             String
+  profilePhoto     String?
   districtId       String?
   district         District?      @relation(fields: [districtId], references: [id])
   talukId          String?
@@ -427,3 +429,11 @@ model TournamentMessage {
   createdAt      DateTime   @default(now())
 }
 
+model ApplicationLog {
+  id        String   @id @default(uuid())
+  userId    String   // tempId or permanentId
+  role      String   // Player, Coach, Club, Member
+  action    String   // "SUBMITTED", "CHANGES_REQUESTED", "RESUBMITTED", "APPROVED", "REJECTED"
+  remark    String?
+  createdAt DateTime @default(now())
+}

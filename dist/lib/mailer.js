@@ -247,7 +247,7 @@ export async function sendPaymentRequestEmail(opts) {
     console.log(`[Mailer] Payment request email sent to ${toEmail} (${role})`);
 }
 export async function sendClubRegistrationEmail(opts) {
-    const { toEmail, toName } = opts;
+    const { toEmail, toName, tempId, password } = opts;
     const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -268,6 +268,7 @@ export async function sendClubRegistrationEmail(opts) {
               border-radius:999px; padding:4px 16px; font-weight:700; font-size:13px; }
     .footer { background:#f1f5f9; padding:20px 40px; text-align:center;
               border-top:1px solid #e2e8f0; color:#64748b; font-size:12px; }
+    .temp-id-box { background:#f0f9ff; border:1px solid #bae6fd; padding:12px; border-radius:8px; margin-top:16px; font-weight:bold; color:#1e3a8a; }
   </style>
 </head>
 <body>
@@ -281,6 +282,12 @@ export async function sendClubRegistrationEmail(opts) {
         <h2>Hello ${toName},</h2>
         <p>Thank you for registering your Club/Organization with the Tamil Nadu Judo Association.</p>
         <p>Your application is currently <span class="status">PENDING APPROVAL</span>.</p>
+        ${tempId ? `
+        <div class="temp-id-box">
+          <div>Your Temporary Club ID is: <strong>${tempId}</strong></div>
+          ${password ? `<div style="margin-top:8px;">Your Password is: <strong>${password}</strong></div>` : ''}
+          <p style="font-size:13px; font-weight:normal; margin-top:8px; color:#475569;">You can use these credentials to log in and check your application status or make requested changes.</p>
+        </div>` : ''}
         <p>Our team will review your details shortly. Once approved, you will receive your official login credentials via email.</p>
         <p>If you have any questions, please contact the TNJA state office.</p>
         <p>Regards,<br/><strong>TNJA Admin Team</strong></p>
@@ -299,6 +306,69 @@ export async function sendClubRegistrationEmail(opts) {
         html,
     });
     console.log(`[Mailer] Club registration receipt sent to ${toEmail}`);
+}
+export async function sendRegistrationReceiptEmail(opts) {
+    const { toEmail, toName, role, tempId, password } = opts;
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+    body { margin:0; font-family:'Roboto',sans-serif; background:#f8fafc; color:#333; }
+    .wrapper { padding: 40px 20px; }
+    .container { max-width:600px; margin:auto; background:#fff; border-radius:16px; overflow:hidden;
+                 box-shadow:0 8px 32px rgba(0,0,0,0.12); }
+    .header { background:linear-gradient(135deg,#f97316 0%,#ea580c 100%);
+              padding:36px 40px; text-align:center; }
+    .header h1 { color:#fff; margin:0; font-size:22px; }
+    .body { padding:36px 40px; }
+    .body h2 { color:#ea580c; margin-top:0; }
+    .body p  { color:#475569; line-height:1.7; }
+    .status { display:inline-block; background:#fef3c7; color:#92400e;
+              border-radius:999px; padding:4px 16px; font-weight:700; font-size:13px; }
+    .footer { background:#f1f5f9; padding:20px 40px; text-align:center;
+              border-top:1px solid #e2e8f0; color:#64748b; font-size:12px; }
+    .temp-id-box { background:#fff7ed; border:1px solid #fed7aa; padding:16px; border-radius:8px; margin:20px 0; font-size:16px; text-align:center; }
+    .temp-id-box strong { color:#9a3412; font-size:20px; display:block; margin-top:8px;}
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="header">
+        <h1>Tamil Nadu Judo Association</h1>
+        <p style="color:#ffedd5; margin:6px 0 0;">Registration Received</p>
+      </div>
+      <div class="body">
+        <h2>Hello ${toName},</h2>
+        <p>Thank you for registering as a <strong>${role}</strong> with the Tamil Nadu Judo Association.</p>
+        <p>Your application has been received and is currently <span class="status">PENDING APPROVAL</span>.</p>
+        
+        <div class="temp-id-box">
+          Your Temporary ID for reference:
+          <strong>${tempId}</strong>
+          ${password ? `<br/><span style="font-size:14px; font-weight:normal;">Your Password: <strong>${password}</strong></span>` : ''}
+          <div style="font-size:13px; font-weight:normal; margin-top:12px; color:#9a3412;">Use these credentials to log in and check your status or update your application if requested by the Admin.</div>
+        </div>
+
+        <p>Our team will review your application. Once approved, you will receive an email with your permanent ID and login credentials.</p>
+        <p>Regards,<br/><strong>TNJA Admin Team</strong></p>
+      </div>
+      <div class="footer">
+        © ${new Date().getFullYear()} Tamil Nadu Judo Association. All rights reserved.
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+    await transporter.sendMail({
+        from: `"${SMTP_FROM_NAME}" <${SMTP_USER}>`,
+        to: `"${toName}" <${toEmail}>`,
+        subject: `TNJA Registration Received – Your Temporary ID`,
+        html,
+    });
+    console.log(`[Mailer] Registration receipt sent to ${toEmail} with Temp ID: ${tempId}`);
 }
 export async function sendResetPasswordEmail(opts) {
     const { toEmail, toName, resetLink } = opts;

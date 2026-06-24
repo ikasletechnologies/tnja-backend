@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import prisma from "../lib/prisma.js";
 import { studentRegistrationSchema, coachRegistrationSchema, clubRegistrationSchema, memberRegistrationSchema } from "../validation/registrationSchema.js";
 import crypto from "crypto";
-import { sendClubRegistrationEmail } from "../lib/mailer.js";
+import { sendClubRegistrationEmail, sendRegistrationReceiptEmail } from "../lib/mailer.js";
 
 // Helper to generate IDs
 const generateTempId = (prefix: string) => {
@@ -67,7 +67,29 @@ export const registerStudent = async (req: Request, res: Response) => {
       }
     });
 
-    console.log(`Email sent to ${student.email}: Temp ID: ${tempId}, Password: ${rawPassword}`);
+    try {
+      await sendRegistrationReceiptEmail({
+        toEmail: student.email,
+        toName: student.fullName,
+        role: "Player",
+        tempId: student.tempId,
+        password: rawPassword
+      });
+    } catch (mailErr) {
+      console.error("[Mailer] Failed to send registration receipt:", mailErr);
+    }
+
+    try {
+      await prisma.applicationLog.create({
+        data: {
+          userId: student.tempId,
+          role: "PLAYER",
+          action: "SUBMITTED"
+        }
+      });
+    } catch (logErr) {
+      console.error("Failed to log application submission:", logErr);
+    }
 
     return res.status(201).json({
       message: "Registration successful. Check your email for login details.",
@@ -133,7 +155,29 @@ export const registerCoach = async (req: Request, res: Response) => {
       }
     });
 
-    console.log(`Email sent to ${coach.email}: Temp ID: ${tempId}, Password: ${rawPassword}`);
+    try {
+      await sendRegistrationReceiptEmail({
+        toEmail: coach.email,
+        toName: coach.fullName,
+        role: "Coach / Referee",
+        tempId: coach.tempId,
+        password: rawPassword
+      });
+    } catch (mailErr) {
+      console.error("[Mailer] Failed to send registration receipt:", mailErr);
+    }
+
+    try {
+      await prisma.applicationLog.create({
+        data: {
+          userId: coach.tempId,
+          role: "COACH",
+          action: "SUBMITTED"
+        }
+      });
+    } catch (logErr) {
+      console.error("Failed to log application submission:", logErr);
+    }
 
     return res.status(201).json({
       message: "Registration successful. Check your email for login details.",
@@ -176,12 +220,15 @@ export const registerClub = async (req: Request, res: Response) => {
     const { clubName, ...rest } = validatedData;
     
     const tempId = generateTempId("TEMP-CLB");
+    const rawPassword = generatePassword();
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
     
     const club = await prisma.club.create({
       data: {
         ...rest,
         name: clubName,
         tempId,
+        password: hashedPassword,
         status: "PENDING"
       }
     });
@@ -190,10 +237,24 @@ export const registerClub = async (req: Request, res: Response) => {
     try {
       await sendClubRegistrationEmail({
         toEmail: club.email,
-        toName: club.name
+        toName: club.name,
+        tempId: club.tempId || undefined,
+        password: rawPassword
       });
     } catch (mailErr) {
       console.error("[Mailer] Failed to send club registration receipt:", mailErr);
+    }
+
+    try {
+      await prisma.applicationLog.create({
+        data: {
+          userId: club.tempId!,
+          role: "CLUB",
+          action: "SUBMITTED"
+        }
+      });
+    } catch (logErr) {
+      console.error("Failed to log application submission:", logErr);
     }
 
     return res.status(201).json({
@@ -249,7 +310,29 @@ export const registerMember = async (req: Request, res: Response) => {
       }
     });
 
-    console.log(`Email sent to ${member.email}: Temp ID: ${tempId}, Password: ${rawPassword}`);
+    try {
+      await sendRegistrationReceiptEmail({
+        toEmail: member.email,
+        toName: member.fullName,
+        role: "General Member",
+        tempId: member.tempId,
+        password: rawPassword
+      });
+    } catch (mailErr) {
+      console.error("[Mailer] Failed to send registration receipt:", mailErr);
+    }
+
+    try {
+      await prisma.applicationLog.create({
+        data: {
+          userId: member.tempId,
+          role: "MEMBER",
+          action: "SUBMITTED"
+        }
+      });
+    } catch (logErr) {
+      console.error("Failed to log application submission:", logErr);
+    }
 
     return res.status(201).json({
       message: "Registration successful. Check your email for login details.",
@@ -261,6 +344,94 @@ export const registerMember = async (req: Request, res: Response) => {
       return res.status(400).json({ errors: error.issues || error.errors || [] });
     }
     console.error("Member Registration error:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const resubmitApplication = async (req: any, res: Response) => {
+  const { userId, role } = req.user;
+  const updates = req.body;
+
+  // Filter out system fields that users should not modify directly
+  const disallowedFields = [
+    "id", "password", "createdAt", "updatedAt", "status", "rejectionRemark", "role",
+    "tempId", "permanentId", "approvedBy", "approvedAt", "mustChangePassword",
+    "resetPasswordToken", "resetPasswordExpires", "isPaid", "validUntil"
+  ];
+
+  const cleanUpdates: any = {};
+  for (const [k, v] of Object.entries(updates)) {
+    if (disallowedFields.includes(k)) continue;
+    
+    // For date fields, empty string should be null
+    if (v === "" && (k.endsWith("At") || k.endsWith("Expires"))) {
+      cleanUpdates[k] = null;
+    } else {
+      cleanUpdates[k] = v;
+    }
+  }
+
+  try {
+    let updatedUser: any = null;
+    let tempIdToLog = "";
+    let roleToLog = "";
+
+    const updateData: any = {
+      ...cleanUpdates,
+      status: "PENDING",
+      rejectionRemark: null
+    };
+
+    if (role === "PLAYER") {
+      const existing = await prisma.student.findUnique({ where: { id: userId } });
+      if (!existing || existing.status !== "REPLAY") return res.status(403).json({ error: "Cannot resubmit" });
+      updatedUser = await prisma.student.update({ where: { id: userId }, data: updateData });
+      tempIdToLog = updatedUser.tempId;
+      roleToLog = "PLAYER";
+    } else if (role === "COACH") {
+      const existing = await prisma.coachReferee.findUnique({ where: { id: userId } });
+      if (!existing || existing.status !== "REPLAY") return res.status(403).json({ error: "Cannot resubmit" });
+      updatedUser = await prisma.coachReferee.update({ where: { id: userId }, data: updateData });
+      tempIdToLog = updatedUser.tempId;
+      roleToLog = "COACH";
+    } else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role)) {
+      const existing = await prisma.member.findUnique({ where: { id: userId } });
+      if (!existing || existing.status !== "REPLAY") return res.status(403).json({ error: "Cannot resubmit" });
+      updatedUser = await prisma.member.update({ where: { id: userId }, data: updateData });
+      tempIdToLog = updatedUser.tempId;
+      roleToLog = "MEMBER";
+    } else if (role === "CLUB") {
+      const existing = await prisma.club.findUnique({ where: { id: userId } });
+      if (!existing || existing.status !== "REPLAY") return res.status(403).json({ error: "Cannot resubmit" });
+      updatedUser = await prisma.club.update({ where: { id: userId }, data: updateData });
+      tempIdToLog = updatedUser.tempId || updatedUser.id;
+      roleToLog = "CLUB";
+    }
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: "User not found or role unhandled" });
+    }
+
+    try {
+      await prisma.applicationLog.create({
+        data: {
+          userId: tempIdToLog,
+          role: roleToLog,
+          action: "RESUBMITTED"
+        }
+      });
+    } catch (logErr) {
+      console.error("Failed to log resubmission:", logErr);
+    }
+
+    const { password: _, ...safeData } = updatedUser;
+
+    return res.json({
+      message: "Application resubmitted successfully. It is now pending approval.",
+      user: safeData
+    });
+  } catch (error) {
+    console.error("Resubmit application error:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
