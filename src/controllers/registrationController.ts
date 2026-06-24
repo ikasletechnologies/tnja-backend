@@ -360,14 +360,37 @@ export const resubmitApplication = async (req: any, res: Response) => {
   ];
 
   const cleanUpdates: any = {};
+  
+  const numericFields = [
+    "age", "annualIncome", "wins", "losses", "draws", 
+    "noOfStudents", "maleStudents", "femaleStudents", 
+    "age6to11Male", "age6to11Female", "age12to18Male", "age12to18Female", 
+    "age16AboveMale", "age16AboveFemale"
+  ];
+
   for (const [k, v] of Object.entries(updates)) {
     if (disallowedFields.includes(k)) continue;
     
-    // For date fields, empty string should be null
-    if (v === "" && (k.endsWith("At") || k.endsWith("Expires"))) {
-      cleanUpdates[k] = null;
+    if (v === "") {
+      // For date fields, empty string should be null
+      if (k.endsWith("At") || k.endsWith("Expires")) {
+        cleanUpdates[k] = null;
+      } 
+      // For number fields, ignore empty strings completely to avoid Prisma type errors
+      else if (numericFields.includes(k)) {
+        continue;
+      } 
+      else {
+        cleanUpdates[k] = v;
+      }
     } else {
-      cleanUpdates[k] = v;
+      // Parse strings to numbers for numeric fields
+      if (numericFields.includes(k) && typeof v === "string") {
+        const parsed = Number(v);
+        cleanUpdates[k] = isNaN(parsed) ? 0 : parsed;
+      } else {
+        cleanUpdates[k] = v;
+      }
     }
   }
 

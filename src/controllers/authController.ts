@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import prisma from "../lib/prisma.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import { sendResetPasswordEmail, sendAadhaarVerificationEmail } from "../lib/mailer.js";
 
 export const login = async (req: Request, res: Response) => {
   const { identifier, password } = req.body;
@@ -490,3 +491,71 @@ export const trackStatus = async (req: Request, res: Response) => {
   }
 };
 
+// ── Aadhaar OTP Verification ──────────────────────────────────────────────────
+export const sendAadhaarOtp = async (req: Request, res: Response) => {
+  const { aadhaarNumber, email } = req.body;
+  if (!aadhaarNumber || !email) {
+    return res.status(400).json({ error: "Aadhaar number and email are required." });
+  }
+
+  try {
+    // 1. Check for duplicates in the system
+    const existingStudent = await prisma.student.findFirst({ where: { aadhaarNumber } });
+    if (existingStudent) return res.status(400).json({ error: "This Aadhaar number is already registered to a Player." });
+
+    const existingCoach = await prisma.coachReferee.findFirst({ where: { aadhaarNumber } });
+    if (existingCoach) return res.status(400).json({ error: "This Aadhaar number is already registered to a Coach/Referee." });
+
+    // Note: Club and Member might not have aadhaarNumber, but if they do in the future, we would check them here.
+
+    // 2. Generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit OTP
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+    // 3. Save OTP in DB (Upsert to replace any previous unused OTP for this aadhaar)
+    await prisma.aadhaarOTP.upsert({
+      where: { aadhaar: aadhaarNumber },
+      update: { otp, email, expiresAt, createdAt: new Date() },
+      create: { aadhaar: aadhaarNumber, email, otp, expiresAt },
+    });
+
+    // 4. Send Email
+    await sendAadhaarVerificationEmail(email, otp);
+
+    return res.json({ message: "OTP sent successfully to " + email });
+  } catch (error) {
+    console.error("Error sending Aadhaar OTP:", error);
+    return res.status(500).json({ error: "Failed to send OTP." });
+  }
+};
+
+export const verifyAadhaarOtp = async (req: Request, res: Response) => {
+  const { aadhaarNumber, otp } = req.body;
+  if (!aadhaarNumber || !otp) {
+    return res.status(400).json({ error: "Aadhaar number and OTP are required." });
+  }
+
+  try {
+    const record = await prisma.aadhaarOTP.findUnique({ where: { aadhaar: aadhaarNumber } });
+
+    if (!record) {
+      return res.status(400).json({ error: "No OTP request found for this Aadhaar number." });
+    }
+
+    if (record.otp !== otp) {
+      return res.status(400).json({ error: "Invalid OTP." });
+    }
+
+    if (record.expiresAt < new Date()) {
+      return res.status(400).json({ error: "OTP has expired. Please request a new one." });
+    }
+
+    // Success! Delete the OTP record so it can't be reused.
+    await prisma.aadhaarOTP.delete({ where: { aadhaar: aadhaarNumber } });
+
+    return res.json({ message: "Aadhaar verified successfully." });
+  } catch (error) {
+    console.error("Error verifying Aadhaar OTP:", error);
+    return res.status(500).json({ error: "Failed to verify OTP." });
+  }
+};

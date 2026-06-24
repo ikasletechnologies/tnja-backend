@@ -6,4 +6,6 @@ export declare const changePassword: (req: any, res: Response) => Promise<Respon
 export declare const forgotPassword: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const resetPassword: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const trackStatus: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+export declare const sendAadhaarOtp: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+export declare const verifyAadhaarOtp: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 //# sourceMappingURL=authController.d.ts.map
