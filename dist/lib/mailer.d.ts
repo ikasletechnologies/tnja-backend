@@ -38,5 +38,12 @@ export declare function sendEventRegistrationEmail(opts: {
     amountPaid: number;
     paymentId: string;
 }): Promise<void>;
+export declare function sendNewTournamentAnnouncement(opts: {
+    toEmail: string;
+    toName: string;
+    tournamentTitle: string;
+    tournamentDate: string;
+    tournamentLevel: string;
+}): Promise<void>;
 export {};
 //# sourceMappingURL=mailer.d.ts.map

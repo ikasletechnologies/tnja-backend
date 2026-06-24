@@ -54,61 +54,110 @@ export const getPublicMembers = async (req: Request, res: Response) => {
 
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
-    const { role: requesterRole, districtId } = (req as any).user;
+    const { role: requesterRole, districtId: requesterDistrictId } = (req as any).user;
+    const { role, status, districtId, talukId, search, gender } = req.query;
 
     const allowedRoles = ["SUPER_ADMIN", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "CEO"];
     if (!allowedRoles.includes(requesterRole)) {
       return res.status(403).json({ error: "You do not have permission to view the directory" });
     }
 
-    const where: any = {};
+    const baseWhere: any = {};
     const districtRestrictedRoles = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"];
 
-    if (districtRestrictedRoles.includes(requesterRole) && districtId) {
-      where.districtId = districtId;
+    // 1. Enforce district restriction for district admins, otherwise allow optional filtering
+    if (districtRestrictedRoles.includes(requesterRole) && requesterDistrictId) {
+      baseWhere.districtId = requesterDistrictId;
+    } else if (districtId) {
+      baseWhere.districtId = String(districtId);
+    }
+
+    if (talukId) baseWhere.talukId = String(talukId);
+    if (status) baseWhere.status = String(status);
+
+    // 2. Search filter
+    const searchStr = search ? String(search) : undefined;
+    const commonSearch = searchStr ? {
+      OR: [
+        { fullName: { contains: searchStr, mode: "insensitive" } },
+        { email: { contains: searchStr, mode: "insensitive" } },
+        { mobileNumber: { contains: searchStr } },
+        { tempId: { contains: searchStr, mode: "insensitive" } },
+        { permanentId: { contains: searchStr, mode: "insensitive" } }
+      ]
+    } : {};
+
+    const clubSearch = searchStr ? {
+      OR: [
+        { name: { contains: searchStr, mode: "insensitive" } },
+        { email: { contains: searchStr, mode: "insensitive" } },
+        { mobileNumber: { contains: searchStr } },
+        { tempId: { contains: searchStr, mode: "insensitive" } },
+        { permanentId: { contains: searchStr, mode: "insensitive" } }
+      ]
+    } : {};
+
+    // 3. Role filter logic (determining which queries to run)
+    const genderFilter = gender ? { gender: String(gender) } : {};
+    let fetchStudents = true, fetchCoaches = true, fetchMembers = true, fetchClubs = true;
+    let memberRoleFilter: string | string[] | undefined = undefined;
+
+    if (role) {
+      const qRole = String(role);
+      fetchStudents = qRole === "STUDENT";
+      fetchCoaches = qRole === "COACH";
+      fetchClubs = qRole === "CLUB";
+      
+      const memberRoles = ["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"];
+      if (qRole === "MEMBER") {
+        fetchMembers = true;
+        memberRoleFilter = memberRoles; // Return all member roles when "MEMBER" is requested
+      } else if (memberRoles.includes(qRole)) {
+        fetchMembers = true;
+        memberRoleFilter = qRole;
+      } else {
+        fetchMembers = false;
+      }
     }
 
     const [students, coaches, members, clubs] = await Promise.all([
-      prisma.student.findMany({
-        where,
+      fetchStudents ? prisma.student.findMany({
+        where: { ...baseWhere, ...commonSearch, ...genderFilter },
         select: { 
           id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, districtId: true, 
-          validUntil: true,
-          district: { select: { name: true } }, taluk: { select: { name: true } },
+          validUntil: true, district: { select: { name: true } }, taluk: { select: { name: true } },
           profilePhoto: true, aadhaarProof: true, incomeProof: true, bplProof: true,
-          wins: true, losses: true, draws: true, coachId: true,
-          coach: { select: { fullName: true } }
+          wins: true, losses: true, draws: true, coachId: true, coach: { select: { fullName: true } }
         },
-      }),
-      prisma.coachReferee.findMany({
-        where,
+      }) : Promise.resolve([]),
+      
+      fetchCoaches ? prisma.coachReferee.findMany({
+        where: { ...baseWhere, ...commonSearch, ...genderFilter },
         select: { 
           id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, districtId: true, 
-          validUntil: true,
-          district: { select: { name: true } }, taluk: { select: { name: true } },
-          profilePhoto: true
+          validUntil: true, district: { select: { name: true } }, taluk: { select: { name: true } }, profilePhoto: true
         },
-      }),
-      prisma.member.findMany({
-        where,
+      }) : Promise.resolve([]),
+      
+      fetchMembers ? prisma.member.findMany({
+        where: { ...baseWhere, ...commonSearch, ...(memberRoleFilter ? { role: Array.isArray(memberRoleFilter) ? { in: memberRoleFilter as any[] } : (memberRoleFilter as any) } : {}), ...genderFilter },
         select: { 
           id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, role: true, createdAt: true, districtId: true, 
-          validUntil: true,
-          district: { select: { name: true } }, taluk: { select: { name: true } },
-          profilePhoto: true, aadhaarFront: true, aadhaarBack: true
+          validUntil: true, district: { select: { name: true } }, taluk: { select: { name: true } }, profilePhoto: true, aadhaarFront: true, aadhaarBack: true
         },
-      }),
-      prisma.club.findMany({
-        where,
-        select: { id: true, name: true, email: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, districtId: true, validUntil: true, district: { select: { name: true } }, taluk: { select: { name: true } } },
-      }),
+      }) : Promise.resolve([]),
+      
+      fetchClubs ? prisma.club.findMany({
+        where: { ...baseWhere, ...clubSearch },
+        select: { id: true, name: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, districtId: true, validUntil: true, district: { select: { name: true } }, taluk: { select: { name: true } } },
+      }) : Promise.resolve([]),
     ]);
 
     const allUsers = [
       ...students.map(u => ({ ...u, role: "STUDENT", districtName: u.district?.name, talukName: u.taluk?.name })),
       ...coaches.map(u => ({ ...u, role: "COACH", districtName: u.district?.name, talukName: u.taluk?.name })),
       ...members.map(u => ({ ...u, role: u.role, districtName: u.district?.name, talukName: u.taluk?.name })),
-      ...clubs.map(u => ({ ...u, fullName: u.name, tempId: u.id, role: "CLUB", districtName: u.district?.name, talukName: u.taluk?.name })),
+      ...clubs.map(u => ({ ...u, fullName: u.name, role: "CLUB", districtName: u.district?.name, talukName: u.taluk?.name })),
     ];
 
     return res.json(allUsers);

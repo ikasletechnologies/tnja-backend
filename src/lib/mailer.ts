@@ -512,3 +512,83 @@ export async function sendEventRegistrationEmail(opts: {
 
   console.log(`[Mailer] Event registration receipt email sent to ${toEmail} for event ${eventName}`);
 }
+
+export async function sendNewTournamentAnnouncement(opts: {
+  toEmail: string;
+  toName: string;
+  tournamentTitle: string;
+  tournamentDate: string;
+  tournamentLevel: string;
+}) {
+  const { toEmail, toName, tournamentTitle, tournamentDate, tournamentLevel } = opts;
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+    body { margin:0; font-family:'Roboto',sans-serif; background:#f0f9ff; color:#333; }
+    .wrapper { padding: 40px 20px; }
+    .container { max-width:600px; margin:auto; background:#fff; border-radius:16px; overflow:hidden;
+                 box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+    .header { background:linear-gradient(135deg,#ff7e5f 0%,#feb47b 100%);
+              padding:36px 40px; text-align:center; }
+    .header h1 { color:#fff; margin:0; font-size:24px; font-weight:900; letter-spacing: 1px; text-transform: uppercase;}
+    .body { padding:36px 40px; }
+    .body h2 { color:#ea580c; margin-top:0; }
+    .body p  { color:#475569; line-height:1.7; }
+    .tournament-card { background:#fff7ed; border:1px solid #fed7aa; border-radius:12px;
+              padding:20px 24px; margin:24px 0; border-left: 5px solid #f97316; }
+    .tournament-card table { width:100%; border-collapse:collapse; }
+    .tournament-card td { padding:8px 0; font-size:15px; }
+    .tournament-card td:first-child { font-weight:700; color:#9a3412; width:30%; }
+    .footer { background:#f8fafc; padding:20px 40px; text-align:center;
+              border-top:1px solid #e2e8f0; color:#94a3b8; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="header">
+        <h1>New Tournament Alert</h1>
+      </div>
+      <div class="body">
+        <h2>Get Ready to Compete!</h2>
+        <p>Dear <strong>${toName}</strong>,</p>
+        <p>A brand new <strong>${tournamentLevel}</strong> level tournament has just been approved and is now open for registration!</p>
+        
+        <div class="tournament-card">
+          <table>
+            <tr>
+              <td>Tournament</td>
+              <td><strong>${tournamentTitle}</strong></td>
+            </tr>
+            <tr>
+              <td>Date</td>
+              <td><strong>${tournamentDate}</strong></td>
+            </tr>
+          </table>
+        </div>
+
+        <p>Log in to your TNJA Portal now to check the eligibility rules and secure your spot before registration closes.</p>
+        <p>We look forward to seeing you on the tatami!</p>
+        <p>Regards,<br/><strong>TNJA Admin Team</strong></p>
+      </div>
+      <div class="footer">
+        © ${new Date().getFullYear()} Tamil Nadu Judo Association. All rights reserved.
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  await transporter.sendMail({
+    from: `"${SMTP_FROM_NAME}" <${SMTP_USER}>`,
+    to: `"${toName}" <${toEmail}>`,
+    subject: `New Tournament Announced: ${tournamentTitle}!`,
+    html,
+  });
+
+  console.log(`[Mailer] New tournament announcement email sent to ${toEmail} for ${tournamentTitle}`);
+}

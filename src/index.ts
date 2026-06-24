@@ -12,7 +12,7 @@ import { createServer } from "http";
 import { initWebSocketServer } from "./lib/ws.js";
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 9000;
 
 app.use(cors());
 app.use(express.json());

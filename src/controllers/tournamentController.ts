@@ -3,12 +3,15 @@ import prisma from "../lib/prisma.js";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import { sendNotificationToUser } from "../lib/ws.js";
+import { sendEventRegistrationEmail, sendNewTournamentAnnouncement } from "../lib/mailer.js";
 
 // ─── HELPER: Calculate Age Group ────────────────────────────────────────────
 const getAgeGroup = (age: number): string => {
-  if (age >= 6 && age <= 11) return "6-11";
-  if (age >= 12 && age <= 18) return "12-18";
-  return "18+";
+  if (age <= 14) return "Sub-Junior (10-14 yrs)";
+  if (age <= 17) return "Cadet (15-17 yrs)";
+  if (age <= 20) return "Junior (18-20 yrs)";
+  if (age < 35) return "Senior (21-34 yrs)";
+  return "Veteran (35+ yrs)";
 };
 
 // ─── HELPER: Get Weight Category ────────────────────────────────────────────
@@ -24,13 +27,14 @@ const getWeightCategory = (weightKg: number): string => {
 };
 
 // ─── HELPER: Create or Get Tournament Draw ──────────────────────────────────
-const createOrGetDraw = async (tournamentId: string, gender: string, ageGroup: string, weightCategory: string) => {
+const createOrGetDraw = async (tournamentId: string, gender: string, ageGroup: string, weightCategory: string, exactAge: number = 0) => {
   try {
     const draw = await prisma.tournamentDraw.upsert({
       where: {
-        tournamentId_ageGroup_gender_weightCategory: {
+        tournamentId_ageGroup_exactAge_gender_weightCategory: {
           tournamentId,
           ageGroup,
+          exactAge,
           gender,
           weightCategory,
         },
@@ -39,6 +43,7 @@ const createOrGetDraw = async (tournamentId: string, gender: string, ageGroup: s
       create: {
         tournamentId,
         ageGroup,
+        exactAge,
         gender,
         weightCategory,
         rounds: { participants: [] }, // Initialize empty rounds
@@ -67,7 +72,7 @@ export const createTournament = async (req: Request, res: Response) => {
     return res.status(403).json({ error: "Only clubs or authorized officials can create tournaments" });
   }
 
-  const { title, dateFrom, dateTo, location, description, entryFee, totalSlots, ageFrom, ageTo, gender, allowBPL, beltEligibility, level, zoneId } = req.body;
+  const { title, dateFrom, dateTo, location, description, entryFee, totalSlots, numberOfMats, ageFrom, ageTo, gender, allowBPL, beltEligibility, level, zoneId } = req.body;
 
   if (!title || !dateFrom || !location || !description || entryFee === undefined || !totalSlots || !level) {
     return res.status(400).json({ error: "Required fields missing" });
@@ -99,6 +104,7 @@ export const createTournament = async (req: Request, res: Response) => {
         description,
         entryFee: Number(entryFee),
         totalSlots: Number(totalSlots),
+        numberOfMats: numberOfMats ? Number(numberOfMats) : 1,
         ageFrom: Number(ageFrom || 0),
         ageTo: Number(ageTo || 100),
         gender: gender || "BOTH",
@@ -227,13 +233,19 @@ export const getTournamentRegistrations = async (req: Request, res: Response) =>
       where: { tournamentId: id },
       include: {
         player: {
-          select: { id: true, fullName: true, permanentId: true, tempId: true, email: true, gender: true },
+          select: { id: true, fullName: true, permanentId: true, tempId: true, email: true, gender: true, age: true, club: { select: { name: true } } },
         },
+        coach: { select: { fullName: true } }
       },
       orderBy: { createdAt: "asc" },
     });
 
-    return res.json(registrations);
+    const formattedRegistrations = registrations.map(reg => ({
+      ...reg,
+      ageGroup: getAgeGroup(reg.player.age)
+    }));
+
+    return res.json(formattedRegistrations);
   } catch (error) {
     console.error("Error fetching tournament registrations:", error);
     return res.status(500).json({ error: "Internal Server Error" });
@@ -281,7 +293,7 @@ export const updateRegistrationStatus = async (req: Request, res: Response) => {
     const registration = await prisma.tournamentRegistration.update({
       where: { id: regId },
       data: { status },
-      include: { player: { select: { id: true, fullName: true } } },
+      include: { player: { select: { id: true, fullName: true, email: true } } },
     });
 
     const defaultMsg = status === "APPROVED"
@@ -306,6 +318,22 @@ export const updateRegistrationStatus = async (req: Request, res: Response) => {
       tournamentId,
       createdAt: new Date().toISOString(),
     });
+
+    if (status === "APPROVED" && registration.player.email) {
+      try {
+        await sendEventRegistrationEmail({
+          toEmail: registration.player.email,
+          toName: registration.player.fullName,
+          eventName: tournament.title,
+          eventDate: new Date(tournament.date).toLocaleDateString("en-IN"),
+          eventLocation: tournament.location,
+          amountPaid: tournament.entryFee,
+          paymentId: registration.paymentId || "Free/BPL Registration",
+        });
+      } catch (err) {
+        console.error("Failed to send approval email:", err);
+      }
+    }
 
     return res.json({ message: `Registration ${status.toLowerCase()} successfully`, registration });
   } catch (error) {
@@ -374,7 +402,7 @@ export const updateTournament = async (req: Request, res: Response) => {
     return res.status(403).json({ error: "Only clubs and officials can update tournaments" });
   }
 
-  const { title, dateFrom, dateTo, location, description, entryFee, totalSlots, ageFrom, ageTo, gender, allowBPL, beltEligibility, level, zoneId } = req.body;
+  const { title, dateFrom, dateTo, location, description, entryFee, totalSlots, numberOfMats, ageFrom, ageTo, gender, allowBPL, beltEligibility, level, zoneId } = req.body;
 
   try {
     const tournament = await prisma.tournament.findUnique({ where: { id } });
@@ -391,6 +419,7 @@ export const updateTournament = async (req: Request, res: Response) => {
         ...(description && { description }),
         ...(entryFee !== undefined && { entryFee: Number(entryFee) }),
         ...(totalSlots !== undefined && { totalSlots: Number(totalSlots) }),
+        ...(numberOfMats !== undefined && { numberOfMats: Number(numberOfMats) }),
         ...(ageFrom !== undefined && { ageFrom: Number(ageFrom) }),
         ...(ageTo !== undefined && { ageTo: Number(ageTo) }),
         ...(gender && { gender }),
@@ -454,15 +483,15 @@ export const getPlayerTournaments = async (req: Request, res: Response) => {
     if (!player.clubId) return res.json([]); // Player not linked to a club
 
     const tournaments = await prisma.tournament.findMany({
-      where: { clubId: player.clubId, status: "APPROVED" },
+      where: { clubId: player.clubId, status: { in: ["APPROVED", "CLOSED"] } },
       include: {
         _count: { select: { registrations: true } },
         registrations: {
           where: { playerId: userId },
-          select: { id: true, status: true, isPaid: true },
+          select: { id: true, status: true, isPaid: true, placement: true },
         },
       },
-      orderBy: { date: "asc" },
+      orderBy: { date: "desc" },
     });
 
     const result = tournaments.map((t) => ({
@@ -508,7 +537,7 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
     // District-level: only from clubs in same district, matching player's gender
     const districtTournaments = await prisma.tournament.findMany({
       where: {
-        status: "APPROVED",
+        status: { in: ["APPROVED", "CLOSED"] },
         level: "DISTRICT",
         club: { districtId: player.districtId },
         OR: [
@@ -518,16 +547,16 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
       },
       include: {
         _count: { select: { registrations: true } },
-        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true } },
+        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true } },
         club: { select: { name: true, district: { select: { name: true } } } },
       },
-      orderBy: { date: "asc" },
+      orderBy: { date: "desc" },
     });
 
     // Zonal-level: level=ZONE, match tournament's zoneId with player's zone, matching player's gender
     const zonalTournaments = await prisma.tournament.findMany({
       where: {
-        status: "APPROVED",
+        status: { in: ["APPROVED", "CLOSED"] },
         level: "ZONE",
         zoneId: player.district?.zoneName ?? "",
         OR: [
@@ -537,16 +566,16 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
       },
       include: {
         _count: { select: { registrations: true } },
-        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true } },
+        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true } },
         club: { select: { name: true, district: { select: { name: true } } } },
       },
-      orderBy: { date: "asc" },
+      orderBy: { date: "desc" },
     });
 
     // State & National: open to all players, but must match gender
     const stateNationalTournaments = await prisma.tournament.findMany({
       where: {
-        status: "APPROVED",
+        status: { in: ["APPROVED", "CLOSED"] },
         level: { in: ["STATE", "NATIONAL"] },
         OR: [
           { gender: "BOTH" },
@@ -555,10 +584,10 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
       },
       include: {
         _count: { select: { registrations: true } },
-        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true } },
+        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true } },
         club: { select: { name: true, district: { select: { name: true } } } },
       },
-      orderBy: { date: "asc" },
+      orderBy: { date: "desc" },
     });
 
     const mapTournament = (t: any) => ({
@@ -583,7 +612,7 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
 // ─── PLAYER: Create Tournament Payment Order ────────────────────────────────
 export const createTournamentPaymentOrder = async (req: Request, res: Response) => {
   const { userId, role } = (req as any).user;
-  const { tournamentId, height, weight } = req.body;
+  const { tournamentId, height, weight, coachId } = req.body;
 
   if (role !== "PLAYER" && role !== "STUDENT") {
     return res.status(403).json({ error: "Only players can register for tournaments" });
@@ -596,7 +625,7 @@ export const createTournamentPaymentOrder = async (req: Request, res: Response) 
   try {
     const player = await prisma.student.findUnique({
       where: { id: userId },
-      select: { clubId: true, districtId: true, isPaid: true, isBPL: true },
+      select: { clubId: true, districtId: true, isPaid: true, isBPL: true, age: true, gender: true },
     });
 
     if (!player) return res.status(404).json({ error: "Player not found" });
@@ -625,6 +654,17 @@ export const createTournamentPaymentOrder = async (req: Request, res: Response) 
     }
     // STATE and NATIONAL: no restriction — any player can register
 
+    // ── Age and Gender validation ───────────────────────────────────────────
+    if (tournament.ageFrom && player.age < tournament.ageFrom) {
+      return res.status(403).json({ error: `You must be at least ${tournament.ageFrom} years old to join this tournament.` });
+    }
+    if (tournament.ageTo && player.age > tournament.ageTo) {
+      return res.status(403).json({ error: `You must be at most ${tournament.ageTo} years old to join this tournament.` });
+    }
+    if (tournament.gender && tournament.gender !== "BOTH" && tournament.gender !== player.gender) {
+      return res.status(403).json({ error: `This tournament is restricted to ${tournament.gender} players only.` });
+    }
+
     // Check slots
     const regCount = await prisma.tournamentRegistration.count({ where: { tournamentId } });
     if (regCount >= tournament.totalSlots) {
@@ -648,6 +688,7 @@ export const createTournamentPaymentOrder = async (req: Request, res: Response) 
           isPaid: true, // It's free, so consider it paid
           height: height || null,
           weight: weight || null,
+          coachId: coachId || null,
         },
       });
 
@@ -665,7 +706,7 @@ export const createTournamentPaymentOrder = async (req: Request, res: Response) 
         // Get tournament's gender (could be MALE, FEMALE, or BOTH)
         const tournamentGender = tournament.gender === "BOTH" ? playerGender : tournament.gender;
 
-        await createOrGetDraw(tournamentId, tournamentGender, ageGroup, weightCategory);
+        await createOrGetDraw(tournamentId, tournamentGender, ageGroup, weightCategory, playerData.age);
       }
 
       const freOrganiserId = tournament.clubId || tournament.officialId;
@@ -698,7 +739,7 @@ export const createTournamentPaymentOrder = async (req: Request, res: Response) 
 // ─── PLAYER: Verify Payment & Register ───────────────────────────────────────
 export const verifyTournamentPayment = async (req: Request, res: Response) => {
   const { userId, role } = (req as any).user;
-  const { tournamentId, razorpay_payment_id, razorpay_order_id, razorpay_signature, height, weight } = req.body;
+  const { tournamentId, razorpay_payment_id, razorpay_order_id, razorpay_signature, height, weight, coachId } = req.body;
 
   if (role !== "PLAYER" && role !== "STUDENT") {
     return res.status(403).json({ error: "Only players can register for tournaments" });
@@ -741,6 +782,7 @@ export const verifyTournamentPayment = async (req: Request, res: Response) => {
         paymentId: razorpay_payment_id,
         height: height || null,
         weight: weight || null,
+        coachId: coachId || null,
       },
     });
 
@@ -758,7 +800,7 @@ export const verifyTournamentPayment = async (req: Request, res: Response) => {
       // Get tournament's gender (could be MALE, FEMALE, or BOTH)
       const tournamentGender = tournament.gender === "BOTH" ? playerGender : tournament.gender;
 
-      await createOrGetDraw(tournamentId, tournamentGender, ageGroup, weightCategory);
+      await createOrGetDraw(tournamentId, tournamentGender, ageGroup, weightCategory, playerData.age);
     }
 
     // Notify the organiser (club or official) that a new player registered
@@ -906,23 +948,66 @@ export const approveTournament = async (req: Request, res: Response) => {
     const updated = await prisma.tournament.update({ where: { id }, data: dataToUpdate });
 
     const notifyId = tournament.clubId || tournament.officialId;
-    if (notifyId) {
-      const customMsg = message?.trim();
-      if (dataToUpdate.status === "APPROVED") {
+    if (dataToUpdate.status === "APPROVED") {
+      if (notifyId) {
+        const customMsg = message?.trim();
         sendNotificationToUser(notifyId, {
           type: "TOURNAMENT_APPROVED",
           message: customMsg || `Your tournament "${tournament.title}" has been approved and is now live!`,
           tournamentId: id,
           createdAt: new Date().toISOString(),
         });
-      } else {
-        sendNotificationToUser(notifyId, {
-          type: "TOURNAMENT_REJECTED",
-          message: customMsg || `Your tournament "${tournament.title}" was rejected. Reason: ${rejectionText}`,
-          tournamentId: id,
-          createdAt: new Date().toISOString(),
-        });
       }
+
+      // Background task to send announcement emails to eligible players
+      (async () => {
+        try {
+          const playerWhereClause: any = { status: "APPROVED" };
+
+          if (tournament.level === "DISTRICT" && tournament.clubId) {
+            const club = await prisma.club.findUnique({ where: { id: tournament.clubId }, select: { districtId: true } });
+            if (club?.districtId) {
+              playerWhereClause.districtId = club.districtId;
+            }
+          } else if (tournament.level === "ZONE" && tournament.zoneId) {
+            playerWhereClause.district = { zoneName: tournament.zoneId };
+          } else if ((tournament.level as string) === "CLUB" && tournament.clubId) {
+            playerWhereClause.clubId = tournament.clubId;
+          }
+
+          if (tournament.gender !== "BOTH") {
+            playerWhereClause.gender = tournament.gender;
+          }
+
+          const eligiblePlayers = await prisma.student.findMany({
+            where: playerWhereClause,
+            select: { email: true, fullName: true },
+          });
+
+          for (const player of eligiblePlayers) {
+            if (player.email) {
+              await sendNewTournamentAnnouncement({
+                toEmail: player.email,
+                toName: player.fullName,
+                tournamentTitle: tournament.title,
+                tournamentDate: new Date(tournament.date).toLocaleDateString("en-IN"),
+                tournamentLevel: tournament.level
+              }).catch(err => console.error("Failed to send announcement to", player.email, err));
+            }
+          }
+        } catch (err) {
+          console.error("Error sending bulk announcement emails:", err);
+        }
+      })();
+
+    } else if (status === "REJECTED" && notifyId) {
+      const customMsg = message?.trim();
+      sendNotificationToUser(notifyId, {
+        type: "TOURNAMENT_REJECTED",
+        message: customMsg || `Your tournament "${tournament.title}" was rejected. Reason: ${rejectionText}`,
+        tournamentId: id,
+        createdAt: new Date().toISOString(),
+      });
     }
 
     return res.json({ message: `Tournament ${status.toLowerCase()} successfully`, tournament: updated });
@@ -1081,12 +1166,13 @@ const autoAdvanceWinner = (rounds: any[]): any[] => {
 
         if (nextMatchIdx < nextRound.length) {
           const nextMatch = nextRound[nextMatchIdx];
+          const isWinnerA = match.winnerId === match.slotA.playerId;
           const winnerSlot = {
             playerId: match.winnerId,
-            playerName: isFirstSlot ? match.slotA.playerName : match.slotB.playerName,
-            club: isFirstSlot ? match.slotA.club : match.slotB.club,
+            playerName: isWinnerA ? match.slotA.playerName : match.slotB.playerName,
+            club: isWinnerA ? match.slotA.club : match.slotB.club,
             isBye: false,
-            seedNumber: isFirstSlot ? match.slotA.seedNumber : match.slotB.seedNumber,
+            seedNumber: isWinnerA ? match.slotA.seedNumber : match.slotB.seedNumber,
           };
 
           // Update the appropriate slot (A or B) if it's TBD
@@ -1105,36 +1191,109 @@ const autoAdvanceWinner = (rounds: any[]): any[] => {
 
 // ─── ADMIN/CLUB: Save Tournament Draw ────────────────────────────────────────
 export const saveTournamentDraw = async (req: Request, res: Response) => {
+  const { userId, role } = (req as any).user;
   const id = req.params.id as string;
-  const { ageGroup, gender, weightCategory, rounds } = req.body;
+  const { ageGroup, exactAge, gender, weightCategory, matNumber, rounds } = req.body;
+
+  const isClub = role === "CLUB";
+  const isOfficial = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN"].includes(role);
+
+  if (!isClub && !isOfficial) {
+    return res.status(403).json({ error: "Only clubs and officials can save draws" });
+  }
+
+  if (!ageGroup || exactAge === undefined || !gender || !weightCategory || !rounds) {
+    return res.status(400).json({ error: "Missing required draw parameters" });
+  }
 
   try {
+    const tournament = await prisma.tournament.findUnique({ where: { id } });
+    if (!tournament) return res.status(404).json({ error: "Tournament not found" });
+    if (tournament.clubId !== userId && tournament.officialId !== userId) {
+      return res.status(403).json({ error: "This tournament does not belong to you" });
+    }
+
     // Auto-advance winners to next round
     const updatedRounds = autoAdvanceWinner(JSON.parse(JSON.stringify(rounds)));
 
     const draw = await prisma.tournamentDraw.upsert({
       where: {
-        tournamentId_ageGroup_gender_weightCategory: {
+        tournamentId_ageGroup_exactAge_gender_weightCategory: {
           tournamentId: id,
           ageGroup,
+          exactAge: Number(exactAge),
           gender,
           weightCategory,
         }
       },
       update: {
+        matNumber: matNumber ? Number(matNumber) : 1,
         rounds: updatedRounds
       },
       create: {
         tournamentId: id,
         ageGroup,
+        exactAge: Number(exactAge),
         gender,
         weightCategory,
+        matNumber: matNumber ? Number(matNumber) : 1,
         rounds: updatedRounds
       }
     });
     return res.json({ message: "Draw saved successfully", draw });
   } catch (error) {
     console.error("Error saving draw:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// ─── ADMIN/CLUB/OFFICIAL: Submit Final Results ───────────────────────────────
+export const submitTournamentResults = async (req: Request, res: Response) => {
+  const { userId, role } = (req as any).user;
+  const id = req.params.id as string;
+  const { results } = req.body; // Array of { playerId: string, placement: "FIRST" | "SECOND" | "THIRD" | "PARTICIPATION" }
+
+  const isClub = role === "CLUB";
+  const isOfficial = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN"].includes(role);
+
+  if (!isClub && !isOfficial) {
+    return res.status(403).json({ error: "Only clubs and officials can submit results" });
+  }
+
+  try {
+    const tournament = await prisma.tournament.findUnique({ where: { id } });
+    if (!tournament) return res.status(404).json({ error: "Tournament not found" });
+    if (tournament.clubId !== userId && tournament.officialId !== userId) return res.status(403).json({ error: "This tournament does not belong to you" });
+
+    // Ensure all players are registered in this tournament
+    const playerIds = results.map((r: any) => r.playerId);
+    const validRegistrations = await prisma.tournamentRegistration.findMany({
+      where: { tournamentId: id, playerId: { in: playerIds } },
+    });
+
+    if (validRegistrations.length !== playerIds.length) {
+      return res.status(400).json({ error: "One or more players are not registered in this tournament" });
+    }
+
+    // Use a transaction to update placements
+    await prisma.$transaction(
+      results.map((r: any) =>
+        prisma.tournamentRegistration.update({
+          where: { tournamentId_playerId: { tournamentId: id, playerId: r.playerId } },
+          data: { placement: r.placement },
+        })
+      )
+    );
+
+    // Also close the tournament
+    await prisma.tournament.update({
+      where: { id },
+      data: { status: "CLOSED" },
+    });
+
+    return res.json({ message: "Results submitted successfully. Tournament is now closed." });
+  } catch (error) {
+    console.error("Error submitting results:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };

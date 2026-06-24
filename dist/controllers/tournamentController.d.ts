@@ -20,4 +20,5 @@ export declare const getTournamentMessages: (req: Request, res: Response) => Pro
 export declare const getTournamentById: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const getTournamentDraws: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const saveTournamentDraw: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+export declare const submitTournamentResults: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 //# sourceMappingURL=tournamentController.d.ts.map
