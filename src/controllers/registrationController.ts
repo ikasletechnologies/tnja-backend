@@ -359,12 +359,50 @@ export const resubmitApplication = async (req: any, res: Response) => {
     "resetPasswordToken", "resetPasswordExpires", "isPaid", "validUntil"
   ];
 
+  const intFields = [
+    "age", "wins", "losses", "draws", 
+    "noOfStudents", "maleStudents", "femaleStudents", 
+    "age6to11Male", "age6to11Female", "age12to18Male", 
+    "age12to18Female", "age16AboveMale", "age16AboveFemale"
+  ];
+  const floatFields = ["annualIncome"];
+  const dateFields = ["dob"];
+  const nullableFields = [
+    "clubId", "coachId", "alternateMobileNumber", "profilePhoto", 
+    "aadhaarProof", "incomeProof", "bplProof", "aadhaarFront", "aadhaarBack", 
+    "employmentType", "companyName", "designation", "workLocation", "address2"
+  ];
+
   const cleanUpdates: any = {};
   for (const [k, v] of Object.entries(updates)) {
     if (disallowedFields.includes(k)) continue;
     
     // For date fields, empty string should be null
     if (v === "" && (k.endsWith("At") || k.endsWith("Expires"))) {
+      cleanUpdates[k] = null;
+    } else if (intFields.includes(k)) {
+      if (v === "" || v === null || v === undefined) {
+        cleanUpdates[k] = 0;
+      } else {
+        const parsed = parseInt(v as string, 10);
+        cleanUpdates[k] = isNaN(parsed) ? 0 : parsed;
+      }
+    } else if (floatFields.includes(k)) {
+      if (v === "" || v === null || v === undefined) {
+        cleanUpdates[k] = 0;
+      } else {
+        const parsed = parseFloat(v as string);
+        cleanUpdates[k] = isNaN(parsed) ? 0 : parsed;
+      }
+    } else if (dateFields.includes(k)) {
+      if (v && typeof v === "string") {
+        cleanUpdates[k] = new Date(v);
+      } else {
+        cleanUpdates[k] = v;
+      }
+    } else if (k === "isBPL") {
+      cleanUpdates[k] = v === true || v === "true";
+    } else if (nullableFields.includes(k) && v === "") {
       cleanUpdates[k] = null;
     } else {
       cleanUpdates[k] = v;

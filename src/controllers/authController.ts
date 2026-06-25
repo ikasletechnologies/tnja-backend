@@ -427,10 +427,10 @@ export const resetPassword = async (req: Request, res: Response) => {
 };
 
 export const trackStatus = async (req: Request, res: Response) => {
-  const id = req.params.id as string;
+  const { tempId, password } = req.body;
 
-  if (!id) {
-    return res.status(400).json({ error: "Tracking ID is required" });
+  if (!tempId || !password) {
+    return res.status(400).json({ error: "Temporary ID and password are required" });
   }
 
   try {
@@ -439,7 +439,7 @@ export const trackStatus = async (req: Request, res: Response) => {
 
     // Check Student
     user = await prisma.student.findFirst({
-      where: { OR: [{ tempId: id }, { permanentId: id }] },
+      where: { OR: [{ tempId: tempId }, { permanentId: tempId }] },
       include: { district: true }
     });
     if (user) role = "PLAYER";
@@ -447,7 +447,7 @@ export const trackStatus = async (req: Request, res: Response) => {
     // Check Coach
     if (!user) {
       user = await prisma.coachReferee.findFirst({
-        where: { OR: [{ tempId: id }, { permanentId: id }] },
+        where: { OR: [{ tempId: tempId }, { permanentId: tempId }] },
         include: { district: true }
       });
       if (user) role = "COACH";
@@ -456,7 +456,7 @@ export const trackStatus = async (req: Request, res: Response) => {
     // Check Member
     if (!user) {
       user = await prisma.member.findFirst({
-        where: { OR: [{ tempId: id }, { permanentId: id }] },
+        where: { OR: [{ tempId: tempId }, { permanentId: tempId }] },
         include: { district: true }
       });
       if (user) role = user.role;
@@ -465,7 +465,7 @@ export const trackStatus = async (req: Request, res: Response) => {
     // Check Club
     if (!user) {
       user = await prisma.club.findFirst({
-        where: { OR: [{ tempId: id }, { permanentId: id }] },
+        where: { OR: [{ tempId: tempId }, { permanentId: tempId }] },
         include: { district: true }
       });
       if (user) role = "CLUB";
@@ -475,9 +475,30 @@ export const trackStatus = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "No application found with this Temporary ID." });
     }
 
-    const { password, ...safeUser } = user;
+    // Verify password
+    if (!user.password) {
+      return res.status(401).json({ error: "No password set for this account." });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: "Incorrect password." });
+    }
+
+    const tokenPayload: any = { userId: user.id, role: role };
+    if (user.districtId) {
+      tokenPayload.districtId = user.districtId;
+    }
+    const token = jwt.sign(
+      tokenPayload,
+      process.env.JWT_SECRET || "fallback",
+      { expiresIn: "24h" }
+    );
+
+    const { password: _, ...safeUser } = user;
     
     return res.json({
+      token,
       user: {
         ...safeUser,
         fullName: safeUser.fullName || safeUser.name || safeUser.clubName,
