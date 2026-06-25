@@ -10,7 +10,7 @@ router.put("/profile", authenticateJWT, updateProfile);
 router.post("/change-password", authenticateJWT, changePassword);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
-router.get("/track-status/:id", trackStatus);
+router.post("/track-status", trackStatus);
 
 router.post("/send-aadhaar-otp", sendAadhaarOtp);
 router.post("/verify-aadhaar-otp", verifyAadhaarOtp);

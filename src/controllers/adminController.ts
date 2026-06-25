@@ -47,10 +47,11 @@ const generatePassword = async () => {
 // ──────────────────────────────────────────────────────────────────────────────
 export const getPendingApplications = async (req: Request, res: Response) => {
   const type = (req.query.type as string || "").toUpperCase();
+  const statusParam = (req.query.status as string || "PENDING").toUpperCase();
   const { role, districtId } = (req as any).user;
 
   try {
-    console.log(`[getPendingApplications] User: ${role}, District: ${districtId}, Type: ${type}`);
+    console.log(`[getPendingApplications] User: ${role}, District: ${districtId}, Type: ${type}, Status: ${statusParam}`);
 
     // Basic permissions: Standard MEMBER role is not allowed to view pending applications
     const allowedRoles = [
@@ -69,7 +70,7 @@ export const getPendingApplications = async (req: Request, res: Response) => {
     }
 
     // Common where clause for filtering
-    const whereClause: any = { status: "PENDING" };
+    const whereClause: any = { status: statusParam };
     
     const districtRestrictedRoles = [
       "DISTRICT_PRESIDENT", 
@@ -122,7 +123,7 @@ export const getPendingApplications = async (req: Request, res: Response) => {
     }
 
     if (type === "EVENT") {
-      const eventWhere: any = { status: "PENDING" };
+      const eventWhere: any = { status: statusParam };
 
       if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
         eventWhere.level = "DISTRICT";
@@ -146,7 +147,7 @@ export const getPendingApplications = async (req: Request, res: Response) => {
     }
 
     if (type === "EVENT_REGISTRATION") {
-      const regWhere: any = { status: "PENDING" };
+      const regWhere: any = { status: statusParam };
 
       if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
         regWhere.event = {
@@ -191,8 +192,8 @@ export const getPendingApplications = async (req: Request, res: Response) => {
     }
 
     // Return all pending counts if no type specified
-    const eventCountWhere: any = { status: "PENDING" };
-    const regWhere: any = { status: "PENDING" };
+    const eventCountWhere: any = { status: statusParam };
+    const regWhere: any = { status: statusParam };
 
     if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
       eventCountWhere.level = "DISTRICT";
