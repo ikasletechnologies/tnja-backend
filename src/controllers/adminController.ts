@@ -1054,7 +1054,7 @@ export const forceCreateStudent = async (req: Request, res: Response) => {
   const { 
     fullName, email, mobileNumber, districtId, talukId, gender, dob, aadhaarNumber,
     bloodGroup, address, city, state, addressPincode, nationality, annualIncome, 
-    schoolName, grade, areaOfInterest, areaOfStudy, preferLocation, clubId
+    schoolName, grade, clubId
   } = req.body;
 
   try {
@@ -1103,9 +1103,6 @@ export const forceCreateStudent = async (req: Request, res: Response) => {
         annualIncome: Number(annualIncome),
         schoolName,
         grade,
-        areaOfInterest,
-        areaOfStudy,
-        preferLocation,
         clubId: clubId || null
       }
     });

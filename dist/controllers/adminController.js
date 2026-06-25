@@ -37,9 +37,10 @@ const generatePassword = async () => {
 // ──────────────────────────────────────────────────────────────────────────────
 export const getPendingApplications = async (req, res) => {
     const type = (req.query.type || "").toUpperCase();
+    const statusParam = (req.query.status || "PENDING").toUpperCase();
     const { role, districtId } = req.user;
     try {
-        console.log(`[getPendingApplications] User: ${role}, District: ${districtId}, Type: ${type}`);
+        console.log(`[getPendingApplications] User: ${role}, District: ${districtId}, Type: ${type}, Status: ${statusParam}`);
         // Basic permissions: Standard MEMBER role is not allowed to view pending applications
         const allowedRoles = [
             "SUPER_ADMIN",
@@ -55,7 +56,7 @@ export const getPendingApplications = async (req, res) => {
             return res.status(403).json({ error: "You do not have permission to view pending applications" });
         }
         // Common where clause for filtering
-        const whereClause = { status: "PENDING" };
+        const whereClause = { status: statusParam };
         const districtRestrictedRoles = [
             "DISTRICT_PRESIDENT",
             "DISTRICT_SECRETARY"
@@ -102,7 +103,7 @@ export const getPendingApplications = async (req, res) => {
             return res.json({ type: "MEMBER", data: members });
         }
         if (type === "EVENT") {
-            const eventWhere = { status: "PENDING" };
+            const eventWhere = { status: statusParam };
             if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
                 eventWhere.level = "DISTRICT";
                 if (districtId) {
@@ -124,7 +125,7 @@ export const getPendingApplications = async (req, res) => {
             return res.json({ type: "EVENT", data: events });
         }
         if (type === "EVENT_REGISTRATION") {
-            const regWhere = { status: "PENDING" };
+            const regWhere = { status: statusParam };
             if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
                 regWhere.event = {
                     level: "DISTRICT",
@@ -168,8 +169,8 @@ export const getPendingApplications = async (req, res) => {
             return res.json({ type: "EVENT_REGISTRATION", data: detailedRegistrations });
         }
         // Return all pending counts if no type specified
-        const eventCountWhere = { status: "PENDING" };
-        const regWhere = { status: "PENDING" };
+        const eventCountWhere = { status: statusParam };
+        const regWhere = { status: statusParam };
         if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
             eventCountWhere.level = "DISTRICT";
             if (districtId)
@@ -958,7 +959,7 @@ export const forceCreateStudent = async (req, res) => {
     if (role !== "SUPER_ADMIN" && role !== "CEO") {
         return res.status(403).json({ error: "Only Super Admin can force create players" });
     }
-    const { fullName, email, mobileNumber, districtId, talukId, gender, dob, aadhaarNumber, bloodGroup, address, city, state, addressPincode, nationality, annualIncome, schoolName, grade, areaOfInterest, areaOfStudy, preferLocation, clubId } = req.body;
+    const { fullName, email, mobileNumber, districtId, talukId, gender, dob, aadhaarNumber, bloodGroup, address, city, state, addressPincode, nationality, annualIncome, schoolName, grade, clubId } = req.body;
     try {
         const existing = await prisma.student.findFirst({
             where: {
@@ -1002,9 +1003,6 @@ export const forceCreateStudent = async (req, res) => {
                 annualIncome: Number(annualIncome),
                 schoolName,
                 grade,
-                areaOfInterest,
-                areaOfStudy,
-                preferLocation,
                 clubId: clubId || null
             }
         });

@@ -117,7 +117,6 @@ model Student {
   alternateMobileNumber String?
   email                 String        @unique
   aadhaarNumber         String        @unique
-  aadhaarProof          String?
   address               String
   city                  String
   state                 String
@@ -133,9 +132,6 @@ model Student {
   schoolName            String
   grade                 String
   degreeDepartment      String?
-  areaOfInterest        String
-  areaOfStudy           String
-  preferLocation        String
   password              String
   status                Status        @default(PENDING)
   rejectionRemark       String?
@@ -235,8 +231,6 @@ model Member {
   alternateMobileNumber String?
   email                 String   @unique
   aadhaarNumber         String   @unique
-  aadhaarFront          String?
-  aadhaarBack           String?
   addressLine1          String
   addressLine2          String?
   city                  String

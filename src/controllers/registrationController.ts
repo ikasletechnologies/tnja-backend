@@ -39,6 +39,17 @@ export const registerStudent = async (req: Request, res: Response) => {
       (validatedData as any).clubId = null;
     }
 
+    if (validatedData.coachId) {
+      const coach = await prisma.coachReferee.findUnique({
+        where: { id: validatedData.coachId }
+      });
+      if (!coach) {
+        return res.status(400).json({ error: "The selected Coach does not exist." });
+      }
+    } else {
+      (validatedData as any).coachId = null;
+    }
+
     // Check if email or mobile or aadhaar exists
     const existing = await prisma.student.findFirst({
       where: {
@@ -369,7 +380,7 @@ export const resubmitApplication = async (req: any, res: Response) => {
   const dateFields = ["dob"];
   const nullableFields = [
     "clubId", "coachId", "alternateMobileNumber", "profilePhoto", 
-    "aadhaarProof", "incomeProof", "bplProof", "aadhaarFront", "aadhaarBack", 
+    "incomeProof", "bplProof", 
     "employmentType", "companyName", "designation", "workLocation", "address2"
   ];
 

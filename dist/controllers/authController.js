@@ -374,16 +374,16 @@ export const resetPassword = async (req, res) => {
     }
 };
 export const trackStatus = async (req, res) => {
-    const id = req.params.id;
-    if (!id) {
-        return res.status(400).json({ error: "Tracking ID is required" });
+    const { tempId, password } = req.body;
+    if (!tempId || !password) {
+        return res.status(400).json({ error: "Temporary ID and password are required" });
     }
     try {
         let user = null;
         let role = "";
         // Check Student
         user = await prisma.student.findFirst({
-            where: { OR: [{ tempId: id }, { permanentId: id }] },
+            where: { OR: [{ tempId: tempId }, { permanentId: tempId }] },
             include: { district: true }
         });
         if (user)
@@ -391,7 +391,7 @@ export const trackStatus = async (req, res) => {
         // Check Coach
         if (!user) {
             user = await prisma.coachReferee.findFirst({
-                where: { OR: [{ tempId: id }, { permanentId: id }] },
+                where: { OR: [{ tempId: tempId }, { permanentId: tempId }] },
                 include: { district: true }
             });
             if (user)
@@ -400,7 +400,7 @@ export const trackStatus = async (req, res) => {
         // Check Member
         if (!user) {
             user = await prisma.member.findFirst({
-                where: { OR: [{ tempId: id }, { permanentId: id }] },
+                where: { OR: [{ tempId: tempId }, { permanentId: tempId }] },
                 include: { district: true }
             });
             if (user)
@@ -409,7 +409,7 @@ export const trackStatus = async (req, res) => {
         // Check Club
         if (!user) {
             user = await prisma.club.findFirst({
-                where: { OR: [{ tempId: id }, { permanentId: id }] },
+                where: { OR: [{ tempId: tempId }, { permanentId: tempId }] },
                 include: { district: true }
             });
             if (user)
@@ -418,8 +418,22 @@ export const trackStatus = async (req, res) => {
         if (!user) {
             return res.status(404).json({ error: "No application found with this Temporary ID." });
         }
-        const { password, ...safeUser } = user;
+        // Verify password
+        if (!user.password) {
+            return res.status(401).json({ error: "No password set for this account." });
+        }
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(401).json({ error: "Incorrect password." });
+        }
+        const tokenPayload = { userId: user.id, role: role };
+        if (user.districtId) {
+            tokenPayload.districtId = user.districtId;
+        }
+        const token = jwt.sign(tokenPayload, process.env.JWT_SECRET || "fallback", { expiresIn: "24h" });
+        const { password: _, ...safeUser } = user;
         return res.json({
+            token,
             user: {
                 ...safeUser,
                 fullName: safeUser.fullName || safeUser.name || safeUser.clubName,
@@ -446,7 +460,22 @@ export const sendAadhaarOtp = async (req, res) => {
         const existingCoach = await prisma.coachReferee.findFirst({ where: { aadhaarNumber } });
         if (existingCoach)
             return res.status(400).json({ error: "This Aadhaar number is already registered to a Coach/Referee." });
-        // Note: Club and Member might not have aadhaarNumber, but if they do in the future, we would check them here.
+        const existingMember = await prisma.member.findFirst({ where: { aadhaarNumber } });
+        if (existingMember)
+            return res.status(400).json({ error: "This Aadhaar number is already registered to a Member." });
+        // 1.5 Check for duplicate email in the system
+        const existingEmailStudent = await prisma.student.findFirst({ where: { email } });
+        if (existingEmailStudent)
+            return res.status(400).json({ error: "This Email ID is already registered to a Player." });
+        const existingEmailCoach = await prisma.coachReferee.findFirst({ where: { email } });
+        if (existingEmailCoach)
+            return res.status(400).json({ error: "This Email ID is already registered to a Coach/Referee." });
+        const existingEmailClub = await prisma.club.findFirst({ where: { email } });
+        if (existingEmailClub)
+            return res.status(400).json({ error: "This Email ID is already registered to a Club." });
+        const existingEmailMember = await prisma.member.findFirst({ where: { email } });
+        if (existingEmailMember)
+            return res.status(400).json({ error: "This Email ID is already registered to a Member." });
         // 2. Generate OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit OTP
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes

@@ -644,4 +644,61 @@ export async function sendAadhaarVerificationEmail(toEmail, otp) {
     });
     console.log(`[Mailer] Aadhaar OTP sent to ${toEmail}`);
 }
+export async function sendAccountDeletionEmail(opts) {
+    const { toEmail, toName, role } = opts;
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+    body { margin:0; font-family:'Roboto',sans-serif; background:#fef2f2; color:#333; }
+    .wrapper { padding: 40px 20px; }
+    .container { max-width:600px; margin:auto; background:#fff; border-radius:16px; overflow:hidden;
+                 box-shadow:0 8px 32px rgba(0,0,0,0.12); }
+    .header { background:linear-gradient(135deg,#991b1b 0%,#b91c1c 100%);
+              padding:36px 40px; text-align:center; }
+    .header h1 { color:#fff; margin:0; font-size:22px; }
+    .body { padding:36px 40px; }
+    .body h2 { color:#991b1b; margin-top:0; }
+    .body p  { color:#475569; line-height:1.7; }
+    .footer { background:#f1f5f9; padding:20px 40px; text-align:center;
+              border-top:1px solid #e2e8f0; color:#64748b; font-size:12px; }
+    .warning { color:#ef4444; font-size:13px; margin-top:20px; font-style:italic; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="header">
+        <h1>Tamil Nadu Judo Association</h1>
+        <p style="color:#fecaca; margin:6px 0 0;">Account Deletion Notice</p>
+      </div>
+      <div class="body">
+        <h2>Hello ${toName},</h2>
+        <p>This email is to notify you that your <strong>${role}</strong> account has been deleted by an Administrator from the TNJA Portal.</p>
+        <p>As a result, your login credentials will no longer work and you will not be able to access the portal.</p>
+        <p>If you believe this was done in error or if you have any questions, please contact the TNJA state office immediately.</p>
+        <p>Regards,<br/><strong>TNJA Admin Team</strong></p>
+      </div>
+      <div class="footer">
+        © ${new Date().getFullYear()} Tamil Nadu Judo Association. All rights reserved.
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+    try {
+        await transporter.sendMail({
+            from: `"${SMTP_FROM_NAME}" <${SMTP_USER}>`,
+            to: `"${toName}" <${toEmail}>`,
+            subject: `Notice: Your TNJA Account has been Deleted`,
+            html,
+        });
+        console.log(`[Mailer] Account deletion email sent to ${toEmail}`);
+    }
+    catch (err) {
+        console.error(`[Mailer] Failed to send deletion email to ${toEmail}:`, err);
+    }
+}
 //# sourceMappingURL=mailer.js.map

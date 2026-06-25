@@ -34,6 +34,17 @@ export const registerStudent = async (req, res) => {
         else {
             validatedData.clubId = null;
         }
+        if (validatedData.coachId) {
+            const coach = await prisma.coachReferee.findUnique({
+                where: { id: validatedData.coachId }
+            });
+            if (!coach) {
+                return res.status(400).json({ error: "The selected Coach does not exist." });
+            }
+        }
+        else {
+            validatedData.coachId = null;
+        }
         // Check if email or mobile or aadhaar exists
         const existing = await prisma.student.findFirst({
             where: {
@@ -328,6 +339,19 @@ export const resubmitApplication = async (req, res) => {
         "tempId", "permanentId", "approvedBy", "approvedAt", "mustChangePassword",
         "resetPasswordToken", "resetPasswordExpires", "isPaid", "validUntil"
     ];
+    const intFields = [
+        "age", "wins", "losses", "draws",
+        "noOfStudents", "maleStudents", "femaleStudents",
+        "age6to11Male", "age6to11Female", "age12to18Male",
+        "age12to18Female", "age16AboveMale", "age16AboveFemale"
+    ];
+    const floatFields = ["annualIncome"];
+    const dateFields = ["dob"];
+    const nullableFields = [
+        "clubId", "coachId", "alternateMobileNumber", "profilePhoto",
+        "incomeProof", "bplProof",
+        "employmentType", "companyName", "designation", "workLocation", "address2"
+    ];
     const cleanUpdates = {};
     const numericFields = [
         "age", "annualIncome", "wins", "losses", "draws",
@@ -338,28 +362,44 @@ export const resubmitApplication = async (req, res) => {
     for (const [k, v] of Object.entries(updates)) {
         if (disallowedFields.includes(k))
             continue;
-        if (v === "") {
-            // For date fields, empty string should be null
-            if (k.endsWith("At") || k.endsWith("Expires")) {
-                cleanUpdates[k] = null;
+        // For date fields, empty string should be null
+        if (v === "" && (k.endsWith("At") || k.endsWith("Expires"))) {
+            cleanUpdates[k] = null;
+        }
+        else if (intFields.includes(k)) {
+            if (v === "" || v === null || v === undefined) {
+                cleanUpdates[k] = 0;
             }
-            // For number fields, ignore empty strings completely to avoid Prisma type errors
-            else if (numericFields.includes(k)) {
-                continue;
+            else {
+                const parsed = parseInt(v, 10);
+                cleanUpdates[k] = isNaN(parsed) ? 0 : parsed;
+            }
+        }
+        else if (floatFields.includes(k)) {
+            if (v === "" || v === null || v === undefined) {
+                cleanUpdates[k] = 0;
+            }
+            else {
+                const parsed = parseFloat(v);
+                cleanUpdates[k] = isNaN(parsed) ? 0 : parsed;
+            }
+        }
+        else if (dateFields.includes(k)) {
+            if (v && typeof v === "string") {
+                cleanUpdates[k] = new Date(v);
             }
             else {
                 cleanUpdates[k] = v;
             }
         }
+        else if (k === "isBPL") {
+            cleanUpdates[k] = v === true || v === "true";
+        }
+        else if (nullableFields.includes(k) && v === "") {
+            cleanUpdates[k] = null;
+        }
         else {
-            // Parse strings to numbers for numeric fields
-            if (numericFields.includes(k) && typeof v === "string") {
-                const parsed = Number(v);
-                cleanUpdates[k] = isNaN(parsed) ? 0 : parsed;
-            }
-            else {
-                cleanUpdates[k] = v;
-            }
+            cleanUpdates[k] = v;
         }
     }
     try {

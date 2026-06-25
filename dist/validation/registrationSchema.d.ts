@@ -24,11 +24,14 @@ export declare const studentRegistrationSchema: z.ZodObject<{
     annualIncome: z.ZodNumber;
     isBPL: z.ZodBoolean;
     clubId: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
+    coachId: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
+    institutionType: z.ZodDefault<z.ZodOptional<z.ZodEnum<{
+        SCHOOL: "SCHOOL";
+        COLLEGE: "COLLEGE";
+    }>>>;
     schoolName: z.ZodString;
     grade: z.ZodString;
-    areaOfInterest: z.ZodString;
-    areaOfStudy: z.ZodString;
-    preferLocation: z.ZodString;
+    degreeDepartment: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
     profilePhoto: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
     incomeProof: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
     bplProof: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
@@ -56,9 +59,12 @@ export declare const coachRegistrationSchema: z.ZodObject<{
     presentGradeInJudo: z.ZodString;
     coachName: z.ZodOptional<z.ZodString>;
     refereeName: z.ZodOptional<z.ZodString>;
-    deptName: z.ZodString;
-    contactPersonDept: z.ZodString;
-    addressDept: z.ZodString;
+    deptName: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
+    contactPersonDept: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
+    addressDept: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
+    employmentType: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
+    companyName: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
+    designation: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
     clubId: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
     profilePhoto: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
 }, z.core.$strip>;

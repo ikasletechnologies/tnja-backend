@@ -527,7 +527,21 @@ export const sendAadhaarOtp = async (req: Request, res: Response) => {
     const existingCoach = await prisma.coachReferee.findFirst({ where: { aadhaarNumber } });
     if (existingCoach) return res.status(400).json({ error: "This Aadhaar number is already registered to a Coach/Referee." });
 
-    // Note: Club and Member might not have aadhaarNumber, but if they do in the future, we would check them here.
+    const existingMember = await prisma.member.findFirst({ where: { aadhaarNumber } });
+    if (existingMember) return res.status(400).json({ error: "This Aadhaar number is already registered to a Member." });
+
+    // 1.5 Check for duplicate email in the system
+    const existingEmailStudent = await prisma.student.findFirst({ where: { email } });
+    if (existingEmailStudent) return res.status(400).json({ error: "This Email ID is already registered to a Player." });
+
+    const existingEmailCoach = await prisma.coachReferee.findFirst({ where: { email } });
+    if (existingEmailCoach) return res.status(400).json({ error: "This Email ID is already registered to a Coach/Referee." });
+
+    const existingEmailClub = await prisma.club.findFirst({ where: { email } });
+    if (existingEmailClub) return res.status(400).json({ error: "This Email ID is already registered to a Club." });
+
+    const existingEmailMember = await prisma.member.findFirst({ where: { email } });
+    if (existingEmailMember) return res.status(400).json({ error: "This Email ID is already registered to a Member." });
 
     // 2. Generate OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit OTP

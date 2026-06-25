@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import prisma from "../lib/prisma.js";
 import bcrypt from "bcrypt";
+import { sendAccountDeletionEmail } from "../lib/mailer.js";
 
 export const getPublicCoaches = async (req: Request, res: Response) => {
   try {
@@ -128,7 +129,7 @@ export const getAllUsers = async (req: Request, res: Response) => {
         select: { 
           id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, districtId: true, 
           validUntil: true, district: { select: { name: true } }, taluk: { select: { name: true } },
-          profilePhoto: true, aadhaarProof: true, incomeProof: true, bplProof: true,
+          profilePhoto: true, incomeProof: true, bplProof: true,
           wins: true, losses: true, draws: true, coachId: true, coach: { select: { fullName: true } }
         },
       }) : Promise.resolve([]),
@@ -145,7 +146,7 @@ export const getAllUsers = async (req: Request, res: Response) => {
         where: { ...baseWhere, ...commonSearch, ...(memberRoleFilter ? { role: Array.isArray(memberRoleFilter) ? { in: memberRoleFilter as any[] } : (memberRoleFilter as any) } : {}), ...genderFilter },
         select: { 
           id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, role: true, createdAt: true, districtId: true, 
-          validUntil: true, district: { select: { name: true } }, taluk: { select: { name: true } }, profilePhoto: true, aadhaarFront: true, aadhaarBack: true
+          validUntil: true, district: { select: { name: true } }, taluk: { select: { name: true } }, profilePhoto: true
         },
       }) : Promise.resolve([]),
       
@@ -330,6 +331,68 @@ export const getCoachStudents = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error fetching coach students:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const deleteUser = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const type = req.params.type as string;
+
+    if (!id || !type) {
+      return res.status(400).json({ error: "Missing user ID or type" });
+    }
+
+    const { role } = (req as any).user;
+    if (role !== "SUPER_ADMIN" && role !== "CEO") {
+      return res.status(403).json({ error: "Forbidden: Only Super Admins can delete users" });
+    }
+
+    try {
+      let deletedUser: any = null;
+      let userRoleForEmail = "";
+
+      if (type === "CLUB") {
+        deletedUser = await prisma.club.findUnique({ where: { id } });
+        userRoleForEmail = "Club";
+        if (deletedUser) await prisma.club.delete({ where: { id } });
+      } else if (type === "STUDENT") {
+        deletedUser = await prisma.student.findUnique({ where: { id } });
+        userRoleForEmail = "Player";
+        if (deletedUser) await prisma.student.delete({ where: { id } });
+      } else if (type === "COACH") {
+        deletedUser = await prisma.coachReferee.findUnique({ where: { id } });
+        userRoleForEmail = "Coach/Referee";
+        if (deletedUser) await prisma.coachReferee.delete({ where: { id } });
+      } else if (type === "MEMBER") {
+        deletedUser = await prisma.member.findUnique({ where: { id } });
+        userRoleForEmail = "Member";
+        if (deletedUser) await prisma.member.delete({ where: { id } });
+      } else {
+        return res.status(400).json({ error: "Invalid user type" });
+      }
+
+      if (deletedUser && deletedUser.email) {
+        // Send email asynchronously without blocking the response
+        sendAccountDeletionEmail({
+          toEmail: deletedUser.email,
+          toName: deletedUser.fullName || deletedUser.clubName || "User",
+          role: userRoleForEmail,
+        }).catch(err => console.error("Error sending deletion email:", err));
+      }
+
+      return res.json({ success: true, message: "User deleted successfully" });
+    } catch (dbError: any) {
+      if (dbError.code === "P2003") {
+        return res.status(400).json({ 
+          error: "Cannot delete user because they are linked to active records (e.g. tournament matches, students). Please remove associated records first." 
+        });
+      }
+      throw dbError;
+    }
+  } catch (error) {
+    console.error("Error deleting user:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };

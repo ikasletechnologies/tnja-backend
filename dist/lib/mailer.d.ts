@@ -55,5 +55,10 @@ export declare function sendNewTournamentAnnouncement(opts: {
     tournamentLevel: string;
 }): Promise<void>;
 export declare function sendAadhaarVerificationEmail(toEmail: string, otp: string): Promise<void>;
+export declare function sendAccountDeletionEmail(opts: {
+    toEmail: string;
+    toName: string;
+    role: string;
+}): Promise<void>;
 export {};
 //# sourceMappingURL=mailer.d.ts.map
