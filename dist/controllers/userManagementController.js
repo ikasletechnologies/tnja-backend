@@ -392,4 +392,43 @@ export const deleteUser = async (req, res) => {
         return res.status(500).json({ error: "Internal Server Error" });
     }
 };
+export const getUserDetails = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const type = req.params.type;
+        if (!id || !type) {
+            return res.status(400).json({ error: "Missing user ID or type" });
+        }
+        const { role } = req.user;
+        if (role !== "SUPER_ADMIN" && role !== "CEO") {
+            return res.status(403).json({ error: "Forbidden: Insufficient privileges" });
+        }
+        let userDetails = null;
+        if (type === "CLUB") {
+            userDetails = await prisma.club.findUnique({ where: { id } });
+        }
+        else if (type === "STUDENT") {
+            userDetails = await prisma.student.findUnique({ where: { id } });
+        }
+        else if (type === "COACH") {
+            userDetails = await prisma.coachReferee.findUnique({ where: { id } });
+        }
+        else if (type === "MEMBER") {
+            userDetails = await prisma.member.findUnique({ where: { id } });
+        }
+        else {
+            return res.status(400).json({ error: "Invalid user type" });
+        }
+        if (!userDetails) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        // Omit password from response
+        const { password, ...safeDetails } = userDetails;
+        return res.json({ success: true, data: safeDetails });
+    }
+    catch (error) {
+        console.error("Error fetching user details:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};
 //# sourceMappingURL=userManagementController.js.map
