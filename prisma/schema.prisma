@@ -129,8 +129,10 @@ model Student {
   bplProof              String?
   clubId                String?
   club                  Club?         @relation(fields: [clubId], references: [id])
+  institutionType       String?       @default("SCHOOL")
   schoolName            String
   grade                 String
+  degreeDepartment      String?
   areaOfInterest        String
   areaOfStudy           String
   preferLocation        String
@@ -179,9 +181,12 @@ model CoachReferee {
   presentGradeInJudo    String
   coachName             String?
   refereeName           String?
-  deptName              String
-  contactPersonDept     String
-  addressDept           String
+  deptName              String?
+  contactPersonDept     String?
+  addressDept           String?
+  employmentType        String?
+  companyName           String?
+  designation           String?
   clubId                String?
   club                  Club?    @relation(fields: [clubId], references: [id])
   students              Student[] @relation("CoachStudents")
@@ -291,6 +296,7 @@ model Event {
   isPaid          Boolean     @default(false)
   entryFee        Float       @default(0)
   meetingLink     String?
+  eventSection    String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   registrations   EventRegistration[]
@@ -435,5 +441,14 @@ model ApplicationLog {
   role      String   // Player, Coach, Club, Member
   action    String   // "SUBMITTED", "CHANGES_REQUESTED", "RESUBMITTED", "APPROVED", "REJECTED"
   remark    String?
+  createdAt DateTime @default(now())
+}
+
+model AadhaarOTP {
+  id        String   @id @default(uuid())
+  aadhaar   String   @unique
+  email     String
+  otp       String
+  expiresAt DateTime
   createdAt DateTime @default(now())
 }

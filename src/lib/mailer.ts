@@ -674,3 +674,61 @@ export async function sendNewTournamentAnnouncement(opts: {
 
   console.log(`[Mailer] New tournament announcement email sent to ${toEmail} for ${tournamentTitle}`);
 }
+
+export async function sendAadhaarVerificationEmail(toEmail: string, otp: string) {
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+    body { margin:0; font-family:'Roboto',sans-serif; background:#f0f9ff; color:#333; }
+    .wrapper { padding: 40px 20px; }
+    .container { max-width:600px; margin:auto; background:#fff; border-radius:16px; overflow:hidden;
+                 box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+    .header { background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 100%);
+              padding:36px 40px; text-align:center; }
+    .header h1 { color:#fff; margin:0; font-size:24px; font-weight:900; letter-spacing: 1px; }
+    .body { padding:36px 40px; text-align:center; }
+    .body h2 { color:#1e3a8a; margin-top:0; }
+    .body p  { color:#475569; line-height:1.7; font-size:16px; }
+    .otp-box { background:#f1f5f9; border:2px dashed #94a3b8; border-radius:12px;
+               padding:24px; margin:32px auto; display:inline-block; letter-spacing: 4px;
+               font-size:32px; font-weight:900; color:#0f172a; }
+    .footer { background:#f8fafc; padding:20px 40px; text-align:center;
+              border-top:1px solid #e2e8f0; color:#94a3b8; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="header">
+        <h1>Aadhaar Verification</h1>
+      </div>
+      <div class="body">
+        <h2>Verify Your Email & Aadhaar</h2>
+        <p>Please use the OTP below to verify your Aadhaar number and proceed with your registration.</p>
+        
+        <div class="otp-box">
+          ${otp}
+        </div>
+
+        <p>This OTP is valid for the next 5 minutes. Do not share this code with anyone.</p>
+      </div>
+      <div class="footer">
+        © ${new Date().getFullYear()} Tamil Nadu Judo Association. All rights reserved.
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  await transporter.sendMail({
+    from: `"${SMTP_FROM_NAME}" <${SMTP_USER}>`,
+    to: toEmail,
+    subject: `Your Aadhaar Verification OTP: ${otp}`,
+    html,
+  });
+
+  console.log(`[Mailer] Aadhaar OTP sent to ${toEmail}`);
+}

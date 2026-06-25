@@ -15,6 +15,8 @@ export const getPublicCoaches = async (req: Request, res: Response) => {
       select: {
         id: true,
         fullName: true,
+        email: true,
+        mobileNumber: true,
         districtId: true,
         talukId: true,
       },

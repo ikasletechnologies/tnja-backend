@@ -374,6 +374,14 @@ export const resubmitApplication = async (req: any, res: Response) => {
   ];
 
   const cleanUpdates: any = {};
+  
+  const numericFields = [
+    "age", "annualIncome", "wins", "losses", "draws", 
+    "noOfStudents", "maleStudents", "femaleStudents", 
+    "age6to11Male", "age6to11Female", "age12to18Male", "age12to18Female", 
+    "age16AboveMale", "age16AboveFemale"
+  ];
+
   for (const [k, v] of Object.entries(updates)) {
     if (disallowedFields.includes(k)) continue;
     

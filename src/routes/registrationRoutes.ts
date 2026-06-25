@@ -5,7 +5,7 @@ import { getAllUsers, updateUserCredentials, updateUserProfile, getPublicCoaches
 import { getClubs } from "../controllers/clubController.js";
 import { getDistricts, getTaluksByDistrict, getTalukDetails } from "../controllers/locationController.js";
 import { authenticateJWT, authorizeAdmin, authorize } from "../middleware/authMiddleware.js";
-import { createEvent, getActiveEvents, getAdminEvents, applyForEvent, createEventPaymentOrder, verifyEventPayment, getEventSections } from "../controllers/eventController.js";
+import { createEvent, getActiveEvents, getAdminEvents, getMyEvents, updateEvent, applyForEvent, createEventPaymentOrder, verifyEventPayment, getEventSections } from "../controllers/eventController.js";
 import { createTournament, getClubTournaments, getTournamentRegistrations, updateRegistrationStatus, sendRegistrationReply, getRegistrationMessages, updateTournament, deleteTournament, getPlayerTournaments, getPlayerPublicMatches, createTournamentPaymentOrder, verifyTournamentPayment, getAdminTournaments, getAdminApprovedTournaments, approveTournament, sendTournamentReply, getApprovedTournaments, getTournamentById, getTournamentDraws, saveTournamentDraw, getTournamentMessages, submitTournamentResults } from "../controllers/tournamentController.js";
 import { downloadCertificate } from "../controllers/certificateController.js";
 import scoreboardOptions from "../data/scoreboardOptions.json" with { type: "json" };
@@ -13,6 +13,8 @@ import scoreboardOptions from "../data/scoreboardOptions.json" with { type: "jso
 const router = Router();
 
 router.post("/events/create", authenticateJWT, createEvent);
+router.get("/events/my", authenticateJWT, getMyEvents);
+router.put("/events/:id", authenticateJWT, updateEvent);
 router.post("/events/apply", authenticateJWT, applyForEvent);
 router.get("/events/active", authenticateJWT, getActiveEvents);
 router.get("/events/admin", authenticateJWT, authorizeAdmin, getAdminEvents);

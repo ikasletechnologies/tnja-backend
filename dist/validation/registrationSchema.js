@@ -33,7 +33,6 @@ export const studentRegistrationSchema = z.object({
     areaOfStudy: z.string().min(1),
     preferLocation: z.string().min(1),
     profilePhoto: z.string().optional().or(z.literal("")),
-    aadhaarProof: z.string().optional().or(z.literal("")),
     incomeProof: z.string().optional().or(z.literal("")),
     bplProof: z.string().optional().or(z.literal("")),
 });
@@ -107,8 +106,6 @@ export const memberRegistrationSchema = z.object({
     city: z.string().min(1),
     addressPincode: z.string().length(6),
     profilePhoto: z.string().optional().or(z.literal("")),
-    aadhaarFront: z.string().optional().or(z.literal("")),
-    aadhaarBack: z.string().optional().or(z.literal("")),
     employmentType: z.string().optional().or(z.literal("")),
     companyName: z.string().optional().or(z.literal("")),
     designation: z.string().optional().or(z.literal("")),

@@ -39,6 +39,7 @@ export const createEvent = async (req, res) => {
                 isPaid: !!isPaid,
                 entryFee: isPaid ? Number(entryFee) || 0 : 0,
                 meetingLink: meetingLink || null,
+                eventSection: req.body.eventSection || null,
             },
         });
         return res.status(201).json({ message: "Event proposed successfully", event: newEvent });
@@ -113,6 +114,75 @@ export const getActiveEvents = async (req, res) => {
     }
     catch (error) {
         console.error("Error fetching active events:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+export const getMyEvents = async (req, res) => {
+    try {
+        const { userId } = req.user;
+        if (!userId) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+        const events = await prisma.event.findMany({
+            where: { createdBy: userId },
+            include: {
+                district: { select: { name: true } },
+                registrations: true,
+            },
+            orderBy: { createdAt: "desc" },
+        });
+        return res.json(events);
+    }
+    catch (error) {
+        console.error("Error fetching user's events:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+export const updateEvent = async (req, res) => {
+    try {
+        const eventId = req.params.id;
+        const { title, description, date, location, level, participantType, districtId, zoneId, isPaid, entryFee, meetingLink, eventSection } = req.body;
+        const { userId, role } = req.user;
+        const event = await prisma.event.findUnique({ where: { id: eventId } });
+        if (!event)
+            return res.status(404).json({ error: "Event not found" });
+        const adminRoles = ["SUPER_ADMIN", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "CEO"];
+        const isAdmin = adminRoles.includes(role);
+        if (event.createdBy !== userId && !isAdmin) {
+            return res.status(403).json({ error: "Unauthorized to edit this event" });
+        }
+        const updateData = {
+            title,
+            description,
+            date: new Date(date),
+            location,
+            level,
+            participantType,
+            isPaid: !!isPaid,
+            entryFee: isPaid ? Number(entryFee) || 0 : 0,
+            meetingLink: meetingLink || null,
+            eventSection: eventSection || null,
+        };
+        if (level === "DISTRICT") {
+            updateData.districtId = districtId;
+            updateData.zoneId = null;
+        }
+        else if (level === "ZONE") {
+            updateData.districtId = null;
+            updateData.zoneId = zoneId;
+        }
+        else {
+            updateData.districtId = null;
+            updateData.zoneId = null;
+        }
+        const updatedEvent = await prisma.event.update({
+            where: { id: eventId },
+            data: updateData,
+        });
+        return res.json({ message: "Event updated successfully", event: updatedEvent });
+    }
+    catch (error) {
+        console.error("Error updating event:", error);
         return res.status(500).json({ error: "Internal Server Error" });
     }
 };
