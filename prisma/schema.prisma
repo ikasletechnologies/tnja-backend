@@ -129,8 +129,10 @@ model Student {
   bplProof              String?
   clubId                String?
   club                  Club?         @relation(fields: [clubId], references: [id])
+  institutionType       String?       @default("SCHOOL")
   schoolName            String
   grade                 String
+  degreeDepartment      String?
   areaOfInterest        String
   areaOfStudy           String
   preferLocation        String
@@ -179,9 +181,12 @@ model CoachReferee {
   presentGradeInJudo    String
   coachName             String?
   refereeName           String?
-  deptName              String
-  contactPersonDept     String
-  addressDept           String
+  deptName              String?
+  contactPersonDept     String?
+  addressDept           String?
+  employmentType        String?
+  companyName           String?
+  designation           String?
   clubId                String?
   club                  Club?    @relation(fields: [clubId], references: [id])
   students              Student[] @relation("CoachStudents")
