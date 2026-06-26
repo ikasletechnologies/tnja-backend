@@ -380,7 +380,7 @@ export const resubmitApplication = async (req: any, res: Response) => {
   const dateFields = ["dob"];
   const nullableFields = [
     "clubId", "coachId", "alternateMobileNumber", "profilePhoto", 
-    "incomeProof", "bplProof", 
+    "bplProof", 
     "employmentType", "companyName", "designation", "workLocation", "address2"
   ];
 

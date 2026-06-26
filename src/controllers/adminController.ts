@@ -281,6 +281,10 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
         return res.status(403).json({ error: "You do not have permission to approve students outside your district" });
       }
 
+      if (student.status === status) {
+        return res.json({ message: `Student application is already ${status}`, data: student });
+      }
+
       const updateData: any = { status, rejectionRemark: remark || null };
 
       if (status === "APPROVED") {
@@ -375,6 +379,10 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
         return res.status(403).json({ error: "You do not have permission to approve coaches outside your district" });
       }
 
+      if (coach.status === status) {
+        return res.json({ message: `Coach application is already ${status}`, data: coach });
+      }
+
       const updateData: any = { status, rejectionRemark: remark || null };
 
       if (status === "APPROVED") {
@@ -431,6 +439,10 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
         return res.status(403).json({ error: "You do not have permission to approve members outside your district" });
       }
 
+      if (member.status === status) {
+        return res.json({ message: `Member application is already ${status}`, data: member });
+      }
+
       const updateData: any = { status, rejectionRemark: remark || null };
 
       if (status === "APPROVED") {
@@ -485,6 +497,10 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
 
       if (districtRestrictedRoles.includes(role) && districtId && club.districtId !== districtId) {
         return res.status(403).json({ error: "You do not have permission to approve clubs outside your district" });
+      }
+
+      if (club.status === status) {
+        return res.json({ message: `Club application is already ${status}`, data: club });
       }
 
       const updateData: any = { status, rejectionRemark: remark || null };
@@ -555,6 +571,10 @@ export const updateApplicationStatus = async (req: Request, res: Response) => {
         if (districtId && eventItem.zoneId !== districtId) {
           return res.status(403).json({ error: "You can only manage events in your own zone" });
         }
+      }
+
+      if (eventItem.status === status) {
+        return res.json({ message: `Event application is already ${status}`, data: eventItem });
       }
 
       const updateData: any = { 

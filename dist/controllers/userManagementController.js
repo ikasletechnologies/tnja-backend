@@ -72,8 +72,13 @@ export const getAllUsers = async (req, res) => {
         }
         if (talukId)
             baseWhere.talukId = String(talukId);
-        if (status)
+        // Default to APPROVED if no specific status is requested
+        if (status) {
             baseWhere.status = String(status);
+        }
+        else {
+            baseWhere.status = "APPROVED";
+        }
         // 2. Search filter
         const searchStr = search ? String(search) : undefined;
         const commonSearch = searchStr ? {
@@ -122,7 +127,7 @@ export const getAllUsers = async (req, res) => {
                 select: {
                     id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, createdAt: true, districtId: true,
                     validUntil: true, district: { select: { name: true } }, taluk: { select: { name: true } },
-                    profilePhoto: true, incomeProof: true, bplProof: true,
+                    profilePhoto: true, bplProof: true,
                     wins: true, losses: true, draws: true, coachId: true, coach: { select: { fullName: true } }
                 },
             }) : Promise.resolve([]),

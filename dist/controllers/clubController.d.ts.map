@@ -1,1 +1,1 @@
-{"version":3,"file":"clubController.d.ts","sourceRoot":"","sources":["../../src/controllers/clubController.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,OAAO,EAAE,QAAQ,EAAE,MAAM,SAAS,CAAC;AAGjD,eAAO,MAAM,QAAQ,GAAU,KAAK,OAAO,EAAE,KAAK,QAAQ,gDAiBzD,CAAC"}
+{"version":3,"file":"clubController.d.ts","sourceRoot":"","sources":["../../src/controllers/clubController.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,OAAO,EAAE,QAAQ,EAAE,MAAM,SAAS,CAAC;AAGjD,eAAO,MAAM,QAAQ,GAAU,KAAK,OAAO,EAAE,KAAK,QAAQ,gDAwBzD,CAAC"}

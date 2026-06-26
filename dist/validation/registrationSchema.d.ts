@@ -34,7 +34,6 @@ export declare const studentRegistrationSchema: z.ZodObject<{
     grade: z.ZodString;
     degreeDepartment: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
     profilePhoto: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
-    incomeProof: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
     bplProof: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
 }, z.core.$strip>;
 export declare const coachRegistrationSchema: z.ZodObject<{

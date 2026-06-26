@@ -250,6 +250,9 @@ export const updateApplicationStatus = async (req, res) => {
             if (districtRestrictedRoles.includes(role) && districtId && student.districtId !== districtId) {
                 return res.status(403).json({ error: "You do not have permission to approve students outside your district" });
             }
+            if (student.status === status) {
+                return res.json({ message: `Student application is already ${status}`, data: student });
+            }
             const updateData = { status, rejectionRemark: remark || null };
             if (status === "APPROVED") {
                 updateData.approvedBy = auditorInfo;
@@ -336,6 +339,9 @@ export const updateApplicationStatus = async (req, res) => {
             if (districtRestrictedRoles.includes(role) && districtId && coach.districtId !== districtId) {
                 return res.status(403).json({ error: "You do not have permission to approve coaches outside your district" });
             }
+            if (coach.status === status) {
+                return res.json({ message: `Coach application is already ${status}`, data: coach });
+            }
             const updateData = { status, rejectionRemark: remark || null };
             if (status === "APPROVED") {
                 const { raw, hashed } = await generatePassword();
@@ -388,6 +394,9 @@ export const updateApplicationStatus = async (req, res) => {
             if (districtRestrictedRoles.includes(role) && districtId && member.districtId !== districtId) {
                 return res.status(403).json({ error: "You do not have permission to approve members outside your district" });
             }
+            if (member.status === status) {
+                return res.json({ message: `Member application is already ${status}`, data: member });
+            }
             const updateData = { status, rejectionRemark: remark || null };
             if (status === "APPROVED") {
                 const { raw, hashed } = await generatePassword();
@@ -439,6 +448,9 @@ export const updateApplicationStatus = async (req, res) => {
                 return res.status(404).json({ error: "Club not found" });
             if (districtRestrictedRoles.includes(role) && districtId && club.districtId !== districtId) {
                 return res.status(403).json({ error: "You do not have permission to approve clubs outside your district" });
+            }
+            if (club.status === status) {
+                return res.json({ message: `Club application is already ${status}`, data: club });
             }
             const updateData = { status, rejectionRemark: remark || null };
             if (status === "APPROVED") {
@@ -504,6 +516,9 @@ export const updateApplicationStatus = async (req, res) => {
                 if (districtId && eventItem.zoneId !== districtId) {
                     return res.status(403).json({ error: "You can only manage events in your own zone" });
                 }
+            }
+            if (eventItem.status === status) {
+                return res.json({ message: `Event application is already ${status}`, data: eventItem });
             }
             const updateData = {
                 status,

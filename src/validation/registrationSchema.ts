@@ -36,7 +36,6 @@ export const studentRegistrationSchema = z.object({
   grade: z.string().min(1),
   degreeDepartment: z.string().optional().or(z.literal("")),
   profilePhoto: z.string().optional().or(z.literal("")),
-  incomeProof: z.string().optional().or(z.literal("")),
   bplProof: z.string().optional().or(z.literal("")),
 });
 
