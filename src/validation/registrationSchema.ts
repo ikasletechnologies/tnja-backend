@@ -16,7 +16,7 @@ export const studentRegistrationSchema = z.object({
   dob: z.string().refine((val) => !isNaN(Date.parse(val)), {
     message: "Invalid date format",
   }).transform((val) => new Date(val)),
-  age: z.number().min(5),
+  age: z.number().min(3, "Player must be at least 3 years old"),
   bloodGroup: z.string().min(1),
   mobileNumber: z.string().regex(/^[0-9]{10}$/, "Invalid mobile number"),
   alternateMobileNumber: z.string().optional(),
@@ -31,7 +31,7 @@ export const studentRegistrationSchema = z.object({
   isBPL: z.boolean(),
   clubId: z.string().optional().or(z.literal("")),
   coachId: z.string().optional().or(z.literal("")),
-  institutionType: z.enum(["SCHOOL", "COLLEGE"]).optional().default("SCHOOL"),
+  institutionType: z.enum(["SCHOOL", "COLLEGE", "DIPLOMA"]).optional().default("SCHOOL"),
   schoolName: z.string().min(1),
   grade: z.string().min(1),
   degreeDepartment: z.string().optional().or(z.literal("")),
