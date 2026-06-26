@@ -28,6 +28,7 @@ export declare const studentRegistrationSchema: z.ZodObject<{
     institutionType: z.ZodDefault<z.ZodOptional<z.ZodEnum<{
         SCHOOL: "SCHOOL";
         COLLEGE: "COLLEGE";
+        DIPLOMA: "DIPLOMA";
     }>>>;
     schoolName: z.ZodString;
     grade: z.ZodString;
