@@ -59,7 +59,7 @@ async function main() {
       create: { name: locationData.name, zoneName: locationData.zone }
     });
 
-    console.log(Processing District [${districtCounter}/38]: ${locationData.name});
+    console.log(`Processing District [${districtCounter}/38]: ${locationData.name}`);
 
     // Create Taluks
     let firstTaluk = null;
@@ -83,21 +83,21 @@ async function main() {
 
     if (!firstTaluk) continue;
 
-    const distPrefix = D${districtCounter};
+    const distPrefix = `D${districtCounter}`;
 
     // Create Club
-    const clubEmail = club_${distPrefix}@example.com;
+    const clubEmail = `club_${distPrefix}@example.com`;
     const club = await prisma.club.upsert({
       where: { email: clubEmail },
       update: {},
       create: {
-        name: ${locationData.name} Dummy Club,
+        name: `${locationData.name} Dummy Club`,
         districtId: district.id,
         talukId: firstTaluk.id,
         pincode: firstTaluk.pincode,
-        mobileNumber: 800000${districtCounter.toString().padStart(4, '0')},
+        mobileNumber: `800000${districtCounter.toString().padStart(4, '0')}`,
         email: clubEmail,
-        address1: Dummy Club Address, ${locationData.name},
+        address1: `Dummy Club Address, ${locationData.name}`,
         president: "Dummy President",
         secretary: "Dummy Secretary",
         coach: "Dummy Coach",
@@ -108,24 +108,24 @@ async function main() {
 
     // Create 7 Members
     for (let i = 1; i <= 7; i++) {
-      const memEmail = member_${distPrefix}_${i}@example.com;
+      const memEmail = `member_${distPrefix}_${i}@example.com`;
       await prisma.member.upsert({
         where: { email: memEmail },
         update: {},
         create: {
-          tempId: MEM-${distPrefix}-${i},
+          tempId: `MEM-${distPrefix}-${i}`,
           districtId: district.id,
           talukId: firstTaluk.id,
           pincode: firstTaluk.pincode,
-          fullName: Member ${i} of ${locationData.name},
+          fullName: `Member ${i} of ${locationData.name}`,
           fatherName: "Father",
           gender: "MALE",
           dob: new Date("1985-01-01"),
           bloodGroup: "O+",
-          mobileNumber: 8111${districtCounter.toString().padStart(2, '0')}${i.toString().padStart(4, '0')},
+          mobileNumber: `8111${districtCounter.toString().padStart(2, '0')}${i.toString().padStart(4, '0')}`,
           email: memEmail,
-          aadhaarNumber: 1111${districtCounter.toString().padStart(4, '0')}${i.toString().padStart(4, '0')},
-          addressLine1: Member Address ${i},
+          aadhaarNumber: `1111${districtCounter.toString().padStart(4, '0')}${i.toString().padStart(4, '0')}`,
+          addressLine1: `Member Address ${i}`,
           city: locationData.name,
           addressPincode: firstTaluk.pincode,
           role: i === 1 ? "DISTRICT_PRESIDENT" : "MEMBER",
@@ -140,24 +140,24 @@ async function main() {
     // Create 2 Coaches
     let coachRefs = [];
     for (let i = 1; i <= 2; i++) {
-      const coachEmail = coach_${distPrefix}_${i}@example.com;
+      const coachEmail = `coach_${distPrefix}_${i}@example.com`;
       const coach = await prisma.coachReferee.upsert({
         where: { email: coachEmail },
         update: {},
         create: {
-          tempId: COACH-${distPrefix}-${i},
+          tempId: `COACH-${distPrefix}-${i}`,
           districtId: district.id,
           talukId: firstTaluk.id,
           pincode: firstTaluk.pincode,
-          fullName: Coach ${i} of ${locationData.name},
+          fullName: `Coach ${i} of ${locationData.name}`,
           fatherName: "Father",
           gender: "MALE",
           dob: new Date("1980-01-01"),
           age: 46,
           bloodGroup: "A+",
-          mobileNumber: 8222${districtCounter.toString().padStart(2, '0')}${i.toString().padStart(4, '0')},
+          mobileNumber: `8222${districtCounter.toString().padStart(2, '0')}${i.toString().padStart(4, '0')}`,
           email: coachEmail,
-          aadhaarNumber: 2222${districtCounter.toString().padStart(4, '0')}${i.toString().padStart(4, '0')},
+          aadhaarNumber: `2222${districtCounter.toString().padStart(4, '0')}${i.toString().padStart(4, '0')}`,
           historyInJudo: "Black belt",
           historyInOtherMartial: "None",
           presentGradeInJudo: "1st Dan",
@@ -179,13 +179,13 @@ async function main() {
       for (let i = 1; i <= 20; i++) {
         const pIndex = playerCounter;
         const isFemale = i > 10;
-        const playerEmail = player_${distPrefix}_${cat.age}y_${isFemale ? 'f' : 'm'}_${i}@example.com;
+        const playerEmail = `player_${distPrefix}_${cat.age}y_${isFemale ? 'f' : 'm'}_${i}@example.com`;
         
         const distStr = districtCounter.toString().padStart(2, '0');
         const catIdxStr = categories.indexOf(cat).toString();
         const genStr = isFemale ? '1' : '0';
         const iStr = i.toString().padStart(2, '0');
-        const uniqueSuffix = ${distStr}${catIdxStr}${genStr}${iStr};
+        const uniqueSuffix = `${distStr}${catIdxStr}${genStr}${iStr}`;
 
         const student = await prisma.student.upsert({
           where: { email: playerEmail },
@@ -193,19 +193,19 @@ async function main() {
             gender: isFemale ? "FEMALE" : "MALE"
           }, // Update gender if they already exist
           create: {
-            tempId: STU-${distPrefix}-${cat.age}-${isFemale ? 'F' : 'M'}-${i},
+            tempId: `STU-${distPrefix}-${cat.age}-${isFemale ? 'F' : 'M'}-${i}`,
             districtId: district.id,
             talukId: firstTaluk.id,
             pincode: firstTaluk.pincode,
-            fullName: Player ${i} (${cat.age}y) ${isFemale ? 'Female' : 'Male'} ${locationData.name},
+            fullName: `Player ${i} (${cat.age}y) ${isFemale ? 'Female' : 'Male'} ${locationData.name}`,
             gender: isFemale ? "FEMALE" : "MALE",
             dob: cat.dob,
             age: cat.age,
             bloodGroup: "B+",
-            mobileNumber: 8333${uniqueSuffix},
+            mobileNumber: `8333${uniqueSuffix}`,
             email: playerEmail,
-            aadhaarNumber: 333300${uniqueSuffix},
-            address: Player Address ${i},
+            aadhaarNumber: `333300${uniqueSuffix}`,
+            address: `Player Address ${i}`,
             city: locationData.name,
             state: "Tamil Nadu",
             addressPincode: firstTaluk.pincode,
@@ -213,9 +213,6 @@ async function main() {
             annualIncome: 300000,
             schoolName: "Dummy School",
             grade: "A",
-            areaOfInterest: "Judo",
-            areaOfStudy: "General",
-            preferLocation: locationData.name,
             status: "APPROVED",
             isPaid: true,
             password: hashedPwd,
@@ -250,10 +247,10 @@ async function main() {
   }
   
   console.log("Seeding finished successfully!");
-  console.log(Total Districts Processed: ${districtCounter - 1});
-  console.log(Total Members Seeded: ${memberCounter - 1});
-  console.log(Total Coaches Seeded: ${coachCounter - 1});
-  console.log(Total Players Seeded: ${playerCounter - 1});
+  console.log(`Total Districts Processed: ${districtCounter - 1}`);
+  console.log(`Total Members Seeded: ${memberCounter - 1}`);
+  console.log(`Total Coaches Seeded: ${coachCounter - 1}`);
+  console.log(`Total Players Seeded: ${playerCounter - 1}`);
 }
 
 main()
