@@ -34,6 +34,14 @@ export const studentRegistrationSchema = z.object({
     degreeDepartment: z.string().optional().or(z.literal("")),
     profilePhoto: z.string().optional().or(z.literal("")),
     bplProof: z.string().optional().or(z.literal("")),
+}).superRefine((data, ctx) => {
+    if (data.isBPL && (!data.bplProof || data.bplProof === "")) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "BPL proof image is required when BPL is selected",
+            path: ["bplProof"],
+        });
+    }
 });
 export const coachRegistrationSchema = z.object({
     districtId: z.string().uuid("Invalid District selection"),
