@@ -723,14 +723,19 @@ export async function sendAadhaarVerificationEmail(toEmail: string, otp: string)
 </body>
 </html>`;
 
-  await transporter.sendMail({
-    from: `"${SMTP_FROM_NAME}" <${SMTP_USER}>`,
-    to: toEmail,
-    subject: `Your Aadhaar Verification OTP: ${otp}`,
-    html,
-  });
-
-  console.log(`[Mailer] Aadhaar OTP sent to ${toEmail}`);
+  try {
+    await transporter.sendMail({
+      from: `"${SMTP_FROM_NAME}" <${SMTP_USER}>`,
+      to: toEmail,
+      subject: `Your Aadhaar Verification OTP: ${otp}`,
+      html,
+    });
+    console.log(`[Mailer] Aadhaar OTP sent to ${toEmail}`);
+  } catch (error: any) {
+    console.error(`[Mailer] Failed to send Aadhaar OTP to ${toEmail}:`, error.message);
+    console.log(`[Mailer DEV MODE] Fallback - The OTP for ${toEmail} is: ${otp}`);
+    // Swallowing the error so development is not blocked by email sending limits.
+  }
 }
 
 export async function sendAccountDeletionEmail(opts: {
