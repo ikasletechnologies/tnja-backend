@@ -153,7 +153,7 @@ export const getAllUsers = async (req, res) => {
         const allUsers = [
             ...students.map(u => ({ ...u, role: "STUDENT", districtName: u.district?.name, talukName: u.taluk?.name })),
             ...coaches.map(u => ({ ...u, role: "COACH", districtName: u.district?.name, talukName: u.taluk?.name })),
-            ...members.map(u => ({ ...u, role: u.role, districtName: u.district?.name, talukName: u.taluk?.name })),
+            ...members.map(u => ({ ...u, role: u.role, districtName: (['DISTRICT_PRESIDENT', 'DISTRICT_SECRETARY'].includes(u.role) && u.assignedDistrict) ? u.assignedDistrict.name : u.district?.name, talukName: u.taluk?.name })),
             ...clubs.map(u => ({ ...u, fullName: u.name, role: "CLUB", districtName: u.district?.name, talukName: u.taluk?.name })),
         ];
         return res.json(allUsers);

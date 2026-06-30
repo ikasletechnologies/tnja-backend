@@ -152,7 +152,7 @@ export const getAllUsers = async (req: Request, res: Response) => {
         where: { ...baseWhere, ...commonSearch, ...(memberRoleFilter ? { role: Array.isArray(memberRoleFilter) ? { in: memberRoleFilter as any[] } : (memberRoleFilter as any) } : {}), ...genderFilter },
         select: { 
           id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, role: true, createdAt: true, districtId: true, 
-          validUntil: true, district: { select: { name: true } }, taluk: { select: { name: true } }, profilePhoto: true
+          validUntil: true, district: { select: { name: true } }, taluk: { select: { name: true } }, profilePhoto: true, assignedDistrict: { select: { name: true } }
         },
       }) : Promise.resolve([]),
       
@@ -165,7 +165,7 @@ export const getAllUsers = async (req: Request, res: Response) => {
     const allUsers = [
       ...students.map(u => ({ ...u, role: "STUDENT", districtName: u.district?.name, talukName: u.taluk?.name })),
       ...coaches.map(u => ({ ...u, role: "COACH", districtName: u.district?.name, talukName: u.taluk?.name })),
-      ...members.map(u => ({ ...u, role: u.role, districtName: u.district?.name, talukName: u.taluk?.name })),
+      ...members.map(u => ({ ...u, role: u.role, districtName: (['DISTRICT_PRESIDENT', 'DISTRICT_SECRETARY'].includes(u.role) && u.assignedDistrict) ? u.assignedDistrict.name : u.district?.name, talukName: u.taluk?.name })),
       ...clubs.map(u => ({ ...u, fullName: u.name, role: "CLUB", districtName: u.district?.name, talukName: u.taluk?.name })),
     ];
 

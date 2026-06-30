@@ -39,6 +39,7 @@ model District {
   coaches   CoachReferee[]
   clubs     Club[]
   members   Member[]
+  assignedMembers Member[] @relation("AssignedDistrict")
   events    Event[]
 }
 
@@ -217,6 +218,8 @@ model Member {
   permanentId           String?  @unique
   districtId            String
   district              District @relation(fields: [districtId], references: [id])
+  assignedDistrictId    String?
+  assignedDistrict      District? @relation("AssignedDistrict", fields: [assignedDistrictId], references: [id])
   talukId               String
   taluk                 Taluk    @relation(fields: [talukId], references: [id])
   pincode               String

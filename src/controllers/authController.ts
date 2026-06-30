@@ -97,7 +97,7 @@ export const login = async (req: Request, res: Response) => {
     const isMemberRole = ["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role);
     const tokenPayload: any = { userId: user.id, role: role };
     if (isMemberRole && user.districtId) {
-      tokenPayload.districtId = user.districtId;
+      tokenPayload.districtId = (user.assignedDistrictId && ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) ? user.assignedDistrictId : user.districtId;
     }
 
     const token = jwt.sign(
@@ -154,12 +154,12 @@ export const getProfile = async (req: any, res: Response) => {
     } else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role)) {
       userData = await prisma.member.findUnique({
         where: { id: userId },
-        include: { district: true, taluk: true }
+        include: { district: true, taluk: true, assignedDistrict: true }
       });
     } else if (role === "CLUB") {
       userData = await prisma.club.findUnique({
         where: { id: userId },
-        include: { district: true, taluk: true }
+        include: { district: true, taluk: true, assignedDistrict: true }
       });
     }
 
@@ -488,7 +488,7 @@ export const trackStatus = async (req: Request, res: Response) => {
 
     const tokenPayload: any = { userId: user.id, role: role };
     if (user.districtId) {
-      tokenPayload.districtId = user.districtId;
+      tokenPayload.districtId = (user.assignedDistrictId && ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) ? user.assignedDistrictId : user.districtId;
     }
     const token = jwt.sign(
       tokenPayload,
