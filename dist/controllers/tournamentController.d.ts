@@ -5,6 +5,7 @@ export declare const getApprovedTournaments: (req: Request, res: Response) => Pr
 export declare const getTournamentRegistrations: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const getRegistrationMessages: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const updateRegistrationStatus: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+export declare const updateRegistrationMetrics: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const sendRegistrationReply: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const updateTournament: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const deleteTournament: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;

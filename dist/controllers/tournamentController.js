@@ -337,6 +337,52 @@ export const updateRegistrationStatus = async (req, res) => {
         return res.status(500).json({ error: "Internal Server Error" });
     }
 };
+// ─── CLUB/OFFICIAL: Update Registration Metrics (Weight/Height) ───────────────
+export const updateRegistrationMetrics = async (req, res) => {
+    const { userId, role } = req.user;
+    const tournamentId = req.params.id;
+    const regId = req.params.regId;
+    const { weight, height } = req.body;
+    const isClub = role === "CLUB";
+    const isOfficial = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN"].includes(role);
+    if (!isClub && !isOfficial) {
+        return res.status(403).json({ error: "Access denied" });
+    }
+    try {
+        const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
+        if (!tournament)
+            return res.status(404).json({ error: "Tournament not found" });
+        if (tournament.clubId !== userId && tournament.officialId !== userId) {
+            return res.status(403).json({ error: "This tournament does not belong to you" });
+        }
+        if (tournament.status === "CLOSED") {
+            return res.status(400).json({ error: "Cannot edit metrics for a completed tournament" });
+        }
+        const registration = await prisma.tournamentRegistration.findUnique({
+            where: { id: regId },
+        });
+        if (!registration)
+            return res.status(404).json({ error: "Registration not found" });
+        const updatedRegistration = await prisma.tournamentRegistration.update({
+            where: { id: regId },
+            data: { weight: weight || registration.weight, height: height || registration.height },
+        });
+        if (weight || height) {
+            await prisma.student.update({
+                where: { id: registration.playerId },
+                data: {
+                    ...(weight && { weight }),
+                    ...(height && { height })
+                }
+            });
+        }
+        return res.json({ message: "Metrics updated successfully", registration: updatedRegistration });
+    }
+    catch (error) {
+        console.error("Error updating registration metrics:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};
 // ─── CLUB: Send Reply to a Player Registration ───────────────────────────────
 export const sendRegistrationReply = async (req, res) => {
     const { userId, role } = req.user;
@@ -945,7 +991,27 @@ export const approveTournament = async (req, res) => {
                 dataToUpdate.superAdminApproval = "APPROVED";
             if (role === "CEO")
                 dataToUpdate.ceoApproval = "APPROVED";
-            dataToUpdate.status = "APPROVED";
+            const distApp = dataToUpdate.districtApproval || tournament.districtApproval;
+            const stateApp = dataToUpdate.stateApproval || tournament.stateApproval;
+            const saApp = dataToUpdate.superAdminApproval || tournament.superAdminApproval;
+            const ceoApp = dataToUpdate.ceoApproval || tournament.ceoApproval;
+            // Super Admin and CEO can bypass lower-level approvals
+            if (role === "SUPER_ADMIN" || role === "CEO") {
+                dataToUpdate.status = "APPROVED";
+                dataToUpdate.districtApproval = "APPROVED";
+                dataToUpdate.stateApproval = "APPROVED";
+                dataToUpdate.superAdminApproval = "APPROVED";
+                dataToUpdate.ceoApproval = "APPROVED";
+            }
+            else {
+                const allDone = ["APPROVED", "NOT_REQUIRED"].includes(distApp) &&
+                    ["APPROVED", "NOT_REQUIRED"].includes(stateApp) &&
+                    ["APPROVED", "NOT_REQUIRED"].includes(saApp) &&
+                    ["APPROVED", "NOT_REQUIRED"].includes(ceoApp);
+                if (allDone) {
+                    dataToUpdate.status = "APPROVED";
+                }
+            }
         }
         const updated = await prisma.tournament.update({ where: { id }, data: dataToUpdate });
         const notifyId = tournament.clubId || tournament.officialId;

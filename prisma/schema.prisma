@@ -145,6 +145,8 @@ model Student {
   wins                  Int           @default(0)
   losses                Int           @default(0)
   draws                 Int           @default(0)
+  height                String?
+  weight                String?
   coachId               String?
   coach                 CoachReferee? @relation("CoachStudents", fields: [coachId], references: [id])
   tournamentRegs        TournamentRegistration[]
