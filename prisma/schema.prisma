@@ -326,6 +326,7 @@ model Tournament {
   gender             String                   @default("BOTH")
   allowBPL           Boolean                  @default(false)
   beltEligibility    String?
+  bannerImage        String?
   level              EventLevel               @default(DISTRICT)
   
   districtApproval   Status                   @default(PENDING)

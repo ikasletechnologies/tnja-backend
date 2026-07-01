@@ -1008,12 +1008,59 @@ export const promoteMember = async (req: Request, res: Response) => {
     const member = await prisma.member.findUnique({ where: { id: memberId } });
     if (!member) return res.status(404).json({ error: "Member not found" });
 
+    const targetDistrictId = districtId || member.assignedDistrictId || member.districtId;
+
+    if (role === "DISTRICT_PRESIDENT" || role === "DISTRICT_SECRETARY") {
+      const existing = await prisma.member.findFirst({
+        where: {
+          role: role as any,
+          OR: [
+            { assignedDistrictId: targetDistrictId },
+            { districtId: targetDistrictId, assignedDistrictId: null }
+          ],
+          NOT: { id: memberId }
+        }
+      });
+      if (existing) {
+        return res.status(400).json({ error: `A member already holds the role of ${role} in this district.` });
+      }
+    }
+
+    if (role === "ZONE_PRESIDENT" || role === "ZONE_SECRETARY") {
+      const targetDistrict = await prisma.district.findUnique({ where: { id: targetDistrictId }});
+      if (targetDistrict?.zoneName) {
+        const zoneDistricts = await prisma.district.findMany({
+          where: { zoneName: targetDistrict.zoneName },
+          select: { id: true }
+        });
+        const zoneDistrictIds = zoneDistricts.map(d => d.id);
+        
+        const existing = await prisma.member.findFirst({
+          where: {
+            role: role as any,
+            OR: [
+              { assignedDistrictId: { in: zoneDistrictIds } },
+              { districtId: { in: zoneDistrictIds }, assignedDistrictId: null }
+            ],
+            NOT: { id: memberId }
+          }
+        });
+        if (existing) {
+          return res.status(400).json({ error: `A member already holds the role of ${role} in this zone (${targetDistrict.zoneName}).` });
+        }
+      }
+    }
+
+    let updateData: any = { role: role as any };
+    if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY"].includes(role)) {
+      updateData.assignedDistrictId = targetDistrictId;
+    } else {
+      updateData.assignedDistrictId = null;
+    }
+
     const updated = await prisma.member.update({
       where: { id: memberId },
-      data: { 
-        role: role as any,
-        ...(districtId && { districtId })
-      }
+      data: updateData
     });
 
     return res.json({ message: `Member promoted to ${role} successfully`, data: updated });

@@ -97,7 +97,7 @@ router.patch("/settings/global", authenticateJWT, authorizeAdmin, updateGlobalSe
 router.get("/users/all", authenticateJWT, authorizeAdmin, getAllUsers);
 router.patch("/users/credentials", authenticateJWT, authorizeAdmin, updateUserCredentials);
 router.patch("/users/profile", authenticateJWT, authorize(["SUPER_ADMIN", "CEO"]), updateUserProfile);
-router.get("/users/:type/:id", authenticateJWT, authorize(["SUPER_ADMIN", "CEO"]), getUserDetails);
+router.get("/users/:type/:id", authenticateJWT, authorizeAdmin, getUserDetails);
 router.delete("/users/:type/:id", authenticateJWT, authorize(["SUPER_ADMIN", "CEO"]), deleteUser);
 router.patch("/member/promote", authenticateJWT, authorizeAdmin, promoteMember);
 

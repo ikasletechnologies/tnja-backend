@@ -204,6 +204,9 @@ export const updateUserProfile = async (req, res) => {
         else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role)) {
             if (safe.dob)
                 safe.dob = new Date(safe.dob);
+            if (safe.districtId && ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
+                safe.assignedDistrictId = safe.districtId;
+            }
             updated = await prisma.member.update({ where: { id: userId }, data: safe });
         }
         else if (role === "CLUB") {
@@ -418,7 +421,7 @@ export const getUserDetails = async (req, res) => {
         else if (type === "COACH") {
             userDetails = await prisma.coachReferee.findUnique({ where: { id } });
         }
-        else if (type === "MEMBER") {
+        else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(type)) {
             userDetails = await prisma.member.findUnique({ where: { id } });
         }
         else {

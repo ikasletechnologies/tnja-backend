@@ -72,7 +72,7 @@ export const createTournament = async (req: Request, res: Response) => {
     return res.status(403).json({ error: "Only clubs or authorized officials can create tournaments" });
   }
 
-  const { title, dateFrom, dateTo, location, description, entryFee, totalSlots, numberOfMats, ageFrom, ageTo, gender, allowBPL, beltEligibility, level, zoneId } = req.body;
+  const { title, dateFrom, dateTo, location, description, entryFee, totalSlots, numberOfMats, ageFrom, ageTo, gender, allowBPL, beltEligibility, bannerImage, level, zoneId } = req.body;
 
   if (!title || !dateFrom || !location || !description || entryFee === undefined || !totalSlots || !level) {
     return res.status(400).json({ error: "Required fields missing" });
@@ -110,6 +110,7 @@ export const createTournament = async (req: Request, res: Response) => {
         gender: gender || "BOTH",
         allowBPL: Boolean(allowBPL),
         beltEligibility: beltEligibility || null,
+        bannerImage: bannerImage || null,
         level,
         zoneId: zoneId || null,
         clubId: isClub ? userId : null,
@@ -423,7 +424,7 @@ export const updateTournament = async (req: Request, res: Response) => {
     return res.status(403).json({ error: "Only clubs and officials can update tournaments" });
   }
 
-  const { title, dateFrom, dateTo, location, description, entryFee, totalSlots, numberOfMats, ageFrom, ageTo, gender, allowBPL, beltEligibility, level, zoneId } = req.body;
+  const { title, dateFrom, dateTo, location, description, entryFee, totalSlots, numberOfMats, ageFrom, ageTo, gender, allowBPL, beltEligibility, bannerImage, level, zoneId } = req.body;
 
   try {
     const tournament = await prisma.tournament.findUnique({ where: { id } });
@@ -446,6 +447,7 @@ export const updateTournament = async (req: Request, res: Response) => {
         ...(gender && { gender }),
         ...(allowBPL !== undefined && { allowBPL: Boolean(allowBPL) }),
         ...(beltEligibility !== undefined && { beltEligibility }),
+        ...(bannerImage !== undefined && { bannerImage }),
         ...(level && { level }),
         ...(zoneId !== undefined && { zoneId }),
       },
@@ -705,7 +707,7 @@ export const createTournamentPaymentOrder = async (req: Request, res: Response) 
         data: {
           tournamentId,
           playerId: userId,
-          status: "PENDING",
+          status: "APPROVED",
           isPaid: true, // It's free, so consider it paid
           height: height || null,
           weight: weight || null,
@@ -757,7 +759,7 @@ export const createTournamentPaymentOrder = async (req: Request, res: Response) 
       if (freOrganiserId) {
         sendNotificationToUser(freOrganiserId, {
           type: "NEW_TOURNAMENT_REGISTRATION",
-          message: `A player has registered for your tournament "${tournament.title}". Review and approve in Tournaments.`,
+          message: `A player has successfully registered for your tournament "${tournament.title}".`,
           tournamentId,
           createdAt: new Date().toISOString(),
         });
@@ -821,7 +823,7 @@ export const verifyTournamentPayment = async (req: Request, res: Response) => {
       data: {
         tournamentId,
         playerId: userId,
-        status: "PENDING",
+        status: "APPROVED",
         isPaid: true,
         paymentId: razorpay_payment_id,
         height: height || null,
@@ -863,14 +865,14 @@ export const verifyTournamentPayment = async (req: Request, res: Response) => {
     if (organiserId) {
       sendNotificationToUser(organiserId, {
         type: "NEW_TOURNAMENT_REGISTRATION",
-        message: `A player has paid and registered for your tournament "${tournament.title}". Review and approve in Tournaments.`,
+        message: `A player has paid and successfully registered for your tournament "${tournament.title}".`,
         tournamentId,
         createdAt: new Date().toISOString(),
       });
     }
 
     return res.status(201).json({
-      message: "Payment verified. Registration submitted for approval.",
+      message: "Payment verified. Registration successful.",
       registration,
     });
   } catch (error) {
