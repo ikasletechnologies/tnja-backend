@@ -142,7 +142,7 @@ export const getAllUsers = async (req, res) => {
                 where: { ...baseWhere, ...commonSearch, ...(memberRoleFilter ? { role: Array.isArray(memberRoleFilter) ? { in: memberRoleFilter } : memberRoleFilter } : {}), ...genderFilter },
                 select: {
                     id: true, fullName: true, email: true, tempId: true, permanentId: true, status: true, mobileNumber: true, role: true, createdAt: true, districtId: true,
-                    validUntil: true, district: { select: { name: true } }, taluk: { select: { name: true } }, profilePhoto: true
+                    validUntil: true, district: { select: { name: true } }, taluk: { select: { name: true } }, profilePhoto: true, assignedDistrict: { select: { name: true } }
                 },
             }) : Promise.resolve([]),
             fetchClubs ? prisma.club.findMany({
