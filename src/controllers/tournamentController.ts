@@ -1332,6 +1332,24 @@ const autoAdvanceWinner = (rounds: any[]): any[] => {
           } else if (!isFirstSlot && nextMatch.slotB.playerName === "TBD") {
             nextRound[nextMatchIdx].slotB = winnerSlot;
           }
+          
+          // Bronze Match Logic: If this is the semi-final and a bronze match exists
+          if (roundIdx === rounds.length - 2 && nextRound.length > 1) {
+            const loserSlot = {
+              playerId: isWinnerA ? match.slotB.playerId : match.slotA.playerId,
+              playerName: isWinnerA ? match.slotB.playerName : match.slotA.playerName,
+              club: isWinnerA ? match.slotB.club : match.slotA.club,
+              isBye: false,
+              seedNumber: isWinnerA ? match.slotB.seedNumber : match.slotA.seedNumber,
+            };
+
+            const bronzeMatch = nextRound[1];
+            if (isFirstSlot && bronzeMatch.slotA.playerName === "TBD") {
+              nextRound[1].slotA = loserSlot;
+            } else if (!isFirstSlot && bronzeMatch.slotB.playerName === "TBD") {
+              nextRound[1].slotB = loserSlot;
+            }
+          }
         }
       }
     }
