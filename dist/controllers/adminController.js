@@ -956,6 +956,17 @@ export const promoteMember = async (req, res) => {
                 }
             }
         }
+        if (role === "STATE_PRESIDENT" || role === "STATE_SECRETARY") {
+            const existing = await prisma.member.findFirst({
+                where: {
+                    role: role,
+                    NOT: { id: memberId }
+                }
+            });
+            if (existing) {
+                return res.status(400).json({ error: `A member already holds the role of ${role.replace("_", " ")}.` });
+            }
+        }
         let updateData = { role: role };
         if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY"].includes(role)) {
             updateData.assignedDistrictId = targetDistrictId;

@@ -159,7 +159,7 @@ export const getProfile = async (req: any, res: Response) => {
     } else if (role === "CLUB") {
       userData = await prisma.club.findUnique({
         where: { id: userId },
-        include: { district: true, taluk: true, assignedDistrict: true }
+        include: { district: true, taluk: true }
       });
     }
 

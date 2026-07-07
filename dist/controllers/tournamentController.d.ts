@@ -1,10 +1,14 @@
 import type { Request, Response } from "express";
+export declare const getAgeGroup: (age: number, category?: string) => string;
+export declare const getWeightCategory: (weightKg: number, gender: string, ageGroup: string) => string;
 export declare const createTournament: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+export declare const startTournament: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const getClubTournaments: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const getApprovedTournaments: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const getTournamentRegistrations: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const getRegistrationMessages: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const updateRegistrationStatus: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+export declare const disqualifyRegistration: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const updateRegistrationMetrics: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const sendRegistrationReply: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const updateTournament: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;

@@ -4,34 +4,252 @@ import crypto from "crypto";
 import { sendNotificationToUser } from "../lib/ws.js";
 import { sendEventRegistrationEmail, sendNewTournamentAnnouncement } from "../lib/mailer.js";
 // ─── HELPER: Calculate Age Group ────────────────────────────────────────────
-const getAgeGroup = (age) => {
+export const getAgeGroup = (age, category) => {
+    if (category) {
+        if (category.includes("Mini Sub-Junior Age Group 1") && age <= 7)
+            return category;
+        if (category.includes("Mini Sub-Junior Age Group 2") && age <= 9)
+            return category;
+        if (category.includes("Mini Sub-Junior Age Group 3") && age <= 11)
+            return category;
+        if (category.includes("Sub-Junior") && age >= 12 && age <= 14)
+            return category;
+        if (category.includes("Cadet") && age >= 15 && age <= 17)
+            return category;
+        if (category.includes("Junior") && age >= 15 && age <= 20)
+            return category;
+        if (category.includes("Senior") && age >= 15)
+            return category;
+        if (category.includes("Veteran") && age >= 35)
+            return category;
+    }
+    if (age <= 7)
+        return "Mini Sub-Junior Age Group 1";
+    if (age <= 9)
+        return "Mini Sub-Junior Age Group 2";
+    if (age <= 11)
+        return "Mini Sub-Junior Age Group 3";
     if (age <= 14)
-        return "Sub-Junior (10-14 yrs)";
+        return "Sub-Junior";
     if (age <= 17)
-        return "Cadet (15-17 yrs)";
+        return "Cadet";
     if (age <= 20)
-        return "Junior (18-20 yrs)";
+        return "Junior";
     if (age < 35)
-        return "Senior (21-34 yrs)";
-    return "Veteran (35+ yrs)";
+        return "Senior";
+    return "Veteran";
 };
 // ─── HELPER: Get Weight Category ────────────────────────────────────────────
-const getWeightCategory = (weightKg) => {
-    if (weightKg <= 45)
-        return "45kg";
-    if (weightKg <= 50)
-        return "50kg";
-    if (weightKg <= 55)
-        return "55kg";
-    if (weightKg <= 60)
-        return "60kg";
-    if (weightKg <= 66)
-        return "66kg";
-    if (weightKg <= 73)
-        return "73kg";
-    if (weightKg <= 81)
-        return "81kg";
-    return "90kg+";
+export const getWeightCategory = (weightKg, gender, ageGroup) => {
+    const w = weightKg;
+    const isMale = gender === "MALE";
+    if (ageGroup.includes("Age Group 1")) {
+        if (isMale) {
+            if (w <= 20)
+                return "-20kg";
+            if (w <= 25)
+                return "-25kg";
+            if (w <= 30)
+                return "-30kg";
+            return "+30kg";
+        }
+        else {
+            if (w <= 18)
+                return "-18kg";
+            if (w <= 22)
+                return "-22kg";
+            if (w <= 26)
+                return "-26kg";
+            return "+26kg";
+        }
+    }
+    if (ageGroup.includes("Age Group 2")) {
+        if (isMale) {
+            if (w <= 25)
+                return "-25kg";
+            if (w <= 30)
+                return "-30kg";
+            if (w <= 35)
+                return "-35kg";
+            return "+35kg";
+        }
+        else {
+            if (w <= 22)
+                return "-22kg";
+            if (w <= 26)
+                return "-26kg";
+            if (w <= 30)
+                return "-30kg";
+            return "+30kg";
+        }
+    }
+    if (ageGroup.includes("Age Group 3")) {
+        if (isMale) {
+            if (w <= 30)
+                return "-30kg";
+            if (w <= 35)
+                return "-35kg";
+            if (w <= 40)
+                return "-40kg";
+            if (w <= 45)
+                return "-45kg";
+            return "+45kg";
+        }
+        else {
+            if (w <= 28)
+                return "-28kg";
+            if (w <= 32)
+                return "-32kg";
+            if (w <= 36)
+                return "-36kg";
+            if (w <= 40)
+                return "-40kg";
+            return "+40kg";
+        }
+    }
+    if (ageGroup.includes("Sub-Junior")) {
+        if (isMale) {
+            if (w <= 30)
+                return "-30kg";
+            if (w <= 35)
+                return "-35kg";
+            if (w <= 40)
+                return "-40kg";
+            if (w <= 45)
+                return "-45kg";
+            if (w <= 50)
+                return "-50kg";
+            if (w <= 55)
+                return "-55kg";
+            if (w <= 60)
+                return "-60kg";
+            if (w <= 66)
+                return "-66kg";
+            return "+66kg";
+        }
+        else {
+            if (w <= 28)
+                return "-28kg";
+            if (w <= 32)
+                return "-32kg";
+            if (w <= 36)
+                return "-36kg";
+            if (w <= 40)
+                return "-40kg";
+            if (w <= 44)
+                return "-44kg";
+            if (w <= 48)
+                return "-48kg";
+            if (w <= 52)
+                return "-52kg";
+            if (w <= 57)
+                return "-57kg";
+            return "+57kg";
+        }
+    }
+    if (ageGroup.includes("Cadet")) {
+        if (isMale) {
+            if (w <= 50)
+                return "-50kg";
+            if (w <= 55)
+                return "-55kg";
+            if (w <= 60)
+                return "-60kg";
+            if (w <= 66)
+                return "-66kg";
+            if (w <= 73)
+                return "-73kg";
+            if (w <= 81)
+                return "-81kg";
+            if (w <= 90)
+                return "-90kg";
+            return "+90kg";
+        }
+        else {
+            if (w <= 40)
+                return "-40kg";
+            if (w <= 44)
+                return "-44kg";
+            if (w <= 48)
+                return "-48kg";
+            if (w <= 52)
+                return "-52kg";
+            if (w <= 57)
+                return "-57kg";
+            if (w <= 63)
+                return "-63kg";
+            if (w <= 70)
+                return "-70kg";
+            return "+70kg";
+        }
+    }
+    if (ageGroup.includes("Junior")) {
+        if (isMale) {
+            if (w <= 55)
+                return "-55kg";
+            if (w <= 60)
+                return "-60kg";
+            if (w <= 66)
+                return "-66kg";
+            if (w <= 73)
+                return "-73kg";
+            if (w <= 81)
+                return "-81kg";
+            if (w <= 90)
+                return "-90kg";
+            if (w <= 100)
+                return "-100kg";
+            return "+100kg";
+        }
+        else {
+            if (w <= 44)
+                return "-44kg";
+            if (w <= 48)
+                return "-48kg";
+            if (w <= 52)
+                return "-52kg";
+            if (w <= 57)
+                return "-57kg";
+            if (w <= 63)
+                return "-63kg";
+            if (w <= 70)
+                return "-70kg";
+            if (w <= 78)
+                return "-78kg";
+            return "+78kg";
+        }
+    }
+    // Senior / Veteran
+    if (isMale) {
+        if (w <= 60)
+            return "-60kg";
+        if (w <= 66)
+            return "-66kg";
+        if (w <= 73)
+            return "-73kg";
+        if (w <= 81)
+            return "-81kg";
+        if (w <= 90)
+            return "-90kg";
+        if (w <= 100)
+            return "-100kg";
+        return "+100kg";
+    }
+    else {
+        if (w <= 48)
+            return "-48kg";
+        if (w <= 52)
+            return "-52kg";
+        if (w <= 57)
+            return "-57kg";
+        if (w <= 63)
+            return "-63kg";
+        if (w <= 70)
+            return "-70kg";
+        if (w <= 78)
+            return "-78kg";
+        return "+78kg";
+    }
 };
 // ─── HELPER: Create or Get Tournament Draw ──────────────────────────────────
 const createOrGetDraw = async (tournamentId, gender, ageGroup, weightCategory, exactAge = 0) => {
@@ -75,8 +293,8 @@ export const createTournament = async (req, res) => {
     if (!isClub && !isOfficial) {
         return res.status(403).json({ error: "Only clubs or authorized officials can create tournaments" });
     }
-    const { title, dateFrom, dateTo, location, description, entryFee, totalSlots, numberOfMats, ageFrom, ageTo, gender, allowBPL, beltEligibility, bannerImage, level, zoneId } = req.body;
-    if (!title || !dateFrom || !location || !description || entryFee === undefined || !totalSlots || !level) {
+    const { title, dateFrom, dateTo, location, description, entryFee, numberOfMats, ageFrom, ageTo, gender, allowBPL, beltEligibility, bannerImage, level, zoneId } = req.body;
+    if (!title || !dateFrom || !location || !description || entryFee === undefined || !level) {
         return res.status(400).json({ error: "Required fields missing" });
     }
     try {
@@ -103,7 +321,6 @@ export const createTournament = async (req, res) => {
                 location,
                 description,
                 entryFee: Number(entryFee),
-                totalSlots: Number(totalSlots),
                 numberOfMats: numberOfMats ? Number(numberOfMats) : 1,
                 ageFrom: Number(ageFrom || 0),
                 ageTo: Number(ageTo || 100),
@@ -114,7 +331,7 @@ export const createTournament = async (req, res) => {
                 level,
                 zoneId: zoneId || null,
                 clubId: isClub ? userId : null,
-                officialId: isOfficial ? userId : null,
+                officialId: (isOfficial && role !== "SUPER_ADMIN") ? userId : null,
                 status: "PENDING",
                 districtApproval: districtApproval,
                 stateApproval: stateApproval,
@@ -144,6 +361,30 @@ export const createTournament = async (req, res) => {
         return res.status(500).json({ error: "Internal Server Error" });
     }
 };
+// ─── START TOURNAMENT (Close Registrations) ──────────────────────────────────
+export const startTournament = async (req, res) => {
+    const { userId, role } = req.user;
+    const id = req.params.id;
+    try {
+        const tournament = await prisma.tournament.findUnique({ where: { id } });
+        if (!tournament)
+            return res.status(404).json({ error: "Tournament not found" });
+        const isCreator = tournament.clubId === userId || tournament.officialId === userId;
+        const isOfficial = ["SUPER_ADMIN", "CEO", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role);
+        if (!isCreator && !isOfficial) {
+            return res.status(403).json({ error: "You don't have permission to start this tournament" });
+        }
+        const updated = await prisma.tournament.update({
+            where: { id },
+            data: { registrationClosed: true }
+        });
+        return res.json({ message: "Tournament started successfully", tournament: updated });
+    }
+    catch (error) {
+        console.error("Error starting tournament:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};
 // ─── CLUB: Get My Tournaments ────────────────────────────────────────────────
 export const getClubTournaments = async (req, res) => {
     const { userId, role } = req.user;
@@ -153,7 +394,9 @@ export const getClubTournaments = async (req, res) => {
         return res.status(403).json({ error: "Access denied" });
     }
     try {
-        const whereClause = isClub ? { clubId: userId } : { officialId: userId };
+        const whereClause = isClub
+            ? { clubId: userId }
+            : (role === "SUPER_ADMIN" ? { officialId: null, clubId: null } : { officialId: userId });
         const tournaments = await prisma.tournament.findMany({
             where: whereClause,
             include: {
@@ -219,8 +462,9 @@ export const getTournamentRegistrations = async (req, res) => {
         const tournament = await prisma.tournament.findUnique({ where: { id } });
         if (!tournament)
             return res.status(404).json({ error: "Tournament not found" });
-        if (tournament.clubId !== userId && tournament.officialId !== userId)
+        if (!isOfficial && tournament.clubId !== userId && tournament.officialId !== userId) {
             return res.status(403).json({ error: "This tournament does not belong to you" });
+        }
         const registrations = await prisma.tournamentRegistration.findMany({
             where: { tournamentId: id },
             include: {
@@ -337,6 +581,40 @@ export const updateRegistrationStatus = async (req, res) => {
         return res.status(500).json({ error: "Internal Server Error" });
     }
 };
+export const disqualifyRegistration = async (req, res) => {
+    const regId = req.params.regId;
+    const { currentWeight } = req.body;
+    const { userId, role } = req.user;
+    try {
+        const registration = await prisma.tournamentRegistration.findUnique({
+            where: { id: regId },
+            include: { tournament: true, player: true },
+        });
+        if (!registration)
+            return res.status(404).json({ error: "Registration not found" });
+        if (registration.tournament.clubId !== userId && registration.tournament.officialId !== userId && role !== "SUPER_ADMIN" && role !== "CEO") {
+            return res.status(403).json({ error: "Unauthorized" });
+        }
+        // Add a message about the disqualification
+        await prisma.tournamentRegistrationMessage.create({
+            data: {
+                registrationId: regId,
+                senderRole: "SYSTEM",
+                senderName: "Tournament Admin",
+                message: `Player was disqualified. Actual weigh-in weight: ${currentWeight}kg.`,
+            }
+        });
+        const updated = await prisma.tournamentRegistration.update({
+            where: { id: regId },
+            data: { status: "DISQUALIFIED" },
+        });
+        return res.json({ message: "Player disqualified", registration: updated });
+    }
+    catch (error) {
+        console.error("Error disqualifying registration:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};
 // ─── CLUB/OFFICIAL: Update Registration Metrics (Weight/Height) ───────────────
 export const updateRegistrationMetrics = async (req, res) => {
     const { userId, role } = req.user;
@@ -438,7 +716,7 @@ export const updateTournament = async (req, res) => {
     if (!isClub && !isOfficial) {
         return res.status(403).json({ error: "Only clubs and officials can update tournaments" });
     }
-    const { title, dateFrom, dateTo, location, description, entryFee, totalSlots, numberOfMats, ageFrom, ageTo, gender, allowBPL, beltEligibility, bannerImage, level, zoneId } = req.body;
+    const { title, dateFrom, dateTo, location, description, entryFee, numberOfMats, ageFrom, ageTo, gender, allowBPL, beltEligibility, bannerImage, level, zoneId } = req.body;
     try {
         const tournament = await prisma.tournament.findUnique({ where: { id } });
         if (!tournament)
@@ -454,7 +732,6 @@ export const updateTournament = async (req, res) => {
                 ...(location && { location }),
                 ...(description && { description }),
                 ...(entryFee !== undefined && { entryFee: Number(entryFee) }),
-                ...(totalSlots !== undefined && { totalSlots: Number(totalSlots) }),
                 ...(numberOfMats !== undefined && { numberOfMats: Number(numberOfMats) }),
                 ...(ageFrom !== undefined && { ageFrom: Number(ageFrom) }),
                 ...(ageTo !== undefined && { ageTo: Number(ageTo) }),
@@ -634,7 +911,7 @@ export const getPlayerPublicMatches = async (req, res) => {
 // ─── PLAYER: Create Tournament Payment Order ────────────────────────────────
 export const createTournamentPaymentOrder = async (req, res) => {
     const { userId, role } = req.user;
-    const { tournamentId, height, weight, coachId } = req.body;
+    const { tournamentId, height, weight, coachId, category } = req.body;
     if (role !== "PLAYER" && role !== "STUDENT") {
         return res.status(403).json({ error: "Only players can register for tournaments" });
     }
@@ -682,11 +959,8 @@ export const createTournamentPaymentOrder = async (req, res) => {
         if (tournament.gender && tournament.gender !== "BOTH" && tournament.gender !== player.gender) {
             return res.status(403).json({ error: `This tournament is restricted to ${tournament.gender} players only.` });
         }
-        // Check slots
-        const regCount = await prisma.tournamentRegistration.count({ where: { tournamentId } });
-        if (regCount >= tournament.totalSlots) {
-            return res.status(400).json({ error: "Tournament is full" });
-        }
+        // Slot check removed (totalSlots not in schema)
+        // const regCount = await prisma.tournamentRegistration.count({ where: { tournamentId } });
         // Check duplicate
         const existing = await prisma.tournamentRegistration.findUnique({
             where: { tournamentId_playerId: { tournamentId, playerId: userId } },
@@ -713,9 +987,9 @@ export const createTournamentPaymentOrder = async (req, res) => {
                 select: { age: true, gender: true },
             });
             if (playerData && weight) {
-                const ageGroup = getAgeGroup(playerData.age);
-                const weightCategory = getWeightCategory(Number(weight));
                 const playerGender = playerData.gender === "FEMALE" ? "FEMALE" : "MALE";
+                const ageGroup = getAgeGroup(playerData.age, category);
+                const weightCategory = getWeightCategory(Number(weight), playerGender, ageGroup);
                 // Get tournament's gender (could be MALE, FEMALE, or BOTH)
                 const tournamentGender = tournament.gender === "BOTH" ? playerGender : tournament.gender;
                 await createOrGetDraw(tournamentId, tournamentGender, ageGroup, weightCategory, playerData.age);
@@ -767,7 +1041,7 @@ export const createTournamentPaymentOrder = async (req, res) => {
 // ─── PLAYER: Verify Payment & Register ───────────────────────────────────────
 export const verifyTournamentPayment = async (req, res) => {
     const { userId, role } = req.user;
-    const { tournamentId, razorpay_payment_id, razorpay_order_id, razorpay_signature, height, weight, coachId } = req.body;
+    const { tournamentId, razorpay_payment_id, razorpay_order_id, razorpay_signature, height, weight, coachId, category } = req.body;
     if (role !== "PLAYER" && role !== "STUDENT") {
         return res.status(403).json({ error: "Only players can register for tournaments" });
     }
@@ -790,11 +1064,8 @@ export const verifyTournamentPayment = async (req, res) => {
         });
         if (existing)
             return res.status(400).json({ error: "Already registered for this tournament" });
-        // Check slots again before creating
-        const regCount = await prisma.tournamentRegistration.count({ where: { tournamentId } });
-        if (regCount >= tournament.totalSlots) {
-            return res.status(400).json({ error: "Tournament is now full" });
-        }
+        // Slot check removed (totalSlots not in schema)
+        // const regCount = await prisma.tournamentRegistration.count({ where: { tournamentId } });
         const registration = await prisma.tournamentRegistration.create({
             data: {
                 tournamentId,
@@ -813,9 +1084,9 @@ export const verifyTournamentPayment = async (req, res) => {
             select: { age: true, gender: true },
         });
         if (playerData && weight) {
-            const ageGroup = getAgeGroup(playerData.age);
-            const weightCategory = getWeightCategory(Number(weight));
             const playerGender = playerData.gender === "FEMALE" ? "FEMALE" : "MALE";
+            const ageGroup = getAgeGroup(playerData.age, category);
+            const weightCategory = getWeightCategory(Number(weight), playerGender, ageGroup);
             // Get tournament's gender (could be MALE, FEMALE, or BOTH)
             const tournamentGender = tournament.gender === "BOTH" ? playerGender : tournament.gender;
             await createOrGetDraw(tournamentId, tournamentGender, ageGroup, weightCategory, playerData.age);
@@ -1243,6 +1514,23 @@ const autoAdvanceWinner = (rounds) => {
                     }
                     else if (!isFirstSlot && nextMatch.slotB.playerName === "TBD") {
                         nextRound[nextMatchIdx].slotB = winnerSlot;
+                    }
+                    // Bronze Match Logic: If this is the semi-final and a bronze match exists
+                    if (roundIdx === rounds.length - 2 && nextRound.length > 1) {
+                        const loserSlot = {
+                            playerId: isWinnerA ? match.slotB.playerId : match.slotA.playerId,
+                            playerName: isWinnerA ? match.slotB.playerName : match.slotA.playerName,
+                            club: isWinnerA ? match.slotB.club : match.slotA.club,
+                            isBye: false,
+                            seedNumber: isWinnerA ? match.slotB.seedNumber : match.slotA.seedNumber,
+                        };
+                        const bronzeMatch = nextRound[1];
+                        if (isFirstSlot && bronzeMatch.slotA.playerName === "TBD") {
+                            nextRound[1].slotA = loserSlot;
+                        }
+                        else if (!isFirstSlot && bronzeMatch.slotB.playerName === "TBD") {
+                            nextRound[1].slotB = loserSlot;
+                        }
                     }
                 }
             }

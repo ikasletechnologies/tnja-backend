@@ -15,6 +15,7 @@ enum Status {
   REPLAY
   CLOSED
   NOT_REQUIRED
+  DISQUALIFIED
 }
 
 enum Gender {
@@ -321,10 +322,11 @@ model Tournament {
   location           String
   description        String
   entryFee           Float                    @default(0)
-  totalSlots         Int                      @default(32)
+  registrationClosed Boolean                  @default(false)
   numberOfMats       Int                      @default(1)
   ageFrom            Int                      @default(0)
   ageTo              Int                      @default(100)
+  category           String?
   gender             String                   @default("BOTH")
   allowBPL           Boolean                  @default(false)
   beltEligibility    String?
