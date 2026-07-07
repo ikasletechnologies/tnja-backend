@@ -17,12 +17,12 @@ async function main() {
 
   // Define categories (10 players each per district)
   const categories = [
-    { name: "Mini Sub-Junior", age: 9, dob: new Date("2017-08-15"), weight: "30" },
     { name: "Cat 1", age: 14, dob: new Date("2010-01-01"), weight: "40kg" },
     { name: "Cat 2", age: 16, dob: new Date("2008-01-01"), weight: "50kg" },
     { name: "Cat 3", age: 18, dob: new Date("2006-01-01"), weight: "60kg" },
     { name: "Cat 4", age: 20, dob: new Date("2004-01-01"), weight: "70kg" },
     { name: "Cat 5", age: 22, dob: new Date("2002-01-01"), weight: "80kg" },
+    { name: "Mini Sub-Junior", age: 9, dob: new Date("2017-08-15"), weight: "30" },
   ];
 
   // 1. Create Dummy Tournament for Weight Registrations
