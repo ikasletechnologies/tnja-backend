@@ -167,7 +167,7 @@ export const getProfile = async (req: any, res: Response) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Remove password before sending
+    // Remove password before sendingss
     const { password: _, ...safeData } = userData;
 
     return res.json({
