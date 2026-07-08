@@ -41,16 +41,7 @@ function randomItem<T>(arr: T[]): T {
 // DATA CONSTANTS
 // ============================================================
 
-const districtsList = [
-  'Ariyalur', 'Chengalpattu', 'Chennai', 'Coimbatore', 'Cuddalore',
-  'Dharmapuri', 'Dindigul', 'Erode', 'Kallakurichi', 'Kancheepuram',
-  'Kanniyakumari', 'Karur', 'Krishnagiri', 'Madurai', 'Mayiladuthurai',
-  'Nagapattinam', 'Namakkal', 'Nilgiris', 'Perambalur', 'Pudukkottai',
-  'Ramanathapuram', 'Ranipet', 'Salem', 'Sivagangai', 'Tenkasi',
-  'Thanjavur', 'Theni', 'Thoothukudi', 'Tiruchirappalli', 'Tirunelveli',
-  'Tirupathur', 'Tiruppur', 'Tiruvallur', 'Tiruvannamalai', 'Tiruvarur',
-  'Vellore', 'Viluppuram', 'Virudhunagar',
-];
+
 
 const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 
@@ -229,33 +220,78 @@ function dobFromAge(age: number): Date {
 // MAIN
 // ============================================================
 
-async function main() {
-  console.log('\n🚀 Tamil Nadu Judo Association — Comprehensive Seed\n');
-  console.log('═'.repeat(55));
+const districtsList = [
+  { name: 'Chennai', zoneName: 'North' },
+  { name: 'Tiruvallur', zoneName: 'North' },
+  { name: 'Kancheepuram', zoneName: 'North' },
+  { name: 'Chengalpattu', zoneName: 'North' },
+  { name: 'Vellore', zoneName: 'North' },
+  { name: 'Ranipet', zoneName: 'North' },
+  { name: 'Tirupathur', zoneName: 'North' },
+  { name: 'Tiruvannamalai', zoneName: 'North' },
+  { name: 'Viluppuram', zoneName: 'North' },
+  { name: 'Kallakurichi', zoneName: 'North' },
+  { name: 'Madurai', zoneName: 'South' },
+  { name: 'Theni', zoneName: 'South' },
+  { name: 'Dindigul', zoneName: 'South' },
+  { name: 'Sivagangai', zoneName: 'South' },
+  { name: 'Ramanathapuram', zoneName: 'South' },
+  { name: 'Virudhunagar', zoneName: 'South' },
+  { name: 'Tirunelveli', zoneName: 'South' },
+  { name: 'Tenkasi', zoneName: 'South' },
+  { name: 'Thoothukudi', zoneName: 'South' },
+  { name: 'Kanniyakumari', zoneName: 'South' },
+  { name: 'Tiruchirappalli', zoneName: 'Central' },
+  { name: 'Karur', zoneName: 'Central' },
+  { name: 'Perambalur', zoneName: 'Central' },
+  { name: 'Ariyalur', zoneName: 'Central' },
+  { name: 'Pudukkottai', zoneName: 'Central' },
+  { name: 'Thanjavur', zoneName: 'Central' },
+  { name: 'Tiruvarur', zoneName: 'Central' },
+  { name: 'Nagapattinam', zoneName: 'Central' },
+  { name: 'Mayiladuthurai', zoneName: 'Central' },
+  { name: 'Cuddalore', zoneName: 'Central' },
+  { name: 'Coimbatore', zoneName: 'West' },
+  { name: 'Tiruppur', zoneName: 'West' },
+  { name: 'Erode', zoneName: 'West' },
+  { name: 'Nilgiris', zoneName: 'West' },
+  { name: 'Salem', zoneName: 'West' },
+  { name: 'Namakkal', zoneName: 'West' },
+  { name: 'Dharmapuri', zoneName: 'West' },
+  { name: 'Krishnagiri', zoneName: 'West' }
+];
 
-  // ── STEP 0: Clean database (TRUNCATE CASCADE bypasses all FK ordering) ──
-  console.log('\n🗑️  Cleaning existing data...');
-  await prisma.$executeRawUnsafe(`
-    TRUNCATE TABLE
-      "TournamentDraw", "TournamentRegistrationMessage", "TournamentRegistration",
-      "TournamentMessage", "Tournament", "Student", "Member", "CoachReferee",
-      "Club", "Taluk", "District",
-      "EventRegistration", "Event",
-      "Grievance", "ApplicationLog", "AadhaarOTP"
-    CASCADE
-  `);
+async function main() {
+  console.log('🚀 Tamil Nadu Judo Association — Comprehensive Seed');
+
+  console.log('\n═══════════════════════════════════════════════════════\n');
+
+  // ── STEP 0: Clean DB ────────────────────────────────────────
+  console.log('🗑️  Cleaning existing data...');
+  // WARNING: Delete order matters (child tables before parent tables)
+  await prisma.tournamentMat.deleteMany();
+  await prisma.tournamentDraw.deleteMany();
+  await prisma.tournamentRegistration.deleteMany();
+  await prisma.tournament.deleteMany();
+  await prisma.student.deleteMany();
+  await prisma.member.deleteMany();
+  await prisma.coachReferee.deleteMany();
+  await prisma.club.deleteMany();
+  await prisma.taluk.deleteMany();
+  await prisma.district.deleteMany();
   console.log('✅ Database cleaned');
 
-  // ── STEP 1: 38 Districts + 1 Taluk each ──────────────────
+  // ── STEP 1: 38 Districts & Taluks ────────────────────────────
   console.log('\n📍 Creating 38 Districts & Taluks...');
   const districtRecs: { id: string; name: string; talukId: string }[] = [];
 
-  for (const name of districtsList) {
+  for (const dist of districtsList) {
     const d = await prisma.district.create({
       data: {
-        name,
+        name: dist.name,
+        zoneName: dist.zoneName,
         taluks: {
-          create: [{ name: `${name} Central Taluk`, pincode: `6${randomInt(10000, 99999)}` }],
+          create: [{ name: `${dist.name} Central Taluk`, pincode: `6${randomInt(10000, 99999)}` }],
         },
       },
       include: { taluks: true },
