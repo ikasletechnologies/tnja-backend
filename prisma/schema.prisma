@@ -190,6 +190,7 @@ model CoachReferee {
   club                  Club?    @relation(fields: [clubId], references: [id])
   students              Student[] @relation("CoachStudents")
   tournamentRegs        TournamentRegistration[]
+  tournamentMats        TournamentMat[]
   password              String
   status                Status   @default(PENDING)
   rejectionRemark       String?
@@ -351,6 +352,20 @@ model Tournament {
   messages           TournamentMessage[]
   createdAt          DateTime                 @default(now())
   updatedAt          DateTime                 @updatedAt
+  mats               TournamentMat[]
+}
+
+model TournamentMat {
+  id           String        @id @default(uuid())
+  tournamentId String
+  tournament   Tournament    @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  matNumber    Int
+  refereeId    String?       
+  referee      CoachReferee? @relation(fields: [refereeId], references: [id])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([tournamentId, matNumber])
 }
 
 model TournamentRegistration {

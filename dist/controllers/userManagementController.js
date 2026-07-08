@@ -439,4 +439,42 @@ export const getUserDetails = async (req, res) => {
         return res.status(500).json({ error: "Internal Server Error" });
     }
 };
+export const searchRefereeById = async (req, res) => {
+    try {
+        const { id } = req.query;
+        if (!id || typeof id !== "string") {
+            return res.status(400).json({ error: "Please provide a valid referee ID." });
+        }
+        const referee = await prisma.coachReferee.findFirst({
+            where: {
+                OR: [
+                    { tempId: id },
+                    { permanentId: id }
+                ],
+                status: "APPROVED"
+            },
+            select: {
+                id: true,
+                tempId: true,
+                permanentId: true,
+                fullName: true,
+                district: { select: { name: true } },
+                club: { select: { name: true } }
+            }
+        });
+        if (!referee) {
+            return res.status(404).json({ error: "Referee not found or not approved." });
+        }
+        return res.json({
+            id: referee.id,
+            name: referee.fullName,
+            district: referee.district?.name || "N/A",
+            club: referee.club?.name || "Independent"
+        });
+    }
+    catch (error) {
+        console.error("Error searching referee:", error);
+        return res.status(500).json({ error: "Internal server error" });
+    }
+};
 //# sourceMappingURL=userManagementController.js.map

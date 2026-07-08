@@ -28,6 +28,36 @@ export const downloadCertificate = async (req, res) => {
             return res.status(400).json({ error: "Certificate is only available after the tournament is closed." });
         }
         const { player, tournament, placement } = registration;
+        // Fetch all draws for this tournament to find the exact category the player competed in
+        const draws = await prisma.tournamentDraw.findMany({
+            where: { tournamentId },
+            select: { ageGroup: true, gender: true, weightCategory: true, rounds: true }
+        });
+        let exactCategory = "";
+        for (const draw of draws) {
+            const rounds = draw.rounds;
+            if (!Array.isArray(rounds))
+                continue;
+            let playerFound = false;
+            for (const round of rounds) {
+                if (!Array.isArray(round))
+                    continue;
+                for (const match of round) {
+                    if (match.slotA?.playerId === userId || match.slotB?.playerId === userId) {
+                        playerFound = true;
+                        break;
+                    }
+                }
+                if (playerFound)
+                    break;
+            }
+            if (playerFound) {
+                const genText = draw.gender === "FEMALE" ? "GIRLS" : "BOYS";
+                const weightText = draw.weightCategory.toLowerCase().includes("kg") ? draw.weightCategory : `${draw.weightCategory}KG`;
+                exactCategory = `${draw.ageGroup.toUpperCase()} ${genText} - ${weightText.toUpperCase()}`;
+                break;
+            }
+        }
         // Create a new PDF document
         const pdfDoc = await PDFDocument.create();
         const page = pdfDoc.addPage([842, 595]); // A4 landscape size
@@ -203,20 +233,23 @@ export const downloadCertificate = async (req, res) => {
         page.drawText(dateVal, { x: 180 - dateValWidth / 2, y: footerY, size: 14, font: serifFont, color: darkGray });
         // Column 2: Category
         const rankLabel = "CATEGORY";
-        // Calculate Age Group
-        let ageGroup = "SENIOR";
-        const age = player.age;
-        if (age >= 10 && age <= 14)
-            ageGroup = "SUB-JUNIOR";
-        else if (age >= 15 && age <= 17)
-            ageGroup = "CADET";
-        else if (age >= 18 && age <= 20)
-            ageGroup = "JUNIOR";
-        else if (age >= 21 && age <= 34)
-            ageGroup = "SENIOR";
-        else if (age >= 35)
-            ageGroup = "VETERAN";
-        const rankVal = `${ageGroup} ${player.gender === "FEMALE" ? "GIRLS" : "BOYS"} - ${registration.weight || ""}KG`;
+        let rankVal = exactCategory;
+        if (!rankVal) {
+            // Fallback if player wasn't found in any draw
+            let ageGroup = "SENIOR";
+            const age = player.age;
+            if (age >= 10 && age <= 14)
+                ageGroup = "SUB-JUNIOR";
+            else if (age >= 15 && age <= 17)
+                ageGroup = "CADET";
+            else if (age >= 18 && age <= 20)
+                ageGroup = "JUNIOR";
+            else if (age >= 21 && age <= 34)
+                ageGroup = "SENIOR";
+            else if (age >= 35)
+                ageGroup = "VETERAN";
+            rankVal = `${ageGroup} ${player.gender === "FEMALE" ? "GIRLS" : "BOYS"} - ${registration.weight || ""}KG`;
+        }
         const rankLabelWidth = serifFont.widthOfTextAtSize(rankLabel, 12);
         const rankValWidth = serifFont.widthOfTextAtSize(rankVal, 14);
         page.drawText(rankLabel, { x: width / 2 - rankLabelWidth / 2, y: footerY + 20, size: 12, font: serifFont, color: black });

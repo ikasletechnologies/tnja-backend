@@ -7,4 +7,5 @@ export declare const updateUserCredentials: (req: Request, res: Response) => Pro
 export declare const getCoachStudents: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const deleteUser: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const getUserDetails: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+export declare const searchRefereeById: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 //# sourceMappingURL=userManagementController.d.ts.map

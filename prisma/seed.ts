@@ -1,408 +1,666 @@
-import { PrismaClient, EventLevel, Status, Gender } from '@prisma/client';
+import { PrismaClient, EventLevel, Status, Gender, MemberRole } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const prefix = Math.floor(10000 + Math.random() * 90000).toString(); // 5 digits
-let uniqueCounter = 1;
+// ============================================================
+// UTILITY — Unique ID / Mobile / Aadhaar Generators
+// ============================================================
 
-function getUniqueId() {
-    uniqueCounter++;
-    return `${prefix}${uniqueCounter.toString().padStart(4, '0')}`; // 9 digits
+let _seq = 1000; // start offset so IDs never conflict
+
+function nextSeq(): number {
+  return _seq++;
 }
 
-const districtsList = [
-    'Ariyalur', 'Chengalpattu', 'Chennai', 'Coimbatore', 'Cuddalore', 'Dharmapuri', 'Dindigul', 'Erode',
-    'Kallakurichi', 'Kancheepuram', 'Kanniyakumari', 'Karur', 'Krishnagiri', 'Madurai', 'Mayiladuthurai',
-    'Nagapattinam', 'Namakkal', 'Nilgiris', 'Perambalur', 'Pudukkottai', 'Ramanathapuram', 'Ranipet',
-    'Salem', 'Sivagangai', 'Tenkasi', 'Thanjavur', 'Theni', 'Thoothukudi', 'Tiruchirappalli', 'Tirunelveli',
-    'Tirupathur', 'Tiruppur', 'Tiruvallur', 'Tiruvannamalai', 'Tiruvarur', 'Vellore', 'Viluppuram', 'Virudhunagar'
-];
-
-const categoriesData = [
-    {
-        division: 'Mini Sub Junior',
-        ageGroup: '7-8 Years',
-        birthYears: [2018, 2019],
-        genders: {
-            MALE: ['-15kg to -20kg', '-20kg to -25kg', '-25kg to -30kg', '-30kg to -35kg', 'Above 35kg'],
-            FEMALE: ['-14kg to -18kg', '-18kg to -22kg', '-22kg to -26kg', '-26kg to -30kg', 'Above 30kg']
-        }
-    },
-    {
-        division: 'Mini Sub Junior',
-        ageGroup: '8-9 Years',
-        birthYears: [2017, 2018],
-        genders: {
-            MALE: ['-25kg', '-25kg to -30kg', '-30kg to -35kg', '+35kg', '+40kg'],
-            FEMALE: ['-22kg', '-22kg to -26kg', '-26kg to -30kg', '+30kg', '+35kg']
-        }
-    },
-    {
-        division: 'Mini Sub Junior',
-        ageGroup: '10-11 Years',
-        birthYears: [2015, 2016],
-        genders: {
-            MALE: ['-30kg', '-30kg to -35kg', '-35kg to -40kg', '-40kg to -45kg', 'Above 45kg'],
-            FEMALE: ['-28kg', '-28kg to -32kg', '-32kg to -36kg', '-36kg to -40kg', 'Above 40kg']
-        }
-    },
-    {
-        division: 'Sub Junior',
-        ageGroup: '12-15 Years',
-        birthYears: [2011, 2012, 2013],
-        genders: {
-            MALE: ['25-30kg', '30-35kg', '35-40kg', '40-45kg', '45-50kg', '50-55kg', '55-60kg', '60-66kg', 'Above 66kg'],
-            FEMALE: ['23-28kg', '28-32kg', '32-36kg', '36-40kg', '40-44kg', '44-48kg', '48-52kg', '52-57kg', 'Above 57kg']
-        }
-    },
-    {
-        division: 'Cadet',
-        ageGroup: '15-17 Years',
-        birthYears: [2008, 2009, 2010],
-        genders: {
-            MALE: ['Up to 50kg', '50-55kg', '55-60kg', '60-66kg', '66-73kg', '73-81kg', '81-90kg', 'Above 90kg'],
-            FEMALE: ['Up to 40kg', '40-44kg', '44-48kg', '48-52kg', '52-57kg', '57-63kg', '63-70kg', 'Above 70kg']
-        }
-    },
-    {
-        division: 'Junior',
-        ageGroup: '15-21 Years',
-        birthYears: [2005, 2006, 2007, 2008, 2009, 2010],
-        genders: {
-            MALE: ['Up to 55kg', '55-60kg', '60-66kg', '66-73kg', '73-81kg', '81-90kg', '90-100kg', 'Above 100kg'],
-            FEMALE: ['Up to 44kg', '44-48kg', '48-52kg', '52-57kg', '57-63kg', '63-70kg', '70-78kg', 'Above 78kg']
-        }
-    },
-    {
-        division: 'Senior',
-        ageGroup: 'Above 15 Years',
-        birthYears: [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010],
-        genders: {
-            MALE: ['Up to 60kg', '60-66kg', '66-73kg', '73-81kg', '81-90kg', '90-100kg', 'Above 100kg'],
-            FEMALE: ['Up to 48kg', '48-52kg', '52-57kg', '57-63kg', '63-70kg', '70-78kg', 'Above 78kg']
-        }
-    }
-];
-
-function generateWeight(weightCategory: string): string {
-    const match = weightCategory.match(/\d+/g);
-    if (!match) return "50";
-    if (match.length >= 2) {
-        const w1 = parseInt(match[0]);
-        const w2 = parseInt(match[1]);
-        return Math.floor((w1 + w2) / 2).toString();
-    } else {
-        if (weightCategory.includes('Above') || weightCategory.includes('+')) {
-            return (parseInt(match[0]) + 5).toString();
-        } else {
-            return (parseInt(match[0]) - 2).toString();
-        }
-    }
+/** 10-digit unique mobile number */
+function uniqueMobile(): string {
+  const n = nextSeq();
+  return `9${n.toString().padStart(9, '0')}`;
 }
 
-function generateDOB(birthYears: number[]): Date {
-    const year = birthYears[Math.floor(Math.random() * birthYears.length)];
-    const month = Math.floor(Math.random() * 12);
-    const day = Math.floor(Math.random() * 28) + 1;
-    return new Date(year, month, day);
+/** 12-digit unique Aadhaar number */
+function uniqueAadhaar(): string {
+  const n = nextSeq();
+  return `2${n.toString().padStart(11, '0')}`;
+}
+
+/** Short unique tempId suffix */
+function uid(): string {
+  return nextSeq().toString().padStart(7, '0');
+}
+
+function randomInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 function randomItem<T>(arr: T[]): T {
-    return arr[Math.floor(Math.random() * arr.length)];
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
+// ============================================================
+// DATA CONSTANTS
+// ============================================================
+
+const districtsList = [
+  'Ariyalur', 'Chengalpattu', 'Chennai', 'Coimbatore', 'Cuddalore',
+  'Dharmapuri', 'Dindigul', 'Erode', 'Kallakurichi', 'Kancheepuram',
+  'Kanniyakumari', 'Karur', 'Krishnagiri', 'Madurai', 'Mayiladuthurai',
+  'Nagapattinam', 'Namakkal', 'Nilgiris', 'Perambalur', 'Pudukkottai',
+  'Ramanathapuram', 'Ranipet', 'Salem', 'Sivagangai', 'Tenkasi',
+  'Thanjavur', 'Theni', 'Thoothukudi', 'Tiruchirappalli', 'Tirunelveli',
+  'Tirupathur', 'Tiruppur', 'Tiruvallur', 'Tiruvannamalai', 'Tiruvarur',
+  'Vellore', 'Viluppuram', 'Virudhunagar',
+];
+
+const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+
+const maleFirstNames = [
+  'Arjun', 'Karthik', 'Vijay', 'Ravi', 'Suresh', 'Ramesh', 'Kumar', 'Ganesh',
+  'Murugan', 'Selvam', 'Dinesh', 'Arun', 'Sathish', 'Praveen', 'Lokesh',
+  'Mani', 'Bala', 'Raja', 'Senthil', 'Hari', 'Anand', 'Kumaran', 'Prasad',
+  'Vignesh', 'Surya', 'Deva', 'Manoj', 'Siva', 'Muthu', 'Pandian',
+  'Rajesh', 'Mahesh', 'Rakesh', 'Nithin', 'Gowtham', 'Naveen', 'Saravana',
+  'Bharath', 'Priyan', 'Ashwin',
+];
+
+const femaleFirstNames = [
+  'Priya', 'Lakshmi', 'Kavitha', 'Meena', 'Saranya', 'Deepa', 'Anitha',
+  'Revathi', 'Sangeetha', 'Nithya', 'Divya', 'Asha', 'Rekha', 'Suganya',
+  'Karthika', 'Devi', 'Kamala', 'Selvi', 'Vasantha', 'Vijayalakshmi',
+  'Padmavathi', 'Geetha', 'Malathi', 'Usha', 'Prema', 'Lavanya', 'Aishwarya',
+  'Pavithra', 'Nivetha', 'Subha', 'Janani', 'Keerthana', 'Tamilarasi',
+  'Abinaya', 'Harini', 'Monisha', 'Pooja', 'Snega', 'Varsha', 'Yazhini',
+];
+
+const lastNames = [
+  'Kumar', 'Raj', 'Krishnan', 'Murugan', 'Rajan', 'Selvam', 'Pandian',
+  'Pillai', 'Nair', 'Chandra', 'Shankar', 'Mani', 'Babu', 'Natarajan',
+  'Subramaniam', 'Annamalai', 'Perumal', 'Venkatesan', 'Ramachandran',
+  'Palani', 'Arumugam', 'Kannan', 'Srinivasan', 'Moorthy', 'Balasubramanian',
+];
+
+function generateName(gender: Gender): string {
+  const first = gender === Gender.MALE
+    ? randomItem(maleFirstNames)
+    : randomItem(femaleFirstNames);
+  return `${first} ${randomItem(lastNames)}`;
+}
+
+// ============================================================
+// AGE → DIVISION + WEIGHT CATEGORIES
+// ============================================================
+
+interface Division {
+  division: string;
+  ageGroup: string;
+  weightsMale: string[];
+  weightsFemale: string[];
+}
+
+const divisions: Division[] = [
+  {
+    division: 'Mini Sub Junior',
+    ageGroup: '7-8 Years',
+    weightsMale: ['-15kg to -20kg', '-20kg to -25kg', '-25kg to -30kg', '-30kg to -35kg', 'Above 35kg'],
+    weightsFemale: ['-14kg to -18kg', '-18kg to -22kg', '-22kg to -26kg', '-26kg to -30kg', 'Above 30kg'],
+  },
+  {
+    division: 'Mini Sub Junior',
+    ageGroup: '8-9 Years',
+    weightsMale: ['-25kg', '-25kg to -30kg', '-30kg to -35kg', '+35kg', '+40kg'],
+    weightsFemale: ['-22kg', '-22kg to -26kg', '-26kg to -30kg', '+30kg', '+35kg'],
+  },
+  {
+    division: 'Mini Sub Junior',
+    ageGroup: '10-11 Years',
+    weightsMale: ['-30kg', '-30kg to -35kg', '-35kg to -40kg', '-40kg to -45kg', 'Above 45kg'],
+    weightsFemale: ['-28kg', '-28kg to -32kg', '-32kg to -36kg', '-36kg to -40kg', 'Above 40kg'],
+  },
+  {
+    division: 'Sub Junior',
+    ageGroup: '12-15 Years',
+    weightsMale: ['25-30kg', '30-35kg', '35-40kg', '40-45kg', '45-50kg', '50-55kg', '55-60kg', '60-66kg', 'Above 66kg'],
+    weightsFemale: ['23-28kg', '28-32kg', '32-36kg', '36-40kg', '40-44kg', '44-48kg', '48-52kg', '52-57kg', 'Above 57kg'],
+  },
+  {
+    division: 'Cadet',
+    ageGroup: '15-17 Years',
+    weightsMale: ['Up to 50kg', '50-55kg', '55-60kg', '60-66kg', '66-73kg', '73-81kg', '81-90kg', 'Above 90kg'],
+    weightsFemale: ['Up to 40kg', '40-44kg', '44-48kg', '48-52kg', '52-57kg', '57-63kg', '63-70kg', 'Above 70kg'],
+  },
+  {
+    division: 'Junior',
+    ageGroup: '15-21 Years',
+    weightsMale: ['Up to 55kg', '55-60kg', '60-66kg', '66-73kg', '73-81kg', '81-90kg', '90-100kg', 'Above 100kg'],
+    weightsFemale: ['Up to 44kg', '44-48kg', '48-52kg', '52-57kg', '57-63kg', '63-70kg', '70-78kg', 'Above 78kg'],
+  },
+  {
+    division: 'Senior',
+    ageGroup: 'Above 15 Years',
+    weightsMale: ['Up to 60kg', '60-66kg', '66-73kg', '73-81kg', '81-90kg', '90-100kg', 'Above 100kg'],
+    weightsFemale: ['Up to 48kg', '48-52kg', '52-57kg', '57-63kg', '63-70kg', '70-78kg', 'Above 78kg'],
+  },
+];
+
+function getDivision(age: number): Division {
+  if (age <= 8) return divisions[0];   // 7-8
+  if (age === 9) return divisions[1];  // 8-9
+  if (age <= 11) return divisions[2];  // 10-11
+  if (age <= 14) return divisions[3];  // 12-15
+  if (age <= 17) return divisions[4];  // 15-17 Cadet
+  if (age <= 21) return divisions[5];  // 15-21 Junior
+  return divisions[6];                 // Senior
+}
+
+/** Realistic weight (kg) based on age + gender, grounded in real child/youth growth data */
+function realisticWeight(age: number, gender: Gender): number {
+  // [min, max] in kg
+  const table: Record<string, [number, number]> = {
+    'MALE_6':  [16, 26], 'MALE_7':  [18, 32], 'MALE_8':  [20, 36],
+    'MALE_9':  [23, 40], 'MALE_10': [26, 44], 'MALE_11': [29, 48],
+    'MALE_12': [32, 54], 'MALE_13': [35, 60], 'MALE_14': [38, 65],
+    'MALE_15': [42, 72], 'MALE_16': [46, 80], 'MALE_17': [50, 88],
+    'MALE_18': [54, 92], 'MALE_19': [56, 96], 'MALE_20': [58, 98],
+    'MALE_21': [58, 100],'MALE_22': [60, 102],'MALE_23': [60, 104],
+    'MALE_24': [62, 105],
+    'FEMALE_6':  [15, 24], 'FEMALE_7':  [17, 28], 'FEMALE_8':  [19, 32],
+    'FEMALE_9':  [21, 36], 'FEMALE_10': [23, 40], 'FEMALE_11': [26, 44],
+    'FEMALE_12': [28, 52], 'FEMALE_13': [30, 56], 'FEMALE_14': [32, 60],
+    'FEMALE_15': [35, 66], 'FEMALE_16': [37, 70], 'FEMALE_17': [39, 74],
+    'FEMALE_18': [40, 76], 'FEMALE_19': [42, 78], 'FEMALE_20': [42, 78],
+    'FEMALE_21': [43, 79],'FEMALE_22': [44, 80], 'FEMALE_23': [44, 82],
+    'FEMALE_24': [45, 83],
+  };
+  const key = `${gender}_${age}`;
+  const [min, max] = table[key] ?? [40, 80];
+  return randomInt(min, max);
+}
+
+/** Map a numeric weight to the appropriate named weight category for a division */
+function weightCategory(weight: number, div: Division, gender: Gender): string {
+  const cats = gender === Gender.MALE ? div.weightsMale : div.weightsFemale;
+
+  for (const cat of cats) {
+    if (matchesCat(weight, cat)) return cat;
+  }
+  return cats[cats.length - 1]; // fallback: last = heaviest category
+}
+
+function matchesCat(w: number, cat: string): boolean {
+  // Remove leading dashes used as decoration (e.g. "-25kg to -30kg" → "25kg to 30kg")
+  const norm = cat.replace(/(?<!\d)-(?=\d)/g, '').toLowerCase().trim();
+
+  if (norm.startsWith('up to')) {
+    const lim = parseInt(norm.match(/\d+/)?.[0] ?? '0');
+    return w <= lim;
+  }
+  if (norm.startsWith('above')) {
+    const lim = parseInt(norm.match(/\d+/)?.[0] ?? '9999');
+    return w > lim;
+  }
+  if (norm.startsWith('+')) {
+    const lim = parseInt(norm.match(/\d+/)?.[0] ?? '0');
+    return w >= lim;
+  }
+  if (norm.includes('to')) {
+    const nums = norm.match(/\d+/g) ?? [];
+    if (nums.length >= 2) {
+      return w >= parseInt(nums[0]) && w < parseInt(nums[1]);
+    }
+  }
+  // plain single bound e.g. "-25kg" means below 25
+  const num = parseInt(norm.match(/\d+/)?.[0] ?? '9999');
+  return w < num;
+}
+
+function heightCm(age: number, gender: Gender): string {
+  const base = gender === Gender.MALE
+    ? Math.min(183, 95 + age * 4)
+    : Math.min(168, 90 + age * 3.4);
+  return Math.floor(base + randomInt(-4, 4)).toString();
+}
+
+function dobFromAge(age: number): Date {
+  const year = 2026 - age;
+  return new Date(year, randomInt(0, 11), randomInt(1, 28));
+}
+
+// ============================================================
+// MAIN
+// ============================================================
+
 async function main() {
-    console.log("Starting Seed Process...");
+  console.log('\n🚀 Tamil Nadu Judo Association — Comprehensive Seed\n');
+  console.log('═'.repeat(55));
 
-    // 1. Create Tournaments
-    console.log("Creating Tournaments...");
-    const t1 = await prisma.tournament.create({
-        data: {
-            title: 'Testing1 Tournament 07-07-2026',
-            date: new Date('2026-07-07'),
-            level: EventLevel.STATE,
-            status: Status.PENDING,
-            location: 'Chennai',
-            description: 'Testing1 Tournament',
-            gender: 'BOTH',
-        }
+  // ── STEP 0: Clean database (TRUNCATE CASCADE bypasses all FK ordering) ──
+  console.log('\n🗑️  Cleaning existing data...');
+  await prisma.$executeRawUnsafe(`
+    TRUNCATE TABLE
+      "TournamentDraw", "TournamentRegistrationMessage", "TournamentRegistration",
+      "TournamentMessage", "Tournament", "Student", "Member", "CoachReferee",
+      "Club", "Taluk", "District",
+      "EventRegistration", "Event",
+      "Grievance", "ApplicationLog", "AadhaarOTP"
+    CASCADE
+  `);
+  console.log('✅ Database cleaned');
+
+  // ── STEP 1: 38 Districts + 1 Taluk each ──────────────────
+  console.log('\n📍 Creating 38 Districts & Taluks...');
+  const districtRecs: { id: string; name: string; talukId: string }[] = [];
+
+  for (const name of districtsList) {
+    const d = await prisma.district.create({
+      data: {
+        name,
+        taluks: {
+          create: [{ name: `${name} Central Taluk`, pincode: `6${randomInt(10000, 99999)}` }],
+        },
+      },
+      include: { taluks: true },
+    });
+    districtRecs.push({ id: d.id, name: d.name, talukId: d.taluks[0].id });
+  }
+  console.log(`✅ ${districtRecs.length} Districts created`);
+
+  // ── STEP 2: 38 Clubs (1 per district) ────────────────────
+  console.log('\n🏢 Creating 38 Clubs (one per district)...');
+  // Map districtId → { id, talukId } for safe lookup
+  const clubByDistrict = new Map<string, { id: string; talukId: string }>();
+  const clubRecs: { id: string; districtId: string }[] = [];
+
+  for (let i = 0; i < districtRecs.length; i++) {
+    const d = districtRecs[i];
+    const id = uid();
+    const club = await prisma.club.create({
+      data: {
+        name: `${d.name} Judo Club`,
+        tempId: `CLUB${id}`,
+        districtId: d.id,
+        talukId: d.talukId,
+        pincode: `6${randomInt(10000, 99999)}`,
+        mobileNumber: uniqueMobile(),
+        email: `club.${id}@tnja.in`,
+        address1: `${randomInt(1, 200)} Main Road, ${d.name}`,
+        president: generateName(Gender.MALE),
+        secretary: generateName(Gender.MALE),
+        coach: generateName(Gender.MALE),
+        status: Status.APPROVED,
+        password: 'Seed@1234',
+      },
+    });
+    clubByDistrict.set(d.id, { id: club.id, talukId: d.talukId });
+    clubRecs.push({ id: club.id, districtId: d.id });
+  }
+  console.log(`✅ ${clubRecs.length} Clubs created`);
+
+  // ── STEP 3: 80 Coaches ────────────────────────────────────
+  console.log('\n🥋 Creating 80 Coaches...');
+  const coachRecs: { id: string }[] = [];
+  const judoGrades = [
+    'Black Belt 1st Dan', 'Black Belt 2nd Dan', 'Black Belt 3rd Dan',
+    'Brown Belt', 'Black Belt 4th Dan',
+  ];
+
+  for (let i = 1; i <= 80; i++) {
+    const distIdx = (i - 1) % districtRecs.length; // evenly spread across 38 districts
+    const d = districtRecs[distIdx];
+    const club = clubByDistrict.get(d.id)!;
+    const gender: Gender = i <= 56 ? Gender.MALE : Gender.FEMALE; // 70% male
+    const dobYear = randomInt(1970, 1992);
+    const id = uid();
+
+    const coach = await prisma.coachReferee.create({
+      data: {
+        tempId: `COACH${id}`,
+        fullName: generateName(gender),
+        fatherName: generateName(Gender.MALE),
+        gender,
+        dob: new Date(dobYear, randomInt(0, 11), randomInt(1, 28)),
+        age: 2026 - dobYear,
+        bloodGroup: randomItem(bloodGroups),
+        mobileNumber: uniqueMobile(),
+        email: `coach.${id}@tnja.in`,
+        aadhaarNumber: uniqueAadhaar(),
+        historyInJudo: `${randomInt(5, 20)} years`,
+        historyInOtherMartial: 'None',
+        presentGradeInJudo: randomItem(judoGrades),
+        coachName: generateName(gender),
+        pincode: `6${randomInt(10000, 99999)}`,
+        districtId: d.id,
+        talukId: d.talukId,
+        clubId: club.id,
+        status: Status.APPROVED,
+        password: 'Seed@1234',
+      },
+    });
+    coachRecs.push({ id: coach.id });
+  }
+  console.log(`✅ 80 Coaches created (spread across all 38 districts)`);
+
+  // ── STEP 4: 40 Members ────────────────────────────────────
+  console.log('\n👥 Creating 40 Members...');
+
+  // 38 District Presidents (one per district)
+  for (let i = 0; i < districtRecs.length; i++) {
+    const d = districtRecs[i];
+    const id = uid();
+    const dobYear = randomInt(1962, 1985);
+    await prisma.member.create({
+      data: {
+        tempId: `MEM${id}`,
+        fullName: generateName(Gender.MALE),
+        fatherName: generateName(Gender.MALE),
+        gender: Gender.MALE,
+        dob: new Date(dobYear, randomInt(0, 11), randomInt(1, 28)),
+        bloodGroup: randomItem(bloodGroups),
+        mobileNumber: uniqueMobile(),
+        email: `dp.${id}@tnja.in`,
+        aadhaarNumber: uniqueAadhaar(),
+        addressLine1: `${randomInt(1, 200)} District Road`,
+        city: d.name,
+        addressPincode: `6${randomInt(10000, 99999)}`,
+        pincode: `6${randomInt(10000, 99999)}`,
+        districtId: d.id,
+        talukId: d.talukId,
+        role: MemberRole.DISTRICT_PRESIDENT,
+        status: Status.APPROVED,
+        password: 'Seed@1234',
+      },
+    });
+  }
+
+  // 1 State President
+  {
+    const d = districtRecs[2]; // Chennai
+    const id = uid();
+    await prisma.member.create({
+      data: {
+        tempId: `MEM${id}`,
+        fullName: 'Ramasamy Natarajan',
+        fatherName: 'Natarajan Pillai',
+        gender: Gender.MALE,
+        dob: new Date(1965, 5, 15),
+        bloodGroup: 'O+',
+        mobileNumber: uniqueMobile(),
+        email: `statepres.${id}@tnja.in`,
+        aadhaarNumber: uniqueAadhaar(),
+        addressLine1: '1 TNJA State Headquarters, Anna Salai',
+        city: 'Chennai',
+        addressPincode: '600002',
+        pincode: '600002',
+        districtId: d.id,
+        talukId: d.talukId,
+        role: MemberRole.STATE_PRESIDENT,
+        status: Status.APPROVED,
+        password: 'Seed@1234',
+      },
+    });
+  }
+
+  // 1 State Secretary
+  {
+    const d = districtRecs[2]; // Chennai
+    const id = uid();
+    await prisma.member.create({
+      data: {
+        tempId: `MEM${id}`,
+        fullName: 'Venkatesan Subramaniam',
+        fatherName: 'Subramaniam Pillai',
+        gender: Gender.MALE,
+        dob: new Date(1970, 3, 22),
+        bloodGroup: 'B+',
+        mobileNumber: uniqueMobile(),
+        email: `statesec.${id}@tnja.in`,
+        aadhaarNumber: uniqueAadhaar(),
+        addressLine1: '2 TNJA State Headquarters, Anna Salai',
+        city: 'Chennai',
+        addressPincode: '600002',
+        pincode: '600002',
+        districtId: d.id,
+        talukId: d.talukId,
+        role: MemberRole.STATE_SECRETARY,
+        status: Status.APPROVED,
+        password: 'Seed@1234',
+      },
+    });
+  }
+
+  console.log(`✅ 40 Members created (38 District Presidents + 1 State President + 1 State Secretary)`);
+
+  // ── STEP 5: 1000 Students ─────────────────────────────────
+  console.log('\n🎓 Creating 1000 Students...');
+
+  interface StudentRecord {
+    id: string;
+    name: string;
+    clubId: string;
+    gender: Gender;
+    age: number;
+    weightKg: number;
+    division: Division;
+  }
+
+  const studentRecs: StudentRecord[] = [];
+
+  for (let i = 1; i <= 1000; i++) {
+    const gender: Gender = i % 2 === 0 ? Gender.MALE : Gender.FEMALE; // exact 500/500 split
+    const age = randomInt(6, 24);
+    const weightKg = realisticWeight(age, gender);
+    const dob = dobFromAge(age);
+    const division = getDivision(age);
+    const height = heightCm(age, gender);
+
+    const distIdx = (i - 1) % districtRecs.length; // spread across all 38 districts
+    const d = districtRecs[distIdx];
+    const club = clubByDistrict.get(d.id)!;
+    const coach = coachRecs[(i - 1) % coachRecs.length];
+
+    const id = uid();
+    const isSchool = age < 18;
+    const schoolName = isSchool
+      ? `${d.name} Government Higher Secondary School`
+      : `${d.name} Arts and Science College`;
+    const grade = isSchool
+      ? `Grade ${Math.max(1, age - 5)}`
+      : `Year ${Math.min(4, age - 17)}`;
+
+    const student = await prisma.student.create({
+      data: {
+        tempId: `STU${id}`,
+        fullName: generateName(gender),
+        gender,
+        dob,
+        age,
+        weight: weightKg.toString(),
+        height,
+        bloodGroup: randomItem(bloodGroups),
+        mobileNumber: uniqueMobile(),
+        email: `stu.${id}@tnja.in`,
+        aadhaarNumber: uniqueAadhaar(),
+        address: `${randomInt(1, 300)} ${d.name} Main Street`,
+        city: d.name,
+        state: 'Tamil Nadu',
+        addressPincode: `6${randomInt(10000, 99999)}`,
+        pincode: `6${randomInt(10000, 99999)}`,
+        nationality: 'Indian',
+        annualIncome: randomInt(50000, 800000),
+        institutionType: isSchool ? 'SCHOOL' : 'COLLEGE',
+        schoolName,
+        grade,
+        districtId: d.id,
+        talukId: d.talukId,
+        clubId: club.id,
+        coachId: coach.id,
+        status: Status.APPROVED,
+        password: 'Seed@1234',
+      },
     });
 
-    const t2 = await prisma.tournament.create({
-        data: {
-            title: 'Testing2 Tournament 07-07-2026',
-            date: new Date('2026-07-07'),
-            level: EventLevel.STATE,
-            status: Status.PENDING,
-            location: 'Chennai',
-            description: 'Testing2 Tournament',
-            gender: 'BOTH',
-        }
+    studentRecs.push({
+      id: student.id,
+      name: student.fullName,
+      clubId: club.id,
+      gender,
+      age,
+      weightKg,
+      division,
     });
-    console.log(`✅ 2 Tournaments Created`);
 
-    // 2. Create Districts and Taluks
-    console.log("Creating Districts...");
-    const districtIds: Record<string, string> = {};
-    const talukIds: Record<string, string> = {};
-    const districtRecords = [];
+    if (i % 100 === 0) process.stdout.write(`   → ${i}/1000 students\n`);
+  }
+  console.log(`✅ 1000 Students created (500 Male / 500 Female, ages 6–24)`);
 
-    for (const name of districtsList) {
-        const district = await prisma.district.create({
-            data: {
-                name: `${name} ${getUniqueId()}`,
-                taluks: {
-                    create: [
-                        { name: `${name} Taluk`, pincode: '600000' }
-                    ]
-                }
-            },
-            include: { taluks: true }
-        });
-        districtRecords.push(district);
-        districtIds[name] = district.id;
-        talukIds[name] = district.taluks[0].id;
-    }
-    console.log(`✅ ${districtsList.length} Districts Created`);
+  // ── STEP 6: Tournament ────────────────────────────────────
+  console.log('\n🏆 Creating Tournament...');
+  const tournament = await prisma.tournament.create({
+    data: {
+      title: 'Tamil Nadu State Judo Championship 2026',
+      date: new Date('2026-08-15'),
+      dateTo: new Date('2026-08-17'),
+      level: EventLevel.STATE,
+      status: Status.APPROVED,
+      location: 'Nehru Indoor Stadium, Chennai',
+      description:
+        'Annual Tamil Nadu State Level Judo Championship 2026 — open to all registered students from across Tamil Nadu. Conducted under the auspices of the Tamil Nadu Judo Association.',
+      gender: 'BOTH',
+      ageFrom: 6,
+      ageTo: 24,
+      numberOfMats: 6,
+      registrationClosed: false,
+      districtApproval: Status.APPROVED,
+      stateApproval: Status.APPROVED,
+      superAdminApproval: Status.APPROVED,
+      ceoApproval: Status.APPROVED,
+    },
+  });
+  console.log(`✅ Tournament: "${tournament.title}"`);
 
-    // 3. Create Clubs
-    console.log("Creating Clubs...");
-    const clubRecords: any[] = [];
-    for (const name of districtsList) {
-        const club = await prisma.club.create({
-            data: {
-                name: `${name} Judo Club`,
-                tempId: `CLUB${getUniqueId()}`,
-                districtId: districtIds[name],
-                talukId: talukIds[name],
-                pincode: '600000',
-                mobileNumber: `9${getUniqueId()}`,
-                email: `club_${getUniqueId()}@test.com`,
-                address1: '123 Main St',
-                president: 'President Name',
-                secretary: 'Secretary Name',
-                coach: 'Coach Name',
-                status: Status.APPROVED,
-            }
-        });
-        clubRecords.push(club);
-    }
-    console.log(`✅ ${clubRecords.length} Clubs Created`);
+  // ── STEP 7: Register all 1000 students ───────────────────
+  console.log('\n📋 Registering 1000 students to tournament...');
+  for (let i = 0; i < studentRecs.length; i++) {
+    const s = studentRecs[i];
+    const coach = coachRecs[i % coachRecs.length];
+    await prisma.tournamentRegistration.create({
+      data: {
+        tournamentId: tournament.id,
+        playerId: s.id,
+        coachId: coach.id,
+        status: Status.APPROVED,
+        weight: s.weightKg.toString(),
+        height: heightCm(s.age, s.gender),
+      },
+    });
+    if ((i + 1) % 100 === 0) process.stdout.write(`   → ${i + 1}/1000 registrations\n`);
+  }
+  console.log(`✅ 1000 Tournament Registrations created`);
 
-    // 4. Create Referees
-    console.log("Creating Referees...");
-    const refereeRecords = [];
-    for (let i = 1; i <= 80; i++) {
-        const district = randomItem(districtRecords);
-        const club = randomItem(clubRecords);
-        const ref = await prisma.coachReferee.create({
-            data: {
-                tempId: `REF${getUniqueId()}`,
-                fullName: `Referee ${i} ${getUniqueId()}`,
-                fatherName: 'Father',
-                gender: Gender.MALE,
-                dob: new Date('1980-01-01'),
-                age: 46,
-                bloodGroup: 'O+',
-                mobileNumber: `8${getUniqueId()}`,
-                email: `referee_${getUniqueId()}@test.com`,
-                aadhaarNumber: `123${getUniqueId()}`,
-                historyInJudo: '10 years',
-                historyInOtherMartial: 'None',
-                presentGradeInJudo: 'Black Belt',
-                pincode: '600000',
-                districtId: district.id,
-                talukId: district.taluks[0].id,
-                clubId: club.id,
-                status: Status.APPROVED,
-                password: 'password123',
-            }
-        });
-        refereeRecords.push(ref);
-    }
-    console.log(`✅ 80 Referees Created`);
+  // ── STEP 8: Group students → bracket draws ────────────────
+  console.log('\n🎯 Generating Tournament Bracket Draws...');
 
-    // 5. Create Players, Registrations and categorize them for Matches
-    console.log("Creating Players & Registrations...");
-    const matchGroups: Record<string, { t1: any[], t2: any[] }> = {};
+  // Build groups: { "Division__AgeGroup__GENDER__WeightCat" → [students] }
+  const groups = new Map<string, { studentId: string; name: string; clubId: string }[]>();
 
-    let totalPlayers = 0;
-    let totalCategories = 0;
-    let totalWeightCategories = 0;
+  for (const s of studentRecs) {
+    const wCat = weightCategory(s.weightKg, s.division, s.gender);
+    const key = `${s.division.division}__${s.division.ageGroup}__${s.gender}__${wCat}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push({ studentId: s.id, name: s.name, clubId: s.clubId });
+  }
 
-    for (const cat of categoriesData) {
-        totalCategories++;
-        for (const [genderStr, weights] of Object.entries(cat.genders)) {
-            const gender = genderStr as Gender;
-            for (const weightCat of weights) {
-                totalWeightCategories++;
-                
-                const groupKey = `${cat.division}_${cat.ageGroup}_${gender}_${weightCat}`;
-                matchGroups[groupKey] = { t1: [], t2: [] };
+  let totalDraws = 0;
+  let totalMatches = 0;
+  let matchCounter = 0;
 
-                const playersToCreate = Array.from({ length: 12 }).map((_, i) => {
-                    const dob = generateDOB(cat.birthYears);
-                    const age = 2026 - dob.getFullYear();
-                    const weight = generateWeight(weightCat);
-                    const club = randomItem(clubRecords);
-                    const districtName = districtsList.find(d => club.name.includes(d)) || districtsList[0];
-                    const uid = getUniqueId();
-                    
-                    return {
-                        tempId: `STU${uid}`,
-                        districtId: districtIds[districtName],
-                        talukId: talukIds[districtName],
-                        clubId: club.id,
-                        fullName: `Member ${uid}`,
-                        gender: gender,
-                        dob: dob,
-                        age: age,
-                        weight: weightCat,
-                        height: '150',
-                        bloodGroup: 'O+',
-                        mobileNumber: `7${uid}`,
-                        email: `player_${uid}@test.com`,
-                        aadhaarNumber: `123${uid}`,
-                        address: 'Player Address',
-                        city: 'City',
-                        state: 'Tamil Nadu',
-                        addressPincode: '600000',
-                        pincode: '600000',
-                        nationality: 'Indian',
-                        annualIncome: 100000,
-                        schoolName: 'School',
-                        grade: '10',
-                        password: 'password123',
-                        status: Status.APPROVED,
-                    };
-                });
+  for (const [key, players] of groups.entries()) {
+    if (players.length < 2) continue; // skip singleton groups
 
-                await prisma.student.createMany({ data: playersToCreate });
-                totalPlayers += playersToCreate.length;
+    const parts = key.split('__');
+    const divisionName = parts[0];
+    const ageGroup = parts[1];
+    const gender = parts[2];
+    const wCat = parts[3];
 
-                // Fetch created to get IDs
-                const createdPlayers = await prisma.student.findMany({
-                    where: { tempId: { in: playersToCreate.map(p => p.tempId) } }
-                });
+    const round1: any[] = [];
 
-                // Register 50% to T1, 50% to T2
-                for (let i = 0; i < createdPlayers.length; i++) {
-                    const targetTournament = i % 2 === 0 ? t1.id : t2.id;
-                    const registration = await prisma.tournamentRegistration.create({
-                        data: {
-                            tournamentId: targetTournament,
-                            playerId: createdPlayers[i].id,
-                            status: Status.APPROVED,
-                            weight: createdPlayers[i].weight,
-                            height: createdPlayers[i].height,
-                        }
-                    });
-                    
-                    if (targetTournament === t1.id) {
-                        matchGroups[groupKey].t1.push(registration);
-                    } else {
-                        matchGroups[groupKey].t2.push(registration);
-                    }
-                }
-            }
-        }
-    }
-    
-    console.log(`✅ ${totalCategories} Categories Created`);
-    console.log(`✅ ${totalWeightCategories} Weight Categories Created`);
-    console.log(`✅ ${totalPlayers} Players Created`);
-    console.log(`✅ ${totalPlayers} Tournament Registrations Created`);
-
-    // 6. Generate Matches (TournamentDraw)
-    console.log("Generating Matches...");
-    let totalMatchesCreated = 0;
-
-    for (const cat of categoriesData) {
-        for (const [genderStr, weights] of Object.entries(cat.genders)) {
-            for (const weightCat of weights) {
-                const groupKey = `${cat.division}_${cat.ageGroup}_${genderStr}_${weightCat}`;
-                const group = matchGroups[groupKey];
-
-                const createDraw = async (tournamentId: string, regs: any[]) => {
-                    if (regs.length === 0) return;
-
-                    const playerIds = regs.map(r => r.playerId);
-                    const playersData = await prisma.student.findMany({
-                        where: { id: { in: playerIds } },
-                        select: { id: true, fullName: true, clubId: true }
-                    });
-                    
-                    const actualMatches = [];
-                    for (let i = 0; i < regs.length; i += 2) {
-                        if (i + 1 < regs.length) {
-                            const p1 = playersData.find(p => p.id === regs[i].playerId);
-                            const p2 = playersData.find(p => p.id === regs[i+1].playerId);
-                            
-                            actualMatches.push({
-                                matchId: `M_1_${Math.floor(i/2) + 1}_${Date.now()}`,
-                                round: 1,
-                                matchNumber: Math.floor(i/2) + 1,
-                                matNumber: 1,
-                                slotA: {
-                                    playerId: p1?.id || null,
-                                    playerName: p1?.fullName || "TBD",
-                                    club: p1?.clubId || "",
-                                    isBye: false
-                                },
-                                slotB: {
-                                    playerId: p2?.id || null,
-                                    playerName: p2?.fullName || "TBD",
-                                    club: p2?.clubId || "",
-                                    isBye: false
-                                },
-                                winnerId: null,
-                                status: "PENDING"
-                            });
-                            totalMatchesCreated++;
-                        }
-                    }
-
-                    const roundsData = [ actualMatches ];
-
-                    await prisma.tournamentDraw.create({
-                        data: {
-                            tournamentId: tournamentId,
-                            ageGroup: `${cat.division} ${cat.ageGroup}`,
-                            gender: genderStr,
-                            weightCategory: weightCat,
-                            rounds: roundsData,
-                        }
-                    });
-                };
-
-                await createDraw(t1.id, group.t1);
-                await createDraw(t2.id, group.t2);
-            }
-        }
+    for (let i = 0; i < players.length - 1; i += 2) {
+      matchCounter++;
+      const p1 = players[i];
+      const p2 = players[i + 1];
+      round1.push({
+        matchId: `M${matchCounter}_R1`,
+        round: 1,
+        matchNumber: Math.floor(i / 2) + 1,
+        matNumber: ((totalDraws % 6) + 1),
+        slotA: { playerId: p1.studentId, playerName: p1.name, club: p1.clubId, isBye: false },
+        slotB: { playerId: p2.studentId, playerName: p2.name, club: p2.clubId, isBye: false },
+        winnerId: null,
+        status: 'PENDING',
+      });
+      totalMatches++;
     }
 
-    console.log(`✅ ${totalMatchesCreated} Matches Created`);
+    // Odd player out → BYE entry
+    if (players.length % 2 !== 0) {
+      matchCounter++;
+      const bye = players[players.length - 1];
+      round1.push({
+        matchId: `M${matchCounter}_R1_BYE`,
+        round: 1,
+        matchNumber: Math.floor(players.length / 2) + 1,
+        matNumber: ((totalDraws % 6) + 1),
+        slotA: { playerId: bye.studentId, playerName: bye.name, club: bye.clubId, isBye: false },
+        slotB: { playerId: null, playerName: 'BYE', club: '', isBye: true },
+        winnerId: bye.studentId,
+        status: 'COMPLETED',
+      });
+    }
 
-    console.log("\n==========================================================");
-    console.log("SEED SUMMARY");
-    console.log("==========================================================");
-    console.log(`✅ Tournaments Created: 2`);
-    console.log(`✅ Districts Created: ${districtsList.length}`);
-    console.log(`✅ Clubs Created: ${clubRecords.length}`);
-    console.log(`✅ Referees Created: ${refereeRecords.length}`);
-    console.log(`✅ Categories Created: ${totalCategories}`);
-    console.log(`✅ Weight Categories Created: ${totalWeightCategories}`);
-    console.log(`✅ Players Created: ${totalPlayers}`);
-    console.log(`✅ Tournament Registrations Created: ${totalPlayers}`);
-    console.log(`✅ Matches Created: ${totalMatchesCreated}`);
-    console.log("==========================================================");
+    await prisma.tournamentDraw.create({
+      data: {
+        tournamentId: tournament.id,
+        ageGroup: `${divisionName} ${ageGroup}`,
+        gender,
+        weightCategory: wCat,
+        rounds: [round1],
+      },
+    });
+
+    totalDraws++;
+  }
+
+  console.log(`✅ ${totalDraws} Bracket Draws created`);
+  console.log(`✅ ${totalMatches} Matches generated`);
+
+  // ── FINAL SUMMARY ─────────────────────────────────────────
+  console.log('\n' + '═'.repeat(55));
+  console.log('              SEED COMPLETE — SUMMARY              ');
+  console.log('═'.repeat(55));
+  console.log(`  ✅ Tamil Nadu Districts      : ${districtRecs.length}`);
+  console.log(`  ✅ Clubs (1 per district)    : ${clubRecs.length}`);
+  console.log(`  ✅ Coaches                   : 80`);
+  console.log(`  ✅ Members                   : 40`);
+  console.log(`       └─ 38 District Presidents`);
+  console.log(`       └─  1 State President`);
+  console.log(`       └─  1 State Secretary`);
+  console.log(`  ✅ Students                  : 1000`);
+  console.log(`       └─ 500 Male / 500 Female`);
+  console.log(`       └─ Ages 6–24`);
+  console.log(`       └─ Realistic weights per age/gender`);
+  console.log(`  ✅ Tournament                : 1`);
+  console.log(`  ✅ Registrations             : 1000`);
+  console.log(`  ✅ Bracket Draws             : ${totalDraws}`);
+  console.log(`  ✅ Matches in Brackets       : ${totalMatches}`);
+  console.log('═'.repeat(55));
+  console.log('\n  🔑 Default password for all: Seed@1234\n');
 }
 
 main()
-    .catch((e) => {
-        console.error(e);
-        process.exit(1);
-    })
-    .finally(async () => {
-        await prisma.$disconnect();
-    });
+  .catch((e) => {
+    console.error('\n❌ Seed failed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

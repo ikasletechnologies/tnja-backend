@@ -211,7 +211,7 @@ export const createTournament = async (req: Request, res: Response) => {
     return res.status(403).json({ error: "Only clubs or authorized officials can create tournaments" });
   }
 
-  const { title, dateFrom, dateTo, location, description, entryFee, numberOfMats, ageFrom, ageTo, gender, allowBPL, beltEligibility, bannerImage, level, zoneId } = req.body;
+  const { title, dateFrom, dateTo, location, description, entryFee, numberOfMats, ageFrom, ageTo, category, gender, allowBPL, beltEligibility, bannerImage, level, zoneId } = req.body;
 
   if (!title || !dateFrom || !location || !description || entryFee === undefined || !level) {
     return res.status(400).json({ error: "Required fields missing" });
@@ -245,6 +245,7 @@ export const createTournament = async (req: Request, res: Response) => {
         numberOfMats: numberOfMats ? Number(numberOfMats) : 1,
         ageFrom: Number(ageFrom || 0),
         ageTo: Number(ageTo || 100),
+        category: category || null,
         gender: gender || "BOTH",
         allowBPL: Boolean(allowBPL),
         beltEligibility: beltEligibility || null,
@@ -685,7 +686,7 @@ export const updateTournament = async (req: Request, res: Response) => {
     return res.status(403).json({ error: "Only clubs and officials can update tournaments" });
   }
 
-  const { title, dateFrom, dateTo, location, description, entryFee, numberOfMats, ageFrom, ageTo, gender, allowBPL, beltEligibility, bannerImage, level, zoneId } = req.body;
+  const { title, dateFrom, dateTo, location, description, entryFee, numberOfMats, ageFrom, ageTo, category, gender, allowBPL, beltEligibility, bannerImage, level, zoneId } = req.body;
 
   try {
     const tournament = await prisma.tournament.findUnique({ where: { id } });
@@ -704,6 +705,7 @@ export const updateTournament = async (req: Request, res: Response) => {
         ...(numberOfMats !== undefined && { numberOfMats: Number(numberOfMats) }),
         ...(ageFrom !== undefined && { ageFrom: Number(ageFrom) }),
         ...(ageTo !== undefined && { ageTo: Number(ageTo) }),
+        ...(category !== undefined && { category }),
         ...(gender && { gender }),
         ...(allowBPL !== undefined && { allowBPL: Boolean(allowBPL) }),
         ...(beltEligibility !== undefined && { beltEligibility }),
@@ -1567,9 +1569,10 @@ export const saveTournamentDraw = async (req: Request, res: Response) => {
 
   const isClub = role === "CLUB";
   const isOfficial = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN"].includes(role);
+  const isCoach = role === "COACH";
 
-  if (!isClub && !isOfficial) {
-    return res.status(403).json({ error: "Only clubs and officials can save draws" });
+  if (!isClub && !isOfficial && !isCoach) {
+    return res.status(403).json({ error: "Only authorized personnel can save draws" });
   }
 
   if (!ageGroup || exactAge === undefined || !gender || !weightCategory || !rounds) {
@@ -1585,7 +1588,17 @@ export const saveTournamentDraw = async (req: Request, res: Response) => {
       tournament.clubId !== userId &&
       tournament.officialId !== userId
     ) {
-      return res.status(403).json({ error: "This tournament does not belong to you" });
+      if (isCoach) {
+        // Verify they are assigned as a referee
+        const isAssigned = await prisma.tournamentMat.findFirst({
+          where: { tournamentId: id, refereeId: userId }
+        });
+        if (!isAssigned) {
+          return res.status(403).json({ error: "You are not assigned as a referee to this tournament" });
+        }
+      } else {
+        return res.status(403).json({ error: "This tournament does not belong to you" });
+      }
     }
 
     // Auto-advance winners to next round
@@ -1669,6 +1682,168 @@ export const submitTournamentResults = async (req: Request, res: Response) => {
     return res.json({ message: "Results submitted successfully. Tournament is now closed." });
   } catch (error) {
     console.error("Error submitting results:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const getTournamentMats = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const mats = await prisma.tournamentMat.findMany({
+      where: { tournamentId: id as string },
+      include: { referee: { select: { fullName: true } } },
+      orderBy: { matNumber: 'asc' }
+    });
+    return res.json({ mats });
+  } catch (error) {
+    console.error("Error fetching tournament mats:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const saveTournamentMats = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { assignments } = req.body; // Array of { matNumber: number, refereeId: string }
+  try {
+    const tournament = await prisma.tournament.findUnique({ where: { id: id as string } });
+    if (!tournament) return res.status(404).json({ error: "Tournament not found" });
+
+    // Resolve referee IDs if they are provided (allows TempID, PermanentID, or UUID)
+    const resolvedAssignments = await Promise.all(assignments.map(async (a: any) => {
+      let finalRefereeId = null;
+      if (a.refereeId) {
+        const referee = await prisma.coachReferee.findFirst({
+          where: { OR: [ { id: a.refereeId }, { tempId: a.refereeId }, { permanentId: a.refereeId } ] },
+          select: { id: true }
+        });
+        if (referee) finalRefereeId = referee.id;
+      }
+      return {
+        tournamentId: id,
+        matNumber: a.matNumber,
+        refereeId: finalRefereeId
+      };
+    }));
+
+    await prisma.$transaction([
+      prisma.tournamentMat.deleteMany({ where: { tournamentId: id as string } }),
+      prisma.tournamentMat.createMany({
+        data: resolvedAssignments
+      })
+    ]);
+    return res.json({ message: "Mat assignments saved successfully." });
+  } catch (error) {
+    console.error("Error saving tournament mats:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const getRefereeMats = async (req: Request | any, res: Response) => {
+  try {
+    const refereeId = req.user?.userId;
+    if (!refereeId) return res.status(401).json({ error: "Unauthorized" });
+
+    const mats = await prisma.tournamentMat.findMany({
+      where: { refereeId },
+      include: {
+        tournament: {
+          select: { id: true, title: true, date: true, status: true, location: true }
+        }
+      },
+      orderBy: { tournament: { date: 'desc' } }
+    });
+
+    return res.json({ mats });
+  } catch (error) {
+    console.error("Error fetching referee mats:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const submitMatchResult = async (req: Request, res: Response) => {
+  const { id, matchId } = req.params;
+  const { winnerId } = req.body;
+
+  try {
+    const draws = await prisma.tournamentDraw.findMany({ where: { tournamentId: id as string } });
+    
+    let updated = false;
+    for (const draw of draws) {
+      const rounds: any[][] = draw.rounds as any[][];
+      let matchFound = false;
+
+      for (const round of rounds) {
+        for (const match of round) {
+          if (match.matchId === matchId) {
+            match.winnerId = winnerId;
+            match.status = "COMPLETED";
+            matchFound = true;
+            break;
+          }
+        }
+        if (matchFound) break;
+      }
+
+      if (matchFound) {
+        await prisma.tournamentDraw.update({
+          where: { id: draw.id },
+          data: { rounds: rounds as any }
+        });
+        updated = true;
+        break;
+      }
+    }
+
+    if (!updated) return res.status(404).json({ error: "Match not found" });
+    return res.json({ message: "Match result saved successfully" });
+  } catch (error) {
+    console.error("Error saving match result:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const updateMatchState = async (req: Request, res: Response) => {
+  const { id, matchId } = req.params;
+  const { scoreA, scoreB, logs, timeLeft, status } = req.body;
+
+  try {
+    const draws = await prisma.tournamentDraw.findMany({ where: { tournamentId: id as string } });
+    
+    let updated = false;
+    for (const draw of draws) {
+      const rounds: any[][] = draw.rounds as any[][];
+      let matchFound = false;
+
+      for (const round of rounds) {
+        for (const match of round) {
+          if (match.matchId === matchId) {
+            if (scoreA !== undefined) match.scoreA = scoreA;
+            if (scoreB !== undefined) match.scoreB = scoreB;
+            if (logs !== undefined) match.logs = logs;
+            if (timeLeft !== undefined) match.timeLeft = timeLeft;
+            if (status !== undefined) match.status = status;
+            
+            matchFound = true;
+            break;
+          }
+        }
+        if (matchFound) break;
+      }
+
+      if (matchFound) {
+        await prisma.tournamentDraw.update({
+          where: { id: draw.id },
+          data: { rounds: rounds as any }
+        });
+        updated = true;
+        break;
+      }
+    }
+
+    if (!updated) return res.status(404).json({ error: "Match not found" });
+    return res.json({ message: "Match state updated successfully" });
+  } catch (error) {
+    console.error("Error updating match state:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
