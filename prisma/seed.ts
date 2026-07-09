@@ -221,44 +221,53 @@ function dobFromAge(age: number): Date {
 // ============================================================
 
 const districtsList = [
-  { name: 'Chennai', zoneName: 'North' },
-  { name: 'Tiruvallur', zoneName: 'North' },
-  { name: 'Kancheepuram', zoneName: 'North' },
-  { name: 'Chengalpattu', zoneName: 'North' },
-  { name: 'Vellore', zoneName: 'North' },
-  { name: 'Ranipet', zoneName: 'North' },
-  { name: 'Tirupathur', zoneName: 'North' },
-  { name: 'Tiruvannamalai', zoneName: 'North' },
-  { name: 'Viluppuram', zoneName: 'North' },
-  { name: 'Kallakurichi', zoneName: 'North' },
-  { name: 'Madurai', zoneName: 'South' },
-  { name: 'Theni', zoneName: 'South' },
-  { name: 'Dindigul', zoneName: 'South' },
-  { name: 'Sivagangai', zoneName: 'South' },
-  { name: 'Ramanathapuram', zoneName: 'South' },
-  { name: 'Virudhunagar', zoneName: 'South' },
-  { name: 'Tirunelveli', zoneName: 'South' },
-  { name: 'Tenkasi', zoneName: 'South' },
-  { name: 'Thoothukudi', zoneName: 'South' },
-  { name: 'Kanniyakumari', zoneName: 'South' },
-  { name: 'Tiruchirappalli', zoneName: 'Central' },
-  { name: 'Karur', zoneName: 'Central' },
-  { name: 'Perambalur', zoneName: 'Central' },
-  { name: 'Ariyalur', zoneName: 'Central' },
-  { name: 'Pudukkottai', zoneName: 'Central' },
-  { name: 'Thanjavur', zoneName: 'Central' },
-  { name: 'Tiruvarur', zoneName: 'Central' },
-  { name: 'Nagapattinam', zoneName: 'Central' },
-  { name: 'Mayiladuthurai', zoneName: 'Central' },
-  { name: 'Cuddalore', zoneName: 'Central' },
-  { name: 'Coimbatore', zoneName: 'West' },
-  { name: 'Tiruppur', zoneName: 'West' },
-  { name: 'Erode', zoneName: 'West' },
-  { name: 'Nilgiris', zoneName: 'West' },
-  { name: 'Salem', zoneName: 'West' },
-  { name: 'Namakkal', zoneName: 'West' },
-  { name: 'Dharmapuri', zoneName: 'West' },
-  { name: 'Krishnagiri', zoneName: 'West' }
+  // Chennai Zone
+  { name: 'Chennai', zoneName: 'Chennai Zone' },
+  { name: 'Chengalpattu', zoneName: 'Chennai Zone' },
+  { name: 'Kancheepuram', zoneName: 'Chennai Zone' },
+  { name: 'Tiruvallur', zoneName: 'Chennai Zone' },
+  { name: 'Vellore', zoneName: 'Chennai Zone' },
+  { name: 'Ranipet', zoneName: 'Chennai Zone' },
+  { name: 'Tirupathur', zoneName: 'Chennai Zone' },
+  { name: 'Tiruvannamalai', zoneName: 'Chennai Zone' },
+
+  // Coimbatore Zone
+  { name: 'Viluppuram', zoneName: 'Coimbatore Zone' },
+  { name: 'Kallakurichi', zoneName: 'Coimbatore Zone' },
+  { name: 'Coimbatore', zoneName: 'Coimbatore Zone' },
+  { name: 'Karur', zoneName: 'Coimbatore Zone' },
+  { name: 'Dindigul', zoneName: 'Coimbatore Zone' },
+
+  // Trichy Zone
+  { name: 'Cuddalore', zoneName: 'Trichy Zone' },
+  { name: 'Tiruchirappalli', zoneName: 'Trichy Zone' },
+  { name: 'Perambalur', zoneName: 'Trichy Zone' },
+  { name: 'Ariyalur', zoneName: 'Trichy Zone' },
+  { name: 'Pudukkottai', zoneName: 'Trichy Zone' },
+  { name: 'Thanjavur', zoneName: 'Trichy Zone' },
+  { name: 'Nagapattinam', zoneName: 'Trichy Zone' },
+  { name: 'Mayiladuthurai', zoneName: 'Trichy Zone' },
+  { name: 'Tiruvarur', zoneName: 'Trichy Zone' },
+
+  // Salem Zone
+  { name: 'Salem', zoneName: 'Salem Zone' },
+  { name: 'Namakkal', zoneName: 'Salem Zone' },
+  { name: 'Dharmapuri', zoneName: 'Salem Zone' },
+  { name: 'Krishnagiri', zoneName: 'Salem Zone' },
+  { name: 'Erode', zoneName: 'Salem Zone' },
+  { name: 'Tiruppur', zoneName: 'Salem Zone' },
+  { name: 'Nilgiris', zoneName: 'Salem Zone' },
+
+  // Madurai Zone
+  { name: 'Madurai', zoneName: 'Madurai Zone' },
+  { name: 'Theni', zoneName: 'Madurai Zone' },
+  { name: 'Sivagangai', zoneName: 'Madurai Zone' },
+  { name: 'Ramanathapuram', zoneName: 'Madurai Zone' },
+  { name: 'Virudhunagar', zoneName: 'Madurai Zone' },
+  { name: 'Tirunelveli', zoneName: 'Madurai Zone' },
+  { name: 'Tenkasi', zoneName: 'Madurai Zone' },
+  { name: 'Thoothukudi', zoneName: 'Madurai Zone' },
+  { name: 'Kanniyakumari', zoneName: 'Madurai Zone' }
 ];
 
 async function main() {

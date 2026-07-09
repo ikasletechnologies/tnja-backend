@@ -13,25 +13,44 @@ export const downloadCertificate = async (req: Request, res: Response) => {
   }
 
   try {
-    const registration = await prisma.tournamentRegistration.findUnique({
-      where: {
-        tournamentId_playerId: {
-          tournamentId,
-          playerId: userId,
+    const regId = req.query.regId as string;
+    let registration;
+    if (regId) {
+      registration = await prisma.tournamentRegistration.findUnique({
+        where: { id: regId },
+        include: {
+          player: { select: { fullName: true, age: true, gender: true } },
+          tournament: { select: { title: true, date: true, status: true } },
         },
-      },
-      include: {
-        player: { select: { fullName: true, age: true, gender: true } },
-        tournament: { select: { title: true, date: true, status: true } },
-      },
-    });
+      });
+    } else {
+      registration = await prisma.tournamentRegistration.findFirst({
+        where: { tournamentId, playerId: userId },
+        include: {
+          player: { select: { fullName: true, age: true, gender: true } },
+          tournament: { select: { title: true, date: true, status: true } },
+        },
+      });
+    }
 
     if (!registration) {
       return res.status(404).json({ error: "Registration not found." });
     }
 
-    if (registration.tournament.status !== "CLOSED") {
-      return res.status(400).json({ error: "Certificate is only available after the tournament is closed." });
+    // Check if the player's category draw is concluded
+    const categoryDraw = await prisma.tournamentDraw.findFirst({
+      where: {
+        tournamentId,
+        ageGroup: registration.ageGroup,
+        gender: registration.gender === "MALE" ? "MALE" : "FEMALE",
+        weightCategory: registration.weightCategory,
+      }
+    });
+
+    const isCategoryConcluded = categoryDraw ? categoryDraw.isConcluded : false;
+
+    if (registration.tournament.status !== "CLOSED" && !isCategoryConcluded) {
+      return res.status(400).json({ error: "Certificate is only available after the category or tournament is concluded." });
     }
 
     const { player, tournament, placement } = registration;

@@ -420,7 +420,7 @@ export const getTournamentRegistrations = async (req: Request, res: Response) =>
 
     const formattedRegistrations = registrations.map(reg => ({
       ...reg,
-      ageGroup: getAgeGroup(reg.player.age)
+      ageGroup: reg.ageGroup || getAgeGroup(reg.player.age)
     }));
 
     return res.json(formattedRegistrations);
@@ -466,7 +466,7 @@ export const updateRegistrationStatus = async (req: Request, res: Response) => {
   try {
     const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
     if (!tournament) return res.status(404).json({ error: "Tournament not found" });
-    if (tournament.clubId !== userId && tournament.officialId !== userId) return res.status(403).json({ error: "This tournament does not belong to you" });
+    if (role !== "SUPER_ADMIN" && role !== "CEO" && tournament.clubId !== userId && tournament.officialId !== userId) return res.status(403).json({ error: "This tournament does not belong to you" });
 
     const existingRegistration = await prisma.tournamentRegistration.findUnique({
       where: { id: regId },
@@ -590,7 +590,7 @@ export const updateRegistrationMetrics = async (req: Request, res: Response) => 
   try {
     const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
     if (!tournament) return res.status(404).json({ error: "Tournament not found" });
-    if (tournament.clubId !== userId && tournament.officialId !== userId) {
+    if (role !== "SUPER_ADMIN" && role !== "CEO" && tournament.clubId !== userId && tournament.officialId !== userId) {
       return res.status(403).json({ error: "This tournament does not belong to you" });
     }
 
@@ -642,7 +642,7 @@ export const sendRegistrationReply = async (req: Request, res: Response) => {
   try {
     const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
     if (!tournament) return res.status(404).json({ error: "Tournament not found" });
-    if (tournament.clubId !== userId && tournament.officialId !== userId) return res.status(403).json({ error: "This tournament does not belong to you" });
+    if (role !== "SUPER_ADMIN" && role !== "CEO" && tournament.clubId !== userId && tournament.officialId !== userId) return res.status(403).json({ error: "This tournament does not belong to you" });
 
     const registration = await prisma.tournamentRegistration.findUnique({
       where: { id: regId },
@@ -691,7 +691,7 @@ export const updateTournament = async (req: Request, res: Response) => {
   try {
     const tournament = await prisma.tournament.findUnique({ where: { id } });
     if (!tournament) return res.status(404).json({ error: "Tournament not found" });
-    if (tournament.clubId !== userId && tournament.officialId !== userId) return res.status(403).json({ error: "This tournament does not belong to you" });
+    if (role !== "SUPER_ADMIN" && role !== "CEO" && tournament.clubId !== userId && tournament.officialId !== userId) return res.status(403).json({ error: "This tournament does not belong to you" });
 
     const updated = await prisma.tournament.update({
       where: { id },
@@ -737,7 +737,7 @@ export const deleteTournament = async (req: Request, res: Response) => {
   try {
     const tournament = await prisma.tournament.findUnique({ where: { id } });
     if (!tournament) return res.status(404).json({ error: "Tournament not found" });
-    if (tournament.clubId !== userId && tournament.officialId !== userId) return res.status(403).json({ error: "This tournament does not belong to you" });
+    if (role !== "SUPER_ADMIN" && role !== "CEO" && tournament.clubId !== userId && tournament.officialId !== userId) return res.status(403).json({ error: "This tournament does not belong to you" });
 
     // Delete registrations first (FK constraint)
     await prisma.tournamentRegistration.deleteMany({ where: { tournamentId: id } });
@@ -773,19 +773,48 @@ export const getPlayerTournaments = async (req: Request, res: Response) => {
         _count: { select: { registrations: true } },
         registrations: {
           where: { playerId: userId },
-          select: { id: true, status: true, isPaid: true, placement: true },
+          select: { id: true, status: true, isPaid: true, placement: true, ageGroup: true, weightCategory: true, gender: true },
         },
       },
       orderBy: { date: "desc" },
     });
 
-    const result = tournaments.map((t) => ({
-      ...t,
-      registrationCount: t._count.registrations,
-      myRegistration: t.registrations[0] || null,
-      registrations: undefined,
-      _count: undefined,
-    }));
+    const concludedDraws = await prisma.tournamentDraw.findMany({
+      where: {
+        tournamentId: { in: tournaments.map(t => t.id) },
+        isConcluded: true
+      },
+      select: {
+        tournamentId: true,
+        ageGroup: true,
+        gender: true,
+        weightCategory: true
+      }
+    });
+
+    const concludedDrawsSet = new Set(
+      concludedDraws.map(d => `${d.tournamentId}_${d.ageGroup}_${d.gender}_${d.weightCategory}`)
+    );
+
+    const result = tournaments.map((t) => {
+      const myReg = t.registrations[0] || null;
+      let isCategoryConcluded = false;
+      if (myReg) {
+        const drawKey = `${t.id}_${myReg.ageGroup}_${myReg.gender}_${myReg.weightCategory}`;
+        isCategoryConcluded = concludedDrawsSet.has(drawKey);
+      }
+
+      return {
+        ...t,
+        registrationCount: t._count.registrations,
+        myRegistration: myReg ? {
+          ...myReg,
+          isCategoryConcluded
+        } : null,
+        registrations: undefined,
+        _count: undefined,
+      };
+    });
 
     return res.json(result);
   } catch (error) {
@@ -832,7 +861,7 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
       },
       include: {
         _count: { select: { registrations: true } },
-        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true } },
+        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true, ageGroup: true, weightCategory: true, gender: true } },
         club: { select: { name: true, district: { select: { name: true } } } },
       },
       orderBy: { date: "desc" },
@@ -851,7 +880,7 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
       },
       include: {
         _count: { select: { registrations: true } },
-        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true } },
+        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true, ageGroup: true, weightCategory: true, gender: true } },
         club: { select: { name: true, district: { select: { name: true } } } },
       },
       orderBy: { date: "desc" },
@@ -869,19 +898,54 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
       },
       include: {
         _count: { select: { registrations: true } },
-        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true } },
+        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true, ageGroup: true, weightCategory: true, gender: true } },
         club: { select: { name: true, district: { select: { name: true } } } },
       },
       orderBy: { date: "desc" },
     });
 
-    const mapTournament = (t: any) => ({
-      ...t,
-      registrationCount: t._count.registrations,
-      myRegistration: t.registrations[0] || null,
-      registrations: undefined,
-      _count: undefined,
+    const tournamentIds = [
+      ...districtTournaments.map(t => t.id),
+      ...zonalTournaments.map(t => t.id),
+      ...stateNationalTournaments.map(t => t.id)
+    ];
+
+    const concludedDraws = await prisma.tournamentDraw.findMany({
+      where: {
+        tournamentId: { in: tournamentIds },
+        isConcluded: true
+      },
+      select: {
+        tournamentId: true,
+        ageGroup: true,
+        gender: true,
+        weightCategory: true
+      }
     });
+
+    const concludedDrawsSet = new Set(
+      concludedDraws.map(d => `${d.tournamentId}_${d.ageGroup}_${d.gender}_${d.weightCategory}`)
+    );
+
+    const mapTournament = (t: any) => {
+      const myReg = t.registrations[0] || null;
+      let isCategoryConcluded = false;
+      if (myReg) {
+        const drawKey = `${t.id}_${myReg.ageGroup}_${myReg.gender}_${myReg.weightCategory}`;
+        isCategoryConcluded = concludedDrawsSet.has(drawKey);
+      }
+
+      return {
+        ...t,
+        registrationCount: t._count.registrations,
+        myRegistration: myReg ? {
+          ...myReg,
+          isCategoryConcluded
+        } : null,
+        registrations: undefined,
+        _count: undefined,
+      };
+    };
 
     return res.json({
       district: districtTournaments.map(mapTournament),
@@ -953,11 +1017,20 @@ export const createTournamentPaymentOrder = async (req: Request, res: Response) 
     // Slot check removed (totalSlots not in schema)
     // const regCount = await prisma.tournamentRegistration.count({ where: { tournamentId } });
 
+    const playerGender = player.gender === "FEMALE" ? "FEMALE" : "MALE";
+    const ageGroup = getAgeGroup(player.age, category);
+    const weightCategory = weight ? getWeightCategory(Number(weight), playerGender, ageGroup) : "ALL";
+
     // Check duplicate
-    const existing = await prisma.tournamentRegistration.findUnique({
-      where: { tournamentId_playerId: { tournamentId, playerId: userId } },
+    const existing = await prisma.tournamentRegistration.findFirst({
+      where: {
+        tournamentId,
+        playerId: userId,
+        ageGroup,
+        weightCategory,
+      },
     });
-    if (existing) return res.status(400).json({ error: "You have already registered for this tournament" });
+    if (existing) return res.status(400).json({ error: "You have already registered for this category in this tournament" });
 
     // Handle Free/BPL Registration
     const isFree = tournament.entryFee === 0 || (tournament.allowBPL && player.isBPL);
@@ -971,24 +1044,18 @@ export const createTournamentPaymentOrder = async (req: Request, res: Response) 
           height: height || null,
           weight: weight || null,
           coachId: coachId || null,
+          ageGroup,
+          weightCategory,
+          gender: playerGender,
         },
       });
 
       // ─── Auto-create or get tournament draw based on player's category ──
-      const playerData = await prisma.student.findUnique({
-        where: { id: userId },
-        select: { age: true, gender: true },
-      });
-
-      if (playerData && weight) {
-        const playerGender = playerData.gender === "FEMALE" ? "FEMALE" : "MALE";
-        const ageGroup = getAgeGroup(playerData.age, category);
-        const weightCategory = getWeightCategory(Number(weight), playerGender, ageGroup);
-
+      if (weight) {
         // Get tournament's gender (could be MALE, FEMALE, or BOTH)
         const tournamentGender = tournament.gender === "BOTH" ? playerGender : tournament.gender;
 
-        await createOrGetDraw(tournamentId, tournamentGender, ageGroup, weightCategory, playerData.age);
+        await createOrGetDraw(tournamentId, tournamentGender, ageGroup, weightCategory, player.age);
       }
 
       // Update the student's global profile with latest height/weight
@@ -1067,13 +1134,25 @@ export const verifyTournamentPayment = async (req: Request, res: Response) => {
     const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
     if (!tournament) return res.status(404).json({ error: "Tournament not found" });
 
-    const existing = await prisma.tournamentRegistration.findUnique({
-      where: { tournamentId_playerId: { tournamentId, playerId: userId } },
+    const playerData = await prisma.student.findUnique({
+      where: { id: userId },
+      select: { age: true, gender: true },
     });
-    if (existing) return res.status(400).json({ error: "Already registered for this tournament" });
+    if (!playerData) return res.status(404).json({ error: "Player not found" });
 
-    // Slot check removed (totalSlots not in schema)
-    // const regCount = await prisma.tournamentRegistration.count({ where: { tournamentId } });
+    const playerGender = playerData.gender === "FEMALE" ? "FEMALE" : "MALE";
+    const ageGroup = getAgeGroup(playerData.age, category);
+    const weightCategory = weight ? getWeightCategory(Number(weight), playerGender, ageGroup) : "ALL";
+
+    const existing = await prisma.tournamentRegistration.findFirst({
+      where: {
+        tournamentId,
+        playerId: userId,
+        ageGroup,
+        weightCategory,
+      },
+    });
+    if (existing) return res.status(400).json({ error: "Already registered for this category in this tournament" });
 
     const registration = await prisma.tournamentRegistration.create({
       data: {
@@ -1085,20 +1164,14 @@ export const verifyTournamentPayment = async (req: Request, res: Response) => {
         height: height || null,
         weight: weight || null,
         coachId: coachId || null,
+        ageGroup,
+        weightCategory,
+        gender: playerGender,
       },
     });
 
     // ─── Auto-create or get tournament draw based on player's category ──
-    const playerData = await prisma.student.findUnique({
-      where: { id: userId },
-      select: { age: true, gender: true },
-    });
-
-    if (playerData && weight) {
-      const playerGender = playerData.gender === "FEMALE" ? "FEMALE" : "MALE";
-      const ageGroup = getAgeGroup(playerData.age, category);
-      const weightCategory = getWeightCategory(Number(weight), playerGender, ageGroup);
-
+    if (weight) {
       // Get tournament's gender (could be MALE, FEMALE, or BOTH)
       const tournamentGender = tournament.gender === "BOTH" ? playerGender : tournament.gender;
 
@@ -1518,42 +1591,44 @@ const autoAdvanceWinner = (rounds: any[]): any[] => {
         const nextMatchIdx = Math.floor(matchIdx / 2);
         const isFirstSlot = matchIdx % 2 === 0; // Slots A and B alternate
 
-        if (nextMatchIdx < nextRound.length) {
-          const nextMatch = nextRound[nextMatchIdx];
-          const isWinnerA = match.winnerId === match.slotA.playerId;
-          const winnerSlot = {
-            playerId: match.winnerId,
-            playerName: isWinnerA ? match.slotA.playerName : match.slotB.playerName,
-            club: isWinnerA ? match.slotA.club : match.slotB.club,
-            isBye: false,
-            seedNumber: isWinnerA ? match.slotA.seedNumber : match.slotB.seedNumber,
-          };
-
-          // Update the appropriate slot (A or B) if it's TBD
-          if (isFirstSlot && nextMatch.slotA.playerName === "TBD") {
-            nextRound[nextMatchIdx].slotA = winnerSlot;
-          } else if (!isFirstSlot && nextMatch.slotB.playerName === "TBD") {
-            nextRound[nextMatchIdx].slotB = winnerSlot;
-          }
-          
-          // Bronze Match Logic: If this is the semi-final and a bronze match exists
-          if (roundIdx === rounds.length - 2 && nextRound.length > 1) {
-            const loserSlot = {
-              playerId: isWinnerA ? match.slotB.playerId : match.slotA.playerId,
-              playerName: isWinnerA ? match.slotB.playerName : match.slotA.playerName,
-              club: isWinnerA ? match.slotB.club : match.slotA.club,
+          if (nextMatchIdx < nextRound.length) {
+            const nextMatch = nextRound[nextMatchIdx];
+            const isWinnerA = match.winnerId === match.slotA.playerId;
+            const winnerSlot = {
+              playerId: match.winnerId,
+              regId: isWinnerA ? (match.slotA as any).regId : (match.slotB as any).regId,
+              playerName: isWinnerA ? match.slotA.playerName : match.slotB.playerName,
+              club: isWinnerA ? match.slotA.club : match.slotB.club,
               isBye: false,
-              seedNumber: isWinnerA ? match.slotB.seedNumber : match.slotA.seedNumber,
+              seedNumber: isWinnerA ? match.slotA.seedNumber : match.slotB.seedNumber,
             };
 
-            const bronzeMatch = nextRound[1];
-            if (isFirstSlot && bronzeMatch.slotA.playerName === "TBD") {
-              nextRound[1].slotA = loserSlot;
-            } else if (!isFirstSlot && bronzeMatch.slotB.playerName === "TBD") {
-              nextRound[1].slotB = loserSlot;
+            // Update the appropriate slot (A or B) if it's TBD
+            if (isFirstSlot && nextMatch.slotA.playerName === "TBD") {
+              nextRound[nextMatchIdx].slotA = winnerSlot;
+            } else if (!isFirstSlot && nextMatch.slotB.playerName === "TBD") {
+              nextRound[nextMatchIdx].slotB = winnerSlot;
+            }
+            
+            // Bronze Match Logic: If this is the semi-final and a bronze match exists
+            if (roundIdx === rounds.length - 2 && nextRound.length > 1) {
+              const loserSlot = {
+                playerId: isWinnerA ? match.slotB.playerId : match.slotA.playerId,
+                regId: isWinnerA ? (match.slotB as any).regId : (match.slotA as any).regId,
+                playerName: isWinnerA ? match.slotB.playerName : match.slotA.playerName,
+                club: isWinnerA ? match.slotB.club : match.slotA.club,
+                isBye: false,
+                seedNumber: isWinnerA ? match.slotB.seedNumber : match.slotA.seedNumber,
+              };
+
+              const bronzeMatch = nextRound[1];
+              if (isFirstSlot && bronzeMatch.slotA.playerName === "TBD") {
+                nextRound[1].slotA = loserSlot;
+              } else if (!isFirstSlot && bronzeMatch.slotB.playerName === "TBD") {
+                nextRound[1].slotB = loserSlot;
+              }
             }
           }
-        }
       }
     }
   }
@@ -1639,7 +1714,7 @@ export const saveTournamentDraw = async (req: Request, res: Response) => {
 export const submitTournamentResults = async (req: Request, res: Response) => {
   const { userId, role } = (req as any).user;
   const id = req.params.id as string;
-  const { results } = req.body; // Array of { playerId: string, placement: "FIRST" | "SECOND" | "THIRD" | "PARTICIPATION" }
+  const { results, ageGroup, exactAge, gender, weightCategory } = req.body;
 
   const isClub = role === "CLUB";
   const isOfficial = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN"].includes(role);
@@ -1651,35 +1726,92 @@ export const submitTournamentResults = async (req: Request, res: Response) => {
   try {
     const tournament = await prisma.tournament.findUnique({ where: { id } });
     if (!tournament) return res.status(404).json({ error: "Tournament not found" });
-    if (tournament.clubId !== userId && tournament.officialId !== userId) return res.status(403).json({ error: "This tournament does not belong to you" });
+    if (role !== "SUPER_ADMIN" && role !== "CEO" && tournament.clubId !== userId && tournament.officialId !== userId) return res.status(403).json({ error: "This tournament does not belong to you" });
 
-    // Ensure all players are registered in this tournament
-    const playerIds = results.map((r: any) => r.playerId);
-    const validRegistrations = await prisma.tournamentRegistration.findMany({
-      where: { tournamentId: id, playerId: { in: playerIds } },
-    });
+    // Ensure all registrations/players are in this tournament
+    const regIds = results.map((r: any) => r.regId).filter(Boolean);
+    const playerIds = results.map((r: any) => r.playerId).filter(Boolean);
 
-    if (validRegistrations.length !== playerIds.length) {
-      return res.status(400).json({ error: "One or more players are not registered in this tournament" });
+    let validRegistrations;
+    if (regIds.length > 0) {
+      validRegistrations = await prisma.tournamentRegistration.findMany({
+        where: { id: { in: regIds }, tournamentId: id },
+      });
+      if (validRegistrations.length !== regIds.length) {
+        return res.status(400).json({ error: "One or more registrations are invalid for this tournament" });
+      }
+    } else {
+      validRegistrations = await prisma.tournamentRegistration.findMany({
+        where: { tournamentId: id, playerId: { in: playerIds } },
+      });
+      if (validRegistrations.length !== playerIds.length) {
+        return res.status(400).json({ error: "One or more players are not registered in this tournament" });
+      }
     }
 
     // Use a transaction to update placements
     await prisma.$transaction(
-      results.map((r: any) =>
-        prisma.tournamentRegistration.update({
-          where: { tournamentId_playerId: { tournamentId: id, playerId: r.playerId } },
-          data: { placement: r.placement },
-        })
-      )
+      results.map((r: any) => {
+        if (r.regId) {
+          return prisma.tournamentRegistration.update({
+            where: { id: r.regId },
+            data: { placement: r.placement },
+          });
+        } else {
+          return prisma.tournamentRegistration.updateMany({
+            where: { tournamentId: id, playerId: r.playerId },
+            data: { placement: r.placement },
+          });
+        }
+      })
     );
 
-    // Also close the tournament
-    await prisma.tournament.update({
-      where: { id },
-      data: { status: "CLOSED" },
-    });
+    let isTournamentClosed = false;
 
-    return res.json({ message: "Results submitted successfully. Tournament is now closed." });
+    if (ageGroup && gender && weightCategory) {
+      // Conclude the specific category draw
+      await prisma.tournamentDraw.update({
+        where: {
+          tournamentId_ageGroup_exactAge_gender_weightCategory: {
+            tournamentId: id,
+            ageGroup,
+            exactAge: exactAge !== undefined ? Number(exactAge) : 0,
+            gender,
+            weightCategory,
+          }
+        },
+        data: { isConcluded: true }
+      });
+
+      // Check if all draws are concluded
+      const allDraws = await prisma.tournamentDraw.findMany({
+        where: { tournamentId: id }
+      });
+      const allConcluded = allDraws.every(d => d.isConcluded);
+      if (allConcluded && allDraws.length > 0) {
+        await prisma.tournament.update({
+          where: { id },
+          data: { status: "CLOSED" },
+        });
+        isTournamentClosed = true;
+      }
+    } else {
+      // Legacy behavior: conclude the entire tournament
+      await prisma.tournamentDraw.updateMany({
+        where: { tournamentId: id },
+        data: { isConcluded: true }
+      });
+      await prisma.tournament.update({
+        where: { id },
+        data: { status: "CLOSED" },
+      });
+      isTournamentClosed = true;
+    }
+
+    return res.json({ 
+      message: isTournamentClosed ? "Results submitted successfully. Tournament is now closed." : "Category results submitted successfully.",
+      isTournamentClosed
+    });
   } catch (error) {
     console.error("Error submitting results:", error);
     return res.status(500).json({ error: "Internal Server Error" });
