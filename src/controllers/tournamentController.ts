@@ -779,7 +779,7 @@ export const getPlayerTournaments = async (req: Request, res: Response) => {
         _count: { select: { registrations: true } },
         registrations: {
           where: { playerId: userId },
-          select: { id: true, status: true, isPaid: true, placement: true, ageGroup: true, ageGroup: true, weightCategory: true, gender: true },
+          select: { id: true, status: true, isPaid: true, placement: true, ageGroup: true, weightCategory: true, gender: true },
         },
       },
       orderBy: { date: "desc" },
@@ -868,7 +868,7 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
       },
       include: {
         _count: { select: { registrations: true } },
-        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true, ageGroup: true, ageGroup: true, weightCategory: true, gender: true } },
+        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true, ageGroup: true, weightCategory: true, gender: true } },
         club: { select: { name: true, district: { select: { name: true } } } },
       },
       orderBy: { date: "desc" },
@@ -887,7 +887,7 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
       },
       include: {
         _count: { select: { registrations: true } },
-        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true, ageGroup: true, ageGroup: true, weightCategory: true, gender: true } },
+        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true, ageGroup: true, weightCategory: true, gender: true } },
         club: { select: { name: true, district: { select: { name: true } } } },
       },
       orderBy: { date: "desc" },
@@ -905,7 +905,7 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
       },
       include: {
         _count: { select: { registrations: true } },
-        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true, ageGroup: true, ageGroup: true, weightCategory: true, gender: true } },
+        registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true, ageGroup: true, weightCategory: true, gender: true } },
         club: { select: { name: true, district: { select: { name: true } } } },
       },
       orderBy: { date: "desc" },
@@ -1028,20 +1028,12 @@ export const createTournamentPaymentOrder = async (req: Request, res: Response) 
       select: { dob: true, gender: true, age: true },
     });
 
-    let ageGroup = "SENIOR";
-    let weightCategory = "ALL";
-    let playerGender = "MALE";
-
-    if (playerData) {
-      playerGender = playerData.gender === "FEMALE" ? "FEMALE" : "MALE";
-      ageGroup = getAgeGroup(playerData.dob, category);
-      if (weight) {
-        weightCategory = getWeightCategory(Number(weight), playerGender, ageGroup);
-      }
+    if (!playerData) {
+      return res.status(404).json({ error: "Player data not found" });
     }
 
-    const playerGender = player.gender === "FEMALE" ? "FEMALE" : "MALE";
-    const ageGroup = getAgeGroup(player.age, category);
+    const playerGender = playerData.gender === "FEMALE" ? "FEMALE" : "MALE";
+    const ageGroup = getAgeGroup(playerData.dob, category);
     const weightCategory = weight ? getWeightCategory(Number(weight), playerGender, ageGroup) : "ALL";
 
     // Check duplicate
@@ -1069,8 +1061,6 @@ export const createTournamentPaymentOrder = async (req: Request, res: Response) 
           height: height || null,
           weight: weight || null,
           coachId: coachId || null,
-          ageGroup,
-          weightCategory,
           ageGroup,
           weightCategory,
           gender: playerGender,
@@ -1145,32 +1135,10 @@ export const verifyTournamentPayment = async (req: Request, res: Response) => {
       select: { dob: true, gender: true, age: true },
     });
 
-    let ageGroup = "SENIOR";
-    let weightCategory = "ALL";
-    let playerGender = "MALE";
-
-    if (playerData) {
-      playerGender = playerData.gender === "FEMALE" ? "FEMALE" : "MALE";
-      ageGroup = getAgeGroup(playerData.dob, category);
-      if (weight) {
-        weightCategory = getWeightCategory(Number(weight), playerGender, ageGroup);
-      }
-    }
-
-    const existing = await prisma.tournamentRegistration.findUnique({
-      where: { 
-        tournamentId_playerId_ageGroup_weightCategory: { 
-          tournamentId, 
-          playerId: userId,
-          ageGroup,
-          weightCategory
-        } 
-      },
-    });
     if (!playerData) return res.status(404).json({ error: "Player not found" });
 
     const playerGender = playerData.gender === "FEMALE" ? "FEMALE" : "MALE";
-    const ageGroup = getAgeGroup(playerData.age, category);
+    const ageGroup = getAgeGroup(playerData.dob, category);
     const weightCategory = weight ? getWeightCategory(Number(weight), playerGender, ageGroup) : "ALL";
 
     const existing = await prisma.tournamentRegistration.findFirst({
@@ -1195,14 +1163,11 @@ export const verifyTournamentPayment = async (req: Request, res: Response) => {
         coachId: coachId || null,
         ageGroup,
         weightCategory,
-        ageGroup,
-        weightCategory,
         gender: playerGender,
       },
     });
 
     // ─── Auto-create or get tournament draw based on player's category ──
-    if (weight) {
     if (playerData && weight) {
       // Get tournament's gender (could be MALE, FEMALE, or BOTH)
       const tournamentGender = tournament.gender === "BOTH" ? playerGender : tournament.gender;
