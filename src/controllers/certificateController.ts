@@ -29,8 +29,20 @@ export const downloadCertificate = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Registration not found." });
     }
 
-    if (registration.tournament.status !== "CLOSED") {
-      return res.status(400).json({ error: "Certificate is only available after the tournament is closed." });
+    // Check if the player's category draw is concluded
+    const categoryDraw = await prisma.tournamentDraw.findFirst({
+      where: {
+        tournamentId,
+        ageGroup: registration.ageGroup,
+        gender: registration.gender === "MALE" ? "MALE" : "FEMALE",
+        weightCategory: registration.weightCategory,
+      }
+    });
+
+    const isCategoryConcluded = categoryDraw ? categoryDraw.isConcluded : false;
+
+    if (registration.tournament.status !== "CLOSED" && !isCategoryConcluded) {
+      return res.status(400).json({ error: "Certificate is only available after the category or tournament is concluded." });
     }
 
     const { player, tournament, placement } = registration;

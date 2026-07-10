@@ -326,6 +326,9 @@ model TournamentRegistration {
   height         String?
   weight         String?
   placement      Placement?                      @default(PARTICIPATION)
+  ageGroup     String     @default("SENIOR")
+  weightCategory String   @default("ALL")
+  gender       Gender     @default(MALE)
   createdAt      DateTime                        @default(now())
   updatedAt      DateTime                        @updatedAt
   ageGroup       String                          @default("SENIOR")
@@ -384,6 +387,7 @@ model TournamentDraw {
   weightCategory String
   matNumber      Int        @default(1)
   rounds         Json
+  isConcluded    Boolean    @default(false)
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
   isConcluded    Boolean    @default(false)
