@@ -9,17 +9,16 @@ export const downloadCertificate = async (req, res) => {
         return res.status(403).json({ error: "Only participants can download certificates." });
     }
     try {
-        const registration = await prisma.tournamentRegistration.findUnique({
+        const registration = await prisma.tournamentRegistration.findFirst({
             where: {
-                tournamentId_playerId: {
-                    tournamentId,
-                    playerId: userId,
-                },
+                tournamentId,
+                playerId: userId,
             },
             include: {
                 player: { select: { fullName: true, age: true, gender: true } },
                 tournament: { select: { title: true, date: true, status: true } },
             },
+            orderBy: { createdAt: "desc" },
         });
         if (!registration) {
             return res.status(404).json({ error: "Registration not found." });

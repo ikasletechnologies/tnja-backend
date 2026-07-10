@@ -13,17 +13,16 @@ export const downloadCertificate = async (req: Request, res: Response) => {
   }
 
   try {
-    const registration = await prisma.tournamentRegistration.findUnique({
+    const registration = await prisma.tournamentRegistration.findFirst({
       where: {
-        tournamentId_playerId: {
-          tournamentId,
-          playerId: userId,
-        },
+        tournamentId,
+        playerId: userId,
       },
       include: {
         player: { select: { fullName: true, age: true, gender: true } },
         tournament: { select: { title: true, date: true, status: true } },
       },
+      orderBy: { createdAt: "desc" },
     });
 
     if (!registration) {

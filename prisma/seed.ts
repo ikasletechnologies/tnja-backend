@@ -1,4 +1,7 @@
 import { PrismaClient, EventLevel, Status, Gender, MemberRole } from '@prisma/client';
+import { hash } from 'bcrypt';
+import crypto from 'crypto';
+import { getAgeGroup, getWeightCategory } from '../src/controllers/tournamentController.js';
 
 const prisma = new PrismaClient();
 
@@ -473,6 +476,7 @@ async function main() {
     name: string;
     clubId: string;
     gender: Gender;
+    dob: Date;
     age: number;
     weightKg: number;
     division: Division;
@@ -539,6 +543,7 @@ async function main() {
       name: student.fullName,
       clubId: club.id,
       gender,
+      dob,
       age,
       weightKg,
       division,
@@ -578,6 +583,9 @@ async function main() {
   for (let i = 0; i < studentRecs.length; i++) {
     const s = studentRecs[i];
     const coach = coachRecs[i % coachRecs.length];
+    const ageGroup = getAgeGroup(s.dob);
+    const weightCategory = getWeightCategory(s.weightKg, s.gender, ageGroup) || "ALL";
+
     await prisma.tournamentRegistration.create({
       data: {
         tournamentId: tournament.id,
@@ -586,6 +594,8 @@ async function main() {
         status: Status.APPROVED,
         weight: s.weightKg.toString(),
         height: heightCm(s.age, s.gender),
+        ageGroup,
+        weightCategory,
       },
     });
     if ((i + 1) % 100 === 0) process.stdout.write(`   → ${i + 1}/1000 registrations\n`);
@@ -599,8 +609,9 @@ async function main() {
   const groups = new Map<string, { studentId: string; name: string; clubId: string }[]>();
 
   for (const s of studentRecs) {
-    const wCat = weightCategory(s.weightKg, s.division, s.gender);
-    const key = `${s.division.division}__${s.division.ageGroup}__${s.gender}__${wCat}`;
+    const ageGroup = getAgeGroup(s.dob);
+    const wCat = getWeightCategory(s.weightKg, s.gender, ageGroup) || "ALL";
+    const key = `${ageGroup}__0__${s.gender}__${wCat}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push({ studentId: s.id, name: s.name, clubId: s.clubId });
   }
@@ -656,7 +667,7 @@ async function main() {
     await prisma.tournamentDraw.create({
       data: {
         tournamentId: tournament.id,
-        ageGroup: `${divisionName} ${ageGroup}`,
+        ageGroup: divisionName,
         gender,
         weightCategory: wCat,
         rounds: [round1],

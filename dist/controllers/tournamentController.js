@@ -3,41 +3,37 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 import { sendNotificationToUser } from "../lib/ws.js";
 import { sendEventRegistrationEmail, sendNewTournamentAnnouncement } from "../lib/mailer.js";
+export const getEligibleCategoriesByBirthYear = (birthYear) => {
+    const eligible = [];
+    if (birthYear === 2018 || birthYear === 2019)
+        eligible.push("Mini Sub-Junior Age Group 1");
+    if (birthYear === 2016 || birthYear === 2017)
+        eligible.push("Mini Sub-Junior Age Group 2");
+    if (birthYear === 2014 || birthYear === 2015)
+        eligible.push("Mini Sub-Junior Age Group 3");
+    if (birthYear >= 2011 && birthYear <= 2013)
+        eligible.push("Sub-Junior");
+    if (birthYear >= 2008 && birthYear <= 2010)
+        eligible.push("Cadet");
+    if (birthYear >= 2005 && birthYear <= 2010)
+        eligible.push("Junior");
+    if (birthYear <= 2010)
+        eligible.push("Senior");
+    const currentYear = new Date().getFullYear();
+    if (currentYear - birthYear >= 35)
+        eligible.push("Veteran");
+    return eligible;
+};
 // ─── HELPER: Calculate Age Group ────────────────────────────────────────────
-export const getAgeGroup = (age, category) => {
-    if (category) {
-        if (category.includes("Mini Sub-Junior Age Group 1") && age <= 7)
-            return category;
-        if (category.includes("Mini Sub-Junior Age Group 2") && age <= 9)
-            return category;
-        if (category.includes("Mini Sub-Junior Age Group 3") && age <= 11)
-            return category;
-        if (category.includes("Sub-Junior") && age >= 12 && age <= 14)
-            return category;
-        if (category.includes("Cadet") && age >= 15 && age <= 17)
-            return category;
-        if (category.includes("Junior") && age >= 15 && age <= 20)
-            return category;
-        if (category.includes("Senior") && age >= 15)
-            return category;
-        if (category.includes("Veteran") && age >= 35)
-            return category;
+export const getAgeGroup = (dob, category) => {
+    if (!dob)
+        return category || "Senior"; // Fallback
+    const birthYear = dob.getFullYear();
+    const eligible = getEligibleCategoriesByBirthYear(birthYear);
+    if (category && eligible.includes(category)) {
+        return category;
     }
-    if (age <= 7)
-        return "Mini Sub-Junior Age Group 1";
-    if (age <= 9)
-        return "Mini Sub-Junior Age Group 2";
-    if (age <= 11)
-        return "Mini Sub-Junior Age Group 3";
-    if (age <= 14)
-        return "Sub-Junior";
-    if (age <= 17)
-        return "Cadet";
-    if (age <= 20)
-        return "Junior";
-    if (age < 35)
-        return "Senior";
-    return "Veteran";
+    return eligible.length > 0 ? eligible[0] : "Senior";
 };
 // ─── HELPER: Get Weight Category ────────────────────────────────────────────
 export const getWeightCategory = (weightKg, gender, ageGroup) => {
@@ -470,7 +466,7 @@ export const getTournamentRegistrations = async (req, res) => {
             where: { tournamentId: id },
             include: {
                 player: {
-                    select: { id: true, fullName: true, permanentId: true, tempId: true, email: true, gender: true, age: true, club: { select: { name: true } } },
+                    select: { id: true, fullName: true, permanentId: true, tempId: true, email: true, gender: true, age: true, dob: true, club: { select: { name: true } } },
                 },
                 coach: { select: { fullName: true } }
             },
@@ -478,7 +474,7 @@ export const getTournamentRegistrations = async (req, res) => {
         });
         const formattedRegistrations = registrations.map(reg => ({
             ...reg,
-            ageGroup: getAgeGroup(reg.player.age)
+            ageGroup: reg.ageGroup || getAgeGroup(reg.player.dob)
         }));
         return res.json(formattedRegistrations);
     }
@@ -798,7 +794,7 @@ export const getPlayerTournaments = async (req, res) => {
                 _count: { select: { registrations: true } },
                 registrations: {
                     where: { playerId: userId },
-                    select: { id: true, status: true, isPaid: true, placement: true },
+                    select: { id: true, status: true, isPaid: true, placement: true, ageGroup: true },
                 },
             },
             orderBy: { date: "desc" },
@@ -807,6 +803,7 @@ export const getPlayerTournaments = async (req, res) => {
             ...t,
             registrationCount: t._count.registrations,
             myRegistration: t.registrations[0] || null,
+            myRegistrations: t.registrations || [],
             registrations: undefined,
             _count: undefined,
         }));
@@ -852,7 +849,7 @@ export const getPlayerPublicMatches = async (req, res) => {
             },
             include: {
                 _count: { select: { registrations: true } },
-                registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true } },
+                registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true, ageGroup: true } },
                 club: { select: { name: true, district: { select: { name: true } } } },
             },
             orderBy: { date: "desc" },
@@ -870,7 +867,7 @@ export const getPlayerPublicMatches = async (req, res) => {
             },
             include: {
                 _count: { select: { registrations: true } },
-                registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true } },
+                registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true, ageGroup: true } },
                 club: { select: { name: true, district: { select: { name: true } } } },
             },
             orderBy: { date: "desc" },
@@ -887,7 +884,7 @@ export const getPlayerPublicMatches = async (req, res) => {
             },
             include: {
                 _count: { select: { registrations: true } },
-                registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true } },
+                registrations: { where: { playerId: userId }, select: { id: true, status: true, isPaid: true, placement: true, ageGroup: true } },
                 club: { select: { name: true, district: { select: { name: true } } } },
             },
             orderBy: { date: "desc" },
@@ -896,6 +893,7 @@ export const getPlayerPublicMatches = async (req, res) => {
             ...t,
             registrationCount: t._count.registrations,
             myRegistration: t.registrations[0] || null,
+            myRegistrations: t.registrations || [],
             registrations: undefined,
             _count: undefined,
         });
@@ -961,14 +959,34 @@ export const createTournamentPaymentOrder = async (req, res) => {
         if (tournament.gender && tournament.gender !== "BOTH" && tournament.gender !== player.gender) {
             return res.status(403).json({ error: `This tournament is restricted to ${tournament.gender} players only.` });
         }
-        // Slot check removed (totalSlots not in schema)
-        // const regCount = await prisma.tournamentRegistration.count({ where: { tournamentId } });
+        // ─── Calculate ageGroup and weightCategory ──
+        const playerData = await prisma.student.findUnique({
+            where: { id: userId },
+            select: { dob: true, gender: true, age: true },
+        });
+        let ageGroup = "SENIOR";
+        let weightCategory = "ALL";
+        let playerGender = "MALE";
+        if (playerData) {
+            playerGender = playerData.gender === "FEMALE" ? "FEMALE" : "MALE";
+            ageGroup = getAgeGroup(playerData.dob, category);
+            if (weight) {
+                weightCategory = getWeightCategory(Number(weight), playerGender, ageGroup);
+            }
+        }
         // Check duplicate
         const existing = await prisma.tournamentRegistration.findUnique({
-            where: { tournamentId_playerId: { tournamentId, playerId: userId } },
+            where: {
+                tournamentId_playerId_ageGroup_weightCategory: {
+                    tournamentId,
+                    playerId: userId,
+                    ageGroup,
+                    weightCategory
+                }
+            },
         });
         if (existing)
-            return res.status(400).json({ error: "You have already registered for this tournament" });
+            return res.status(400).json({ error: "You have already registered for this category in this tournament" });
         // Handle Free/BPL Registration
         const isFree = tournament.entryFee === 0 || (tournament.allowBPL && player.isBPL);
         if (isFree) {
@@ -981,30 +999,15 @@ export const createTournamentPaymentOrder = async (req, res) => {
                     height: height || null,
                     weight: weight || null,
                     coachId: coachId || null,
+                    ageGroup,
+                    weightCategory,
                 },
             });
             // ─── Auto-create or get tournament draw based on player's category ──
-            const playerData = await prisma.student.findUnique({
-                where: { id: userId },
-                select: { age: true, gender: true },
-            });
             if (playerData && weight) {
-                const playerGender = playerData.gender === "FEMALE" ? "FEMALE" : "MALE";
-                const ageGroup = getAgeGroup(playerData.age, category);
-                const weightCategory = getWeightCategory(Number(weight), playerGender, ageGroup);
                 // Get tournament's gender (could be MALE, FEMALE, or BOTH)
                 const tournamentGender = tournament.gender === "BOTH" ? playerGender : tournament.gender;
                 await createOrGetDraw(tournamentId, tournamentGender, ageGroup, weightCategory, playerData.age);
-            }
-            // Update the student's global profile with latest height/weight
-            if (height || weight) {
-                await prisma.student.update({
-                    where: { id: userId },
-                    data: {
-                        ...(height && { height: height }),
-                        ...(weight && { weight: weight })
-                    }
-                });
             }
             // Update the student's global profile with latest height/weight
             if (height || weight) {
@@ -1061,11 +1064,33 @@ export const verifyTournamentPayment = async (req, res) => {
         const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
         if (!tournament)
             return res.status(404).json({ error: "Tournament not found" });
+        // ─── Calculate ageGroup and weightCategory ──
+        const playerData = await prisma.student.findUnique({
+            where: { id: userId },
+            select: { dob: true, gender: true, age: true },
+        });
+        let ageGroup = "SENIOR";
+        let weightCategory = "ALL";
+        let playerGender = "MALE";
+        if (playerData) {
+            playerGender = playerData.gender === "FEMALE" ? "FEMALE" : "MALE";
+            ageGroup = getAgeGroup(playerData.dob, category);
+            if (weight) {
+                weightCategory = getWeightCategory(Number(weight), playerGender, ageGroup);
+            }
+        }
         const existing = await prisma.tournamentRegistration.findUnique({
-            where: { tournamentId_playerId: { tournamentId, playerId: userId } },
+            where: {
+                tournamentId_playerId_ageGroup_weightCategory: {
+                    tournamentId,
+                    playerId: userId,
+                    ageGroup,
+                    weightCategory
+                }
+            },
         });
         if (existing)
-            return res.status(400).json({ error: "Already registered for this tournament" });
+            return res.status(400).json({ error: "Already registered for this category in this tournament" });
         // Slot check removed (totalSlots not in schema)
         // const regCount = await prisma.tournamentRegistration.count({ where: { tournamentId } });
         const registration = await prisma.tournamentRegistration.create({
@@ -1078,17 +1103,12 @@ export const verifyTournamentPayment = async (req, res) => {
                 height: height || null,
                 weight: weight || null,
                 coachId: coachId || null,
+                ageGroup,
+                weightCategory,
             },
         });
         // ─── Auto-create or get tournament draw based on player's category ──
-        const playerData = await prisma.student.findUnique({
-            where: { id: userId },
-            select: { age: true, gender: true },
-        });
         if (playerData && weight) {
-            const playerGender = playerData.gender === "FEMALE" ? "FEMALE" : "MALE";
-            const ageGroup = getAgeGroup(playerData.age, category);
-            const weightCategory = getWeightCategory(Number(weight), playerGender, ageGroup);
             // Get tournament's gender (could be MALE, FEMALE, or BOTH)
             const tournamentGender = tournament.gender === "BOTH" ? playerGender : tournament.gender;
             await createOrGetDraw(tournamentId, tournamentGender, ageGroup, weightCategory, playerData.age);
@@ -1633,8 +1653,8 @@ export const submitTournamentResults = async (req, res) => {
             return res.status(400).json({ error: "One or more players are not registered in this tournament" });
         }
         // Use a transaction to update placements
-        await prisma.$transaction(results.map((r) => prisma.tournamentRegistration.update({
-            where: { tournamentId_playerId: { tournamentId: id, playerId: r.playerId } },
+        await prisma.$transaction(results.map((r) => prisma.tournamentRegistration.updateMany({
+            where: { tournamentId: id, playerId: r.playerId },
             data: { placement: r.placement },
         })));
         // Also close the tournament

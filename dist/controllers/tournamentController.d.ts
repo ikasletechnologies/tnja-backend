@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
-export declare const getAgeGroup: (age: number, category?: string) => string;
+export declare const getEligibleCategoriesByBirthYear: (birthYear: number) => string[];
+export declare const getAgeGroup: (dob: Date | null, category?: string) => string;
 export declare const getWeightCategory: (weightKg: number, gender: string, ageGroup: string) => string;
 export declare const createTournament: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const startTournament: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
