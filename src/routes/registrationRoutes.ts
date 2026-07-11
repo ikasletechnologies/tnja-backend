@@ -6,7 +6,7 @@ import { getClubs } from "../controllers/clubController.js";
 import { getDistricts, getTaluksByDistrict, getTalukDetails } from "../controllers/locationController.js";
 import { authenticateJWT, authorizeAdmin, authorize } from "../middleware/authMiddleware.js";
 import { createEvent, getActiveEvents, getAdminEvents, getMyEvents, updateEvent, applyForEvent, createEventPaymentOrder, verifyEventPayment, getEventSections } from "../controllers/eventController.js";
-import { createTournament, startTournament, getClubTournaments, getTournamentRegistrations, updateRegistrationStatus, disqualifyRegistration, updateRegistrationMetrics, sendRegistrationReply, getRegistrationMessages, updateTournament, deleteTournament, getPlayerTournaments, getPlayerPublicMatches, createTournamentPaymentOrder, verifyTournamentPayment, getAdminTournaments, getAdminApprovedTournaments, approveTournament, sendTournamentReply, getApprovedTournaments, getTournamentById, getTournamentDraws, saveTournamentDraw, getTournamentMessages, getTournamentMats, saveTournamentMats, getRefereeMats, submitMatchResult, updateMatchState, submitTournamentResults } from "../controllers/tournamentController.js";
+import { createTournament, startTournament, getClubTournaments, getTournamentRegistrations, updateRegistrationStatus, disqualifyRegistration, updateRegistrationMetrics, sendRegistrationReply, getRegistrationMessages, updateTournament, deleteTournament, getPlayerTournaments, getPlayerPublicMatches, getCategoryParticipants, createTournamentPaymentOrder, verifyTournamentPayment, getAdminTournaments, getAdminApprovedTournaments, approveTournament, sendTournamentReply, getApprovedTournaments, getTournamentById, getTournamentDraws, saveTournamentDraw, getTournamentMessages, getTournamentMats, saveTournamentMats, getRefereeMats, submitMatchResult, updateMatchState, submitTournamentResults } from "../controllers/tournamentController.js";
 import { downloadCertificate } from "../controllers/certificateController.js";
 import scoreboardOptions from "../data/scoreboardOptions.json" with { type: "json" };
 
@@ -36,6 +36,7 @@ router.get("/tournaments/official/my", authenticateJWT, authorize(["DISTRICT_PRE
 router.get("/tournaments/approved", authenticateJWT, getApprovedTournaments);
 // Player
 router.get("/tournaments/player", authenticateJWT, getPlayerTournaments);
+router.get("/tournaments/player/category-participants", authenticateJWT, getCategoryParticipants);
 router.get("/tournaments/player/matches", authenticateJWT, getPlayerPublicMatches);
 router.post("/tournaments/player/pay", authenticateJWT, createTournamentPaymentOrder);
 router.post("/tournaments/player/verify", authenticateJWT, verifyTournamentPayment);

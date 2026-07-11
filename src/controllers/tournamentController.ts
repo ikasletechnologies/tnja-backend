@@ -830,6 +830,43 @@ export const getPlayerTournaments = async (req: Request, res: Response) => {
   }
 };
 
+// ─── PLAYER: Get Category Participants ───────────────────────────────────────
+export const getCategoryParticipants = async (req: Request, res: Response) => {
+  const { tournamentId, ageGroup, gender, weightCategory } = req.query;
+
+  if (!tournamentId || !ageGroup || !gender || !weightCategory) {
+    return res.status(400).json({ error: "Missing required query parameters" });
+  }
+
+  try {
+    const participants = await prisma.tournamentRegistration.findMany({
+      where: {
+        tournamentId: tournamentId as string,
+        ageGroup: ageGroup as string,
+        gender: gender as string,
+        weightCategory: weightCategory as string,
+        status: "APPROVED"
+      },
+      include: {
+        player: { select: { fullName: true, club: { select: { name: true } }, district: { select: { name: true } } } }
+      },
+      orderBy: { player: { fullName: "asc" } }
+    });
+
+    const formatted = participants.map(p => ({
+      id: p.id,
+      name: p.player?.fullName || "Unknown",
+      club: p.player?.club?.name || "-",
+      district: p.player?.district?.name || "-"
+    }));
+
+    return res.json(formatted);
+  } catch (error) {
+    console.error("Error fetching category participants:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 // ─── PLAYER: Get District / State / National Matches ─────────────────────────
 // District matches: level=DISTRICT, club in player's district
 // State matches:    level=STATE, approved
