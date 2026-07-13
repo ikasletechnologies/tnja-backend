@@ -15,6 +15,7 @@ export declare const sendRegistrationReply: (req: Request, res: Response) => Pro
 export declare const updateTournament: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const deleteTournament: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const getPlayerTournaments: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+export declare const getCategoryParticipants: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const getPlayerPublicMatches: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const createTournamentPaymentOrder: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const verifyTournamentPayment: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;

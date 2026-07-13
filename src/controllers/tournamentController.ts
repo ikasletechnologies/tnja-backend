@@ -843,7 +843,7 @@ export const getCategoryParticipants = async (req: Request, res: Response) => {
       where: {
         tournamentId: tournamentId as string,
         ageGroup: ageGroup as string,
-        gender: gender as string,
+        gender: gender as any,
         weightCategory: weightCategory as string,
         status: "APPROVED"
       },

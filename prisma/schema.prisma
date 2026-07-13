@@ -326,14 +326,11 @@ model TournamentRegistration {
   height         String?
   weight         String?
   placement      Placement?                      @default(PARTICIPATION)
-  ageGroup     String     @default("SENIOR")
-  weightCategory String   @default("ALL")
-  gender       Gender     @default(MALE)
+  ageGroup       String                          @default("SENIOR")
+  weightCategory String                          @default("ALL")
+  gender         Gender                          @default(MALE)
   createdAt      DateTime                        @default(now())
   updatedAt      DateTime                        @updatedAt
-  ageGroup       String                          @default("SENIOR")
-  gender         Gender                          @default(MALE)
-  weightCategory String                          @default("ALL")
   coach          CoachReferee?                   @relation(fields: [coachId], references: [id])
   player         Student                         @relation(fields: [playerId], references: [id])
   tournament     Tournament                      @relation(fields: [tournamentId], references: [id])
@@ -390,7 +387,6 @@ model TournamentDraw {
   isConcluded    Boolean    @default(false)
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
-  isConcluded    Boolean    @default(false)
   tournament     Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
   @@unique([tournamentId, ageGroup, exactAge, gender, weightCategory])
