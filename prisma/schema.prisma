@@ -428,6 +428,7 @@ enum Status {
   CLOSED
   NOT_REQUIRED
   DISQUALIFIED
+  BLOCKED
 }
 
 enum Gender {

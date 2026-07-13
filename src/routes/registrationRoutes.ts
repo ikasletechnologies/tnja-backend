@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { registerStudent, registerCoach, registerClub, registerMember, resubmitApplication } from "../controllers/registrationController.js";
 import { updateApplicationStatus, requestChanges, getApplicationDetails, getPendingApplications, getDashboardStats, getLocationAnalytics, createPaymentOrder, verifyPayment, getGlobalSettings, updateGlobalSettings, promoteMember, forceCreateStudent, forceCreateClub, forceCreateMember } from "../controllers/adminController.js";
-import { getAllUsers, updateUserCredentials, updateUserProfile, getPublicCoaches, getPublicMembers, getCoachStudents, deleteUser, getUserDetails, searchRefereeById } from "../controllers/userManagementController.js";
+import { getAllUsers, updateUserCredentials, updateUserProfile, getPublicCoaches, getPublicMembers, getCoachStudents, deleteUser, getUserDetails, searchRefereeById, blockUser } from "../controllers/userManagementController.js";
 import { getClubs } from "../controllers/clubController.js";
 import { getDistricts, getTaluksByDistrict, getTalukDetails } from "../controllers/locationController.js";
 import { authenticateJWT, authorizeAdmin, authorize } from "../middleware/authMiddleware.js";
@@ -110,6 +110,7 @@ router.patch("/users/credentials", authenticateJWT, authorizeAdmin, updateUserCr
 router.patch("/users/profile", authenticateJWT, authorize(["SUPER_ADMIN", "CEO"]), updateUserProfile);
 router.get("/users/:type/:id", authenticateJWT, authorizeAdmin, getUserDetails);
 router.delete("/users/:type/:id", authenticateJWT, authorize(["SUPER_ADMIN", "CEO"]), deleteUser);
+router.patch("/users/:type/:id/block", authenticateJWT, authorize(["SUPER_ADMIN", "CEO", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"]), blockUser);
 router.patch("/member/promote", authenticateJWT, authorizeAdmin, promoteMember);
 
 // ── Coach/Referee Dashboard ────────────────────────────────────────────────────────

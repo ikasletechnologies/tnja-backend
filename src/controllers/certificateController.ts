@@ -12,12 +12,19 @@ export const downloadCertificate = async (req: Request, res: Response) => {
     return res.status(403).json({ error: "Only participants can download certificates." });
   }
 
+  const regId = req.query.regId as string | undefined;
+
   try {
+    let whereClause: any = {
+      tournamentId,
+      playerId: userId,
+    };
+    if (regId) {
+      whereClause.id = regId;
+    }
+
     const registration = await prisma.tournamentRegistration.findFirst({
-      where: {
-        tournamentId,
-        playerId: userId,
-      },
+      where: whereClause,
       include: {
         player: { select: { fullName: true, age: true, gender: true } },
         tournament: { select: { title: true, date: true, status: true } },

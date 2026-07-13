@@ -486,3 +486,64 @@ export const searchRefereeById = async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 };
+
+export const blockUser = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const type = req.params.type as string; // STUDENT, COACH, MEMBER, CLUB
+
+    if (!id || !type) {
+      return res.status(400).json({ error: "Missing user ID or type" });
+    }
+
+    const { role, districtId } = (req as any).user;
+    
+    // Check permissions
+    const allowedRoles = ["SUPER_ADMIN", "CEO", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"];
+    if (!allowedRoles.includes(role)) {
+      return res.status(403).json({ error: "Forbidden: Insufficient privileges to block users" });
+    }
+
+    let userToBlock: any = null;
+
+    if (type === "CLUB") {
+      userToBlock = await prisma.club.findUnique({ where: { id } });
+    } else if (type === "STUDENT") {
+      userToBlock = await prisma.student.findUnique({ where: { id } });
+    } else if (type === "COACH") {
+      userToBlock = await prisma.coachReferee.findUnique({ where: { id } });
+    } else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(type)) {
+      userToBlock = await prisma.member.findUnique({ where: { id } });
+    } else {
+      return res.status(400).json({ error: "Invalid user type" });
+    }
+
+    if (!userToBlock) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // District level officials can only block users in their own district
+    if (["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) {
+      if (userToBlock.districtId !== districtId) {
+        return res.status(403).json({ error: "Forbidden: You can only block users in your own district" });
+      }
+    }
+
+    // Apply the block
+    let updated;
+    if (type === "CLUB") {
+      updated = await prisma.club.update({ where: { id }, data: { status: "BLOCKED" } });
+    } else if (type === "STUDENT") {
+      updated = await prisma.student.update({ where: { id }, data: { status: "BLOCKED" } });
+    } else if (type === "COACH") {
+      updated = await prisma.coachReferee.update({ where: { id }, data: { status: "BLOCKED" } });
+    } else {
+      updated = await prisma.member.update({ where: { id }, data: { status: "BLOCKED" } });
+    }
+
+    return res.json({ success: true, message: "User has been blocked successfully", data: updated });
+  } catch (error) {
+    console.error("Error blocking user:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
