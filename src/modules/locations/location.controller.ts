@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import prisma from "../../database/prisma";
+import prisma from "../../database/prisma.js";
 
 export const getDistricts = async (req: Request, res: Response) => {
   try {

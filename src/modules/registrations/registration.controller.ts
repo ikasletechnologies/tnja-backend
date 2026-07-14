@@ -1,9 +1,9 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcrypt";
-import prisma from "../../database/prisma";
-import { studentRegistrationSchema, coachRegistrationSchema, clubRegistrationSchema, memberRegistrationSchema } from "../../validators/registrationSchema";
+import prisma from "../../database/prisma.js";
+import { studentRegistrationSchema, coachRegistrationSchema, clubRegistrationSchema, memberRegistrationSchema } from "../../validators/registrationSchema.js";
 import crypto from "crypto";
-import { sendClubRegistrationEmail, sendRegistrationReceiptEmail } from "../../config/mailer";
+import { sendClubRegistrationEmail, sendRegistrationReceiptEmail } from "../../config/mailer.js";
 
 // Helper to generate IDs
 const generateTempId = (prefix: string) => {

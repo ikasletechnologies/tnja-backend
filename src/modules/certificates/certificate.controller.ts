@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import prisma from "../../database/prisma";
+import prisma from "../../database/prisma.js";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import fs from "fs";
 import path from "path";

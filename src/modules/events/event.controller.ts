@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import prisma from "../../database/prisma";
+import prisma from "../../database/prisma.js";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 
@@ -382,7 +382,7 @@ export const verifyEventPayment = async (req: Request, res: Response) => {
 
     if (userDetails) {
       try {
-        const { sendEventRegistrationEmail } = await import("../../../../lib/src/config/mailer");
+        const { sendEventRegistrationEmail } = await import("../../config/mailer.js");
         await sendEventRegistrationEmail({
           toEmail: userDetails.email,
           toName: userDetails.fullName || userDetails.name,

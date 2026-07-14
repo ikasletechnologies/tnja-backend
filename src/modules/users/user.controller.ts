@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
-import prisma from "../../database/prisma";
+import prisma from "../../database/prisma.js";
 import bcrypt from "bcrypt";
-import { sendAccountDeletionEmail } from "../../config/mailer";
+import { sendAccountDeletionEmail } from "../../config/mailer.js";
 
 export const getPublicCoaches = async (req: Request, res: Response) => {
   try {
@@ -163,10 +163,10 @@ export const getAllUsers = async (req: Request, res: Response) => {
     ]);
 
     const allUsers = [
-      ...students.map(u => ({ ...u, role: "STUDENT", districtName: u.district?.name, talukName: u.taluk?.name })),
-      ...coaches.map(u => ({ ...u, role: "COACH", districtName: u.district?.name, talukName: u.taluk?.name })),
-      ...members.map(u => ({ ...u, role: u.role, districtName: (['DISTRICT_PRESIDENT', 'DISTRICT_SECRETARY'].includes(u.role) && u.assignedDistrict) ? u.assignedDistrict.name : u.district?.name, talukName: u.taluk?.name })),
-      ...clubs.map(u => ({ ...u, fullName: u.name, role: "CLUB", districtName: u.district?.name, talukName: u.taluk?.name })),
+      ...students.map((u: any) => ({ ...u, role: "STUDENT", districtName: u.district?.name, talukName: u.taluk?.name })),
+      ...coaches.map((u: any) => ({ ...u, role: "COACH", districtName: u.district?.name, talukName: u.taluk?.name })),
+      ...members.map((u: any) => ({ ...u, role: u.role, districtName: (['DISTRICT_PRESIDENT', 'DISTRICT_SECRETARY'].includes(u.role) && u.assignedDistrict) ? u.assignedDistrict.name : u.district?.name, talukName: u.taluk?.name })),
+      ...clubs.map((u: any) => ({ ...u, fullName: u.name, role: "CLUB", districtName: u.district?.name, talukName: u.taluk?.name })),
     ];
 
     return res.json(allUsers);
@@ -298,7 +298,7 @@ export const getCoachStudents = async (req: Request, res: Response) => {
     });
 
     // Calculate performance metrics for each student
-    const studentsWithPerformance = students.map((student) => {
+    const studentsWithPerformance = students.map((student: any) => {
       const totalMatches = student.wins + student.losses + student.draws;
       const winRate = totalMatches > 0 ? Math.round((student.wins / totalMatches) * 100) : 0;
 
@@ -322,7 +322,7 @@ export const getCoachStudents = async (req: Request, res: Response) => {
 
     // Get tournament participation count for each student
     const studentsWithTournaments = await Promise.all(
-      studentsWithPerformance.map(async (student) => {
+      studentsWithPerformance.map(async (student: any) => {
         const tournamentCount = await prisma.tournamentRegistration.count({
           where: { playerId: student.id },
         });
@@ -388,7 +388,7 @@ export const deleteUser = async (req: Request, res: Response) => {
           toEmail: deletedUser.email,
           toName: deletedUser.fullName || deletedUser.clubName || "User",
           role: userRoleForEmail,
-        }).catch(err => console.error("Error sending deletion email:", err));
+        }).catch((err: any) => console.error("Error sending deletion email:", err));
       }
 
       return res.json({ success: true, message: "User deleted successfully" });

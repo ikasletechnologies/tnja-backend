@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
-import prisma from "../../database/prisma";
+import prisma from "../../database/prisma.js";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
-import { sendApprovalEmail, sendRejectionEmail, sendPaymentRequestEmail } from "../../config/mailer";
+import { sendApprovalEmail, sendRejectionEmail, sendPaymentRequestEmail } from "../../config/mailer.js";
 import Razorpay from "razorpay";
 
 const razorpay = new Razorpay({
@@ -169,7 +169,7 @@ export const getPendingApplications = async (req: Request, res: Response) => {
         orderBy: { createdAt: "desc" },
       });
 
-      const detailedRegistrations = await Promise.all(registrations.map(async (reg) => {
+      const detailedRegistrations = await Promise.all(registrations.map(async (reg: any) => {
         let userDetails: any = null;
         if (reg.role === "STUDENT") {
           userDetails = await prisma.student.findUnique({ where: { id: reg.userId }, select: { fullName: true, email: true, tempId: true } });
@@ -797,12 +797,12 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     ]);
 
     const recent = [
-      ...s.map(i => ({ name: i.fullName, type: "Player", createdAt: i.createdAt })),
-      ...c.map(i => ({ name: i.fullName, type: "Coach", createdAt: i.createdAt })),
-      ...m.map(i => ({ name: i.fullName, type: "Member", createdAt: i.createdAt })),
-      ...cl.map(i => ({ name: i.name, type: "Club", createdAt: i.createdAt })),
+      ...s.map((i: any) => ({ name: i.fullName, type: "Player", createdAt: i.createdAt })),
+      ...c.map((i: any) => ({ name: i.fullName, type: "Coach", createdAt: i.createdAt })),
+      ...m.map((i: any) => ({ name: i.fullName, type: "Member", createdAt: i.createdAt })),
+      ...cl.map((i: any) => ({ name: i.name, type: "Club", createdAt: i.createdAt })),
     ]
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, 5);
 
     return res.json({
@@ -1033,7 +1033,7 @@ export const promoteMember = async (req: Request, res: Response) => {
           where: { zoneName: targetDistrict.zoneName },
           select: { id: true }
         });
-        const zoneDistrictIds = zoneDistricts.map(d => d.id);
+        const zoneDistrictIds = zoneDistricts.map((d: any) => d.id);
         
         const existing = await prisma.member.findFirst({
           where: {
@@ -1104,7 +1104,7 @@ export const getLocationAnalytics = async (req: Request, res: Response) => {
       }
     });
 
-    const analytics = taluks.map(t => ({
+    const analytics = taluks.map((t: any) => ({
       id: t.id,
       name: t.name,
       players: t.students.length,
@@ -1112,7 +1112,7 @@ export const getLocationAnalytics = async (req: Request, res: Response) => {
       members: t.members.length,
       clubs: t.clubs.length,
       total: t.students.length + t.coaches.length + t.members.length + t.clubs.length
-    })).sort((a, b) => b.total - a.total);
+    })).sort((a: any, b: any) => b.total - a.total);
 
     return res.json(analytics);
   } catch (error) {

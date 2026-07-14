@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import prisma from "../../database/prisma";
+import prisma from "../../database/prisma.js";
 
 export const createGrievance = async (req: Request, res: Response) => {
   try {
@@ -34,7 +34,7 @@ export const createGrievance = async (req: Request, res: Response) => {
     });
 
     try {
-      const { sendNotificationToAdmins } = await import("../../../../lib/src/socket/socket");
+      const { sendNotificationToAdmins } = await import("../../socket/socket.js");
       sendNotificationToAdmins({
         type: "NEW_GRIEVANCE",
         grievanceId: grievance.id,
@@ -98,7 +98,7 @@ export const replyToGrievance = async (req: Request, res: Response) => {
     });
 
     try {
-      const { sendNotificationToUser } = await import("../../../../lib/src/socket/socket");
+      const { sendNotificationToUser } = await import("../../socket/socket.js");
       sendNotificationToUser(grievance.userId, {
         type: "GRIEVANCE_REPLY",
         grievanceId: grievance.id,
@@ -134,7 +134,7 @@ export const closeGrievance = async (req: Request, res: Response) => {
     });
 
     try {
-      const { sendNotificationToUser } = await import("../../../../lib/src/socket/socket");
+      const { sendNotificationToUser } = await import("../../socket/socket.js");
       sendNotificationToUser(grievance.userId, {
         type: "GRIEVANCE_CLOSED",
         grievanceId: grievance.id,

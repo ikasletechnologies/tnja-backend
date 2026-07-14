@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
-import { upload } from "../../middleware/uploadMiddleware";
+import { upload } from "../../middleware/uploadMiddleware.js";
 
 const router = Router();
 

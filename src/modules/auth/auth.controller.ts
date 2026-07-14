@@ -1,9 +1,9 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcrypt";
-import prisma from "../../database/prisma";
+import prisma from "../../database/prisma.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { sendResetPasswordEmail, sendAadhaarVerificationEmail } from "../../config/mailer";
+import { sendResetPasswordEmail, sendAadhaarVerificationEmail } from "../../config/mailer.js";
 
 export const login = async (req: Request, res: Response) => {
   const { identifier, password } = req.body;
@@ -356,7 +356,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     const resetLink = `${process.env.FRONTEND_URL || "http://localhost:3000"}/reset-password?token=${resetToken}`;
     
     // Dynamically import sendResetPasswordEmail to avoid circular dependency issues if any
-    const { sendResetPasswordEmail } = await import("../../../../lib/src/config/mailer");
+    const { sendResetPasswordEmail } = await import("../../config/mailer.js");
     await sendResetPasswordEmail({
       toEmail: user.email,
       toName: user.fullName || user.clubName,

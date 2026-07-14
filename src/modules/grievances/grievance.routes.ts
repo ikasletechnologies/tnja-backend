@@ -5,9 +5,9 @@ import {
   getAllGrievances, 
   replyToGrievance,
   closeGrievance
-} from "./grievance.controller";
+} from "./grievance.controller.js";
 
-import { upload } from "../../middleware/uploadMiddleware";
+import { upload } from "../../middleware/uploadMiddleware.js";
 
 const router = Router();
 

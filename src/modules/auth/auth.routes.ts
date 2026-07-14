@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { login, getProfile, updateProfile, changePassword, forgotPassword, resetPassword, trackStatus, sendAadhaarOtp, verifyAadhaarOtp } from "./auth.controller";
-import { authenticateJWT } from "../../middleware/authMiddleware";
+import { login, getProfile, updateProfile, changePassword, forgotPassword, resetPassword, trackStatus, sendAadhaarOtp, verifyAadhaarOtp } from "./auth.controller.js";
+import { authenticateJWT } from "../../middleware/authMiddleware.js";
 
 const router = Router();
 

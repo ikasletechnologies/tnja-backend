@@ -1,9 +1,9 @@
 import type { Request, Response } from "express";
-import prisma from "../../database/prisma";
+import prisma from "../../database/prisma.js";
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import { sendNotificationToUser } from "../../socket/socket";
-import { sendEventRegistrationEmail, sendNewTournamentAnnouncement } from "../../config/mailer";
+import { sendNotificationToUser } from "../../socket/socket.js";
+import { sendEventRegistrationEmail, sendNewTournamentAnnouncement } from "../../config/mailer.js";
 
 export const getEligibleCategoriesByBirthYear = (birthYear: number): string[] => {
   const eligible: string[] = [];
@@ -345,7 +345,7 @@ export const getClubTournaments = async (req: Request, res: Response) => {
       orderBy: { date: "asc" },
     });
 
-    const result = tournaments.map((t) => ({
+    const result = tournaments.map((t: any) => ({
       ...t,
       registrationCount: t._count.registrations,
       hasPendingPlayers: t.registrations.length > 0,
@@ -379,7 +379,7 @@ export const getApprovedTournaments = async (req: Request, res: Response) => {
       orderBy: { date: "desc" },
     });
 
-    const result = tournaments.map((t) => ({
+    const result = tournaments.map((t: any) => ({
       ...t,
       registrationCount: t._count.registrations,
       hasPendingPlayers: t.registrations.length > 0,
@@ -424,7 +424,7 @@ export const getTournamentRegistrations = async (req: Request, res: Response) =>
       orderBy: { createdAt: "asc" },
     });
 
-    const formattedRegistrations = registrations.map(reg => ({
+    const formattedRegistrations = registrations.map((reg: any) => ({
       ...reg,
       ageGroup: reg.ageGroup || reg.ageGroup || getAgeGroup(reg.player.dob)
     }));
@@ -787,7 +787,7 @@ export const getPlayerTournaments = async (req: Request, res: Response) => {
 
     const concludedDraws = await prisma.tournamentDraw.findMany({
       where: {
-        tournamentId: { in: tournaments.map(t => t.id) },
+        tournamentId: { in: tournaments.map((t: any) => t.id) },
         isConcluded: true
       },
       select: {
@@ -799,10 +799,10 @@ export const getPlayerTournaments = async (req: Request, res: Response) => {
     });
 
     const concludedDrawsSet = new Set(
-      concludedDraws.map(d => `${d.tournamentId}_${d.ageGroup}_${d.gender}_${d.weightCategory}`)
+      concludedDraws.map((d: any) => `${d.tournamentId}_${d.ageGroup}_${d.gender}_${d.weightCategory}`)
     );
 
-    const result = tournaments.map((t) => {
+    const result = tournaments.map((t: any) => {
       const myReg = t.registrations[0] || null;
       let isCategoryConcluded = false;
       if (myReg) {
@@ -853,7 +853,7 @@ export const getCategoryParticipants = async (req: Request, res: Response) => {
       orderBy: { player: { fullName: "asc" } }
     });
 
-    const formatted = participants.map(p => ({
+    const formatted = participants.map((p: any) => ({
       id: p.id,
       name: p.player?.fullName || "Unknown",
       club: p.player?.club?.name || "-",
@@ -949,9 +949,9 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
     });
 
     const tournamentIds = [
-      ...districtTournaments.map(t => t.id),
-      ...zonalTournaments.map(t => t.id),
-      ...stateNationalTournaments.map(t => t.id)
+      ...districtTournaments.map((t: any) => t.id),
+      ...zonalTournaments.map((t: any) => t.id),
+      ...stateNationalTournaments.map((t: any) => t.id)
     ];
 
     const concludedDraws = await prisma.tournamentDraw.findMany({
@@ -968,7 +968,7 @@ export const getPlayerPublicMatches = async (req: Request, res: Response) => {
     });
 
     const concludedDrawsSet = new Set(
-      concludedDraws.map(d => `${d.tournamentId}_${d.ageGroup}_${d.gender}_${d.weightCategory}`)
+      concludedDraws.map((d: any) => `${d.tournamentId}_${d.ageGroup}_${d.gender}_${d.weightCategory}`)
     );
 
     const mapTournament = (t: any) => {
@@ -1291,7 +1291,7 @@ export const getAdminTournaments = async (req: Request, res: Response) => {
       orderBy: { createdAt: "desc" },
     });
 
-    const result = tournaments.map((t) => ({
+    const result = tournaments.map((t: any) => ({
       ...t,
       registrationCount: t._count.registrations,
       hasPendingPlayers: t.registrations.length > 0,
@@ -1335,7 +1335,7 @@ export const getAdminApprovedTournaments = async (req: Request, res: Response) =
       orderBy: { createdAt: "desc" },
     });
 
-    const result = tournaments.map((t) => ({
+    const result = tournaments.map((t: any) => ({
       ...t,
       registrationCount: t._count.registrations,
       hasPendingPlayers: t.registrations.length > 0,
@@ -1453,7 +1453,7 @@ export const approveTournament = async (req: Request, res: Response) => {
                 tournamentTitle: tournament.title,
                 tournamentDate: new Date(tournament.date).toLocaleDateString("en-IN"),
                 tournamentLevel: tournament.level
-              }).catch(err => console.error("Failed to send announcement to", player.email, err));
+              }).catch((err: any) => console.error("Failed to send announcement to", player.email, err));
             }
           }
         } catch (err) {
@@ -1543,7 +1543,7 @@ export const sendTournamentReply = async (req: Request, res: Response) => {
     } else if (isCreator) {
       // If the creator commented, we can notify admins (e.g. using sendNotificationToAdmins if imported)
       try {
-        const { sendNotificationToAdmins } = await import("../../../../lib/src/socket/socket");
+        const { sendNotificationToAdmins } = await import("../../socket/socket.js");
         sendNotificationToAdmins({
           type: "NEW_TOURNAMENT",
           tournamentId: id,
@@ -1821,7 +1821,7 @@ export const submitTournamentResults = async (req: Request, res: Response) => {
       const allDraws = await prisma.tournamentDraw.findMany({
         where: { tournamentId: id }
       });
-      const allConcluded = allDraws.every(d => d.isConcluded);
+      const allConcluded = allDraws.every((d: any) => d.isConcluded);
       if (allConcluded && allDraws.length > 0) {
         await prisma.tournament.update({
           where: { id },

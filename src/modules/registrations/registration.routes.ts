@@ -1,14 +1,14 @@
 import { Router } from "express";
-import { registerStudent, registerCoach, registerClub, registerMember, resubmitApplication } from "./registration.controller";
-import { updateApplicationStatus, requestChanges, getApplicationDetails, getPendingApplications, getDashboardStats, getLocationAnalytics, createPaymentOrder, verifyPayment, getGlobalSettings, updateGlobalSettings, promoteMember, forceCreateStudent, forceCreateClub, forceCreateMember } from "../admin/admin.controller";
-import { getAllUsers, updateUserCredentials, updateUserProfile, getPublicCoaches, getPublicMembers, getCoachStudents, deleteUser, getUserDetails, searchRefereeById, blockUser } from "../users/userManagement.controller";
-import { getClubs } from "../clubs/club.controller";
-import { getDistricts, getTaluksByDistrict, getTalukDetails } from "../locations/location.controller";
-import { authenticateJWT, authorizeAdmin, authorize } from "../../middleware/authMiddleware";
-import { createEvent, getActiveEvents, getAdminEvents, getMyEvents, updateEvent, applyForEvent, createEventPaymentOrder, verifyEventPayment, getEventSections } from "../events/event.controller";
-import { createTournament, startTournament, getClubTournaments, getTournamentRegistrations, updateRegistrationStatus, disqualifyRegistration, updateRegistrationMetrics, sendRegistrationReply, getRegistrationMessages, updateTournament, deleteTournament, getPlayerTournaments, getPlayerPublicMatches, getCategoryParticipants, createTournamentPaymentOrder, verifyTournamentPayment, getAdminTournaments, getAdminApprovedTournaments, approveTournament, sendTournamentReply, getApprovedTournaments, getTournamentById, getTournamentDraws, saveTournamentDraw, getTournamentMessages, getTournamentMats, saveTournamentMats, getRefereeMats, submitMatchResult, updateMatchState, submitTournamentResults } from "../tournaments/tournament.controller";
-import { downloadCertificate } from "../certificates/certificate.controller";
-import scoreboardOptions from "../../../../data/scoreboardOptions" with { type: "json" };
+import { registerStudent, registerCoach, registerClub, registerMember, resubmitApplication } from "./registration.controller.js";
+import { updateApplicationStatus, requestChanges, getApplicationDetails, getPendingApplications, getDashboardStats, getLocationAnalytics, createPaymentOrder, verifyPayment, getGlobalSettings, updateGlobalSettings, promoteMember, forceCreateStudent, forceCreateClub, forceCreateMember } from "../admin/admin.controller.js";
+import { getAllUsers, updateUserCredentials, updateUserProfile, getPublicCoaches, getPublicMembers, getCoachStudents, deleteUser, getUserDetails, searchRefereeById, blockUser } from "../users/user.controller.js";
+import { getClubs } from "../clubs/club.controller.js";
+import { getDistricts, getTaluksByDistrict, getTalukDetails } from "../locations/location.controller.js";
+import { authenticateJWT, authorizeAdmin, authorize } from "../../middleware/authMiddleware.js";
+import { createEvent, getActiveEvents, getAdminEvents, getMyEvents, updateEvent, applyForEvent, createEventPaymentOrder, verifyEventPayment, getEventSections } from "../events/event.controller.js";
+import { createTournament, startTournament, getClubTournaments, getTournamentRegistrations, updateRegistrationStatus, disqualifyRegistration, updateRegistrationMetrics, sendRegistrationReply, getRegistrationMessages, updateTournament, deleteTournament, getPlayerTournaments, getPlayerPublicMatches, getCategoryParticipants, createTournamentPaymentOrder, verifyTournamentPayment, getAdminTournaments, getAdminApprovedTournaments, approveTournament, sendTournamentReply, getApprovedTournaments, getTournamentById, getTournamentDraws, saveTournamentDraw, getTournamentMessages, getTournamentMats, saveTournamentMats, getRefereeMats, submitMatchResult, updateMatchState, submitTournamentResults } from "../tournaments/tournament.controller.js";
+import { downloadCertificate } from "../certificates/certificate.controller.js";
+import { scoreboardOptions } from "../../constants/scoreboardOptions.js";
 
 const router = Router();
 

@@ -3,13 +3,13 @@ dotenv.config();
 
 import express from "express";
 import cors from "cors";
-import registrationRoutes from "./modules/registrations/registration.routes";
-import authRoutes from "./modules/auth/auth.routes";
-import grievanceRoutes from "./modules/grievances/grievance.routes";
-import uploadRoutes from "./modules/upload/upload.routes";
+import registrationRoutes from "./modules/registrations/registration.routes.js";
+import authRoutes from "./modules/auth/auth.routes.js";
+import grievanceRoutes from "./modules/grievances/grievance.routes.js";
+import uploadRoutes from "./modules/upload/upload.routes.js";
 
 import { createServer } from "http";
-import { initWebSocketServer } from "./socket/socket";
+import { initWebSocketServer } from "./socket/socket.js";
 
 const app = express();
 const PORT = process.env.PORT || 9000;
