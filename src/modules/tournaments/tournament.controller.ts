@@ -2,6 +2,8 @@ import type { Request, Response } from "express";
 import prisma from "../../database/prisma.js";
 import Razorpay from "razorpay";
 import crypto from "crypto";
+import * as xlsx from "xlsx";
+import fs from "fs";
 import { sendNotificationToUser } from "../../socket/socket.js";
 import { sendEventRegistrationEmail, sendNewTournamentAnnouncement } from "../../config/mailer.js";
 
@@ -2010,6 +2012,122 @@ export const updateMatchState = async (req: Request, res: Response) => {
     return res.json({ message: "Match state updated successfully" });
   } catch (error) {
     console.error("Error updating match state:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// ─── CLUB/OFFICIAL: Bulk Import Players from Excel ───────────────────────────
+export const bulkImportRegistrations = async (req: Request, res: Response) => {
+  const { userId, role } = (req as any).user;
+  const tournamentId = req.params.id as string;
+  const file = req.file;
+
+  const isClub = role === "CLUB";
+  const isOfficial = ["SUPER_ADMIN", "CEO", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role);
+
+  if (!isClub && !isOfficial) {
+    if (file) fs.unlinkSync(file.path);
+    return res.status(403).json({ error: "Access denied" });
+  }
+
+  if (!file) {
+    return res.status(400).json({ error: "No Excel file uploaded" });
+  }
+
+  try {
+    const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
+    if (!tournament) {
+      fs.unlinkSync(file.path);
+      return res.status(404).json({ error: "Tournament not found" });
+    }
+
+    if (!isOfficial && tournament.clubId !== userId && tournament.officialId !== userId) {
+      fs.unlinkSync(file.path);
+      return res.status(403).json({ error: "This tournament does not belong to you" });
+    }
+
+    if (tournament.registrationClosed || new Date(tournament.date) < new Date()) {
+      fs.unlinkSync(file.path);
+      return res.status(400).json({ error: "Registrations are closed or tournament has already started" });
+    }
+
+    // Parse Excel file
+    const workbook = xlsx.readFile(file.path);
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName as string];
+    const data = xlsx.utils.sheet_to_json<any>(sheet as any);
+    
+    fs.unlinkSync(file.path); // clean up
+
+    let successCount = 0;
+    let failedCount = 0;
+    const errors: any[] = [];
+
+    for (const [index, row] of data.entries()) {
+      const rowNum = index + 2; // Assuming header is row 1
+      const aadhaar = row["Aadhaar Number"] || row["Aadhaar"] || row["AadhaarNumber"];
+      const weight = row["Weight"] || row["Weight (kg)"];
+      const height = row["Height"];
+
+      if (!aadhaar) {
+        failedCount++;
+        errors.push({ row: rowNum, error: "Aadhaar number missing" });
+        continue;
+      }
+
+      const player = await prisma.student.findUnique({ where: { aadhaarNumber: String(aadhaar) } });
+      if (!player) {
+        failedCount++;
+        errors.push({ row: rowNum, error: `Player not found with Aadhaar: ${aadhaar}` });
+        continue;
+      }
+
+      if (player.status !== "APPROVED") {
+        failedCount++;
+        errors.push({ row: rowNum, error: `Player with Aadhaar: ${aadhaar} is not APPROVED` });
+        continue;
+      }
+
+      // Check if already registered
+      const existingReg = await prisma.tournamentRegistration.findFirst({
+        where: { tournamentId, playerId: player.id }
+      });
+
+      if (existingReg) {
+        failedCount++;
+        errors.push({ row: rowNum, error: `Player already registered for this tournament` });
+        continue;
+      }
+
+      const ageGroup = getAgeGroup(player.dob, tournament.category || undefined);
+      const weightCategory = weight ? getWeightCategory(Number(weight), player.gender, ageGroup) : "ALL";
+
+      await prisma.tournamentRegistration.create({
+        data: {
+          tournamentId,
+          playerId: player.id,
+          coachId: player.coachId, // link to coach if any
+          status: "APPROVED", // Auto-approve since imported by club/admin
+          isPaid: false, // You could modify this based on Excel if there's a paid column
+          weight: weight ? String(weight) : player.weight,
+          height: height ? String(height) : player.height,
+          ageGroup,
+          weightCategory,
+          gender: player.gender,
+        }
+      });
+      successCount++;
+    }
+
+    return res.json({ 
+      message: `Bulk import completed. ${successCount} successful, ${failedCount} failed.`,
+      successCount,
+      failedCount,
+      errors
+    });
+  } catch (error) {
+    console.error("Error during bulk import:", error);
+    if (file && fs.existsSync(file.path)) fs.unlinkSync(file.path);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };

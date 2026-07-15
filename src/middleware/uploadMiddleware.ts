@@ -24,13 +24,13 @@ const storage = multer.diskStorage({
 
 // Setup File Filter (Allowing safe images and document formats)
 const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  const allowedExtensions = [".jpg", ".jpeg", ".png", ".webp", ".pdf"];
+  const allowedExtensions = [".jpg", ".jpeg", ".png", ".webp", ".pdf", ".xlsx", ".xls", ".csv"];
   const fileExt = path.extname(file.originalname).toLowerCase();
   
   if (allowedExtensions.includes(fileExt)) {
     cb(null, true);
   } else {
-    cb(new Error("Only images (JPEG, PNG, WEBP) and PDF files are allowed!"));
+    cb(new Error("Only images, PDF, and Excel/CSV files are allowed!"));
   }
 };
 
