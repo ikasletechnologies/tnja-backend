@@ -1,5 +1,7 @@
 import { PrismaClient, Status, Gender, MemberRole } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import fs from 'fs';
+import path from 'path';
 
 const prisma = new PrismaClient();
 
@@ -26,51 +28,7 @@ function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-const districtsList = [
-  // Chennai Zone
-  { name: 'Chennai', zoneName: 'Chennai Zone' },
-  { name: 'Chengalpattu', zoneName: 'Chennai Zone' },
-  { name: 'Kancheepuram', zoneName: 'Chennai Zone' },
-  { name: 'Tiruvallur', zoneName: 'Chennai Zone' },
-  { name: 'Vellore', zoneName: 'Chennai Zone' },
-  { name: 'Ranipet', zoneName: 'Chennai Zone' },
-  { name: 'Tirupathur', zoneName: 'Chennai Zone' },
-  { name: 'Tiruvannamalai', zoneName: 'Chennai Zone' },
-  // Coimbatore Zone
-  { name: 'Viluppuram', zoneName: 'Coimbatore Zone' },
-  { name: 'Kallakurichi', zoneName: 'Coimbatore Zone' },
-  { name: 'Coimbatore', zoneName: 'Coimbatore Zone' },
-  { name: 'Karur', zoneName: 'Coimbatore Zone' },
-  { name: 'Dindigul', zoneName: 'Coimbatore Zone' },
-  // Trichy Zone
-  { name: 'Cuddalore', zoneName: 'Trichy Zone' },
-  { name: 'Tiruchirappalli', zoneName: 'Trichy Zone' },
-  { name: 'Perambalur', zoneName: 'Trichy Zone' },
-  { name: 'Ariyalur', zoneName: 'Trichy Zone' },
-  { name: 'Pudukkottai', zoneName: 'Trichy Zone' },
-  { name: 'Thanjavur', zoneName: 'Trichy Zone' },
-  { name: 'Nagapattinam', zoneName: 'Trichy Zone' },
-  { name: 'Mayiladuthurai', zoneName: 'Trichy Zone' },
-  { name: 'Tiruvarur', zoneName: 'Trichy Zone' },
-  // Salem Zone
-  { name: 'Salem', zoneName: 'Salem Zone' },
-  { name: 'Namakkal', zoneName: 'Salem Zone' },
-  { name: 'Dharmapuri', zoneName: 'Salem Zone' },
-  { name: 'Krishnagiri', zoneName: 'Salem Zone' },
-  { name: 'Erode', zoneName: 'Salem Zone' },
-  { name: 'Tiruppur', zoneName: 'Salem Zone' },
-  { name: 'Nilgiris', zoneName: 'Salem Zone' },
-  // Madurai Zone
-  { name: 'Madurai', zoneName: 'Madurai Zone' },
-  { name: 'Theni', zoneName: 'Madurai Zone' },
-  { name: 'Sivagangai', zoneName: 'Madurai Zone' },
-  { name: 'Ramanathapuram', zoneName: 'Madurai Zone' },
-  { name: 'Virudhunagar', zoneName: 'Madurai Zone' },
-  { name: 'Tirunelveli', zoneName: 'Madurai Zone' },
-  { name: 'Tenkasi', zoneName: 'Madurai Zone' },
-  { name: 'Thoothukudi', zoneName: 'Madurai Zone' },
-  { name: 'Kanniyakumari', zoneName: 'Madurai Zone' }
-];
+// districtsList removed in favor of tn_locations.json
 
 async function main() {
   console.log('🚀 Tamil Nadu Judo Association — Minimal Seed');
@@ -89,16 +47,21 @@ async function main() {
   await prisma.district.deleteMany();
   console.log('✅ Database cleaned');
 
-  console.log('\n📍 Creating 38 Districts & Taluks...');
+  console.log('\n📍 Creating Districts & Taluks from tn_locations.json...');
   const districtRecs: { id: string; name: string; talukId: string }[] = [];
+  
+  const locationsData = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'prisma', 'tn_locations.json'), 'utf8'));
 
-  for (const dist of districtsList) {
+  for (const dist of locationsData) {
     const d = await prisma.district.create({
       data: {
         name: dist.name,
-        zoneName: dist.zoneName,
+        zoneName: dist.zone,
         taluks: {
-          create: [{ name: `${dist.name} Central Taluk`, pincode: `6${randomInt(10000, 99999)}` }],
+          create: dist.taluks.map((t: any) => ({
+            name: t.name,
+            pincode: t.pincode,
+          })),
         },
       },
       include: { taluks: true },
