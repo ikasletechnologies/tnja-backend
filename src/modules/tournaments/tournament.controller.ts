@@ -2131,3 +2131,160 @@ export const bulkImportRegistrations = async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+// ─── Export Tournament Completion Report ───────────────────────────────────
+export const downloadTournamentReport = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: id as string },
+      include: {
+        club: { select: { name: true, district: { select: { name: true } } } },
+        official: { select: { fullName: true } },
+        registrations: {
+          include: {
+            player: {
+              select: {
+                id: true,
+                fullName: true,
+                gender: true,
+                dob: true,
+                club: { select: { name: true } },
+                district: { select: { name: true } },
+                mobileNumber: true,
+                email: true,
+                permanentId: true,
+                tempId: true,
+              },
+            },
+          },
+        },
+        draws: true,
+      },
+    });
+
+    if (!tournament) {
+      return res.status(404).json({ error: "Tournament not found" });
+    }
+
+    const regs = tournament.registrations;
+    const totalPlayers = regs.length;
+    const maleCount = regs.filter((r) => r.gender === "MALE" || r.player?.gender === "MALE").length;
+    const femaleCount = regs.filter((r) => r.gender === "FEMALE" || r.player?.gender === "FEMALE").length;
+    const otherCount = totalPlayers - maleCount - femaleCount;
+
+    // Group registrations by Category / Age Group & Weight Category & Gender
+    const categoryMap: Record<string, {
+      ageGroup: string;
+      weightCategory: string;
+      gender: string;
+      males: number;
+      females: number;
+      total: number;
+      firstPlace: string[];
+      secondPlace: string[];
+      thirdPlace: string[];
+    }> = {};
+
+    for (const reg of regs) {
+      const key = `${reg.ageGroup} | ${reg.gender} | ${reg.weightCategory}`;
+      if (!categoryMap[key]) {
+        categoryMap[key] = {
+          ageGroup: reg.ageGroup,
+          weightCategory: reg.weightCategory,
+          gender: reg.gender,
+          males: 0,
+          females: 0,
+          total: 0,
+          firstPlace: [],
+          secondPlace: [],
+          thirdPlace: [],
+        };
+      }
+      const cat = categoryMap[key];
+      cat.total += 1;
+      const g = reg.gender || reg.player?.gender;
+      if (g === "MALE") cat.males += 1;
+      else if (g === "FEMALE") cat.females += 1;
+
+      const playerName = reg.player?.fullName || "Unknown";
+      const clubName = reg.player?.club?.name ? ` (${reg.player.club.name})` : "";
+      const playerStr = `${playerName}${clubName}`;
+
+      if (reg.placement === "FIRST") {
+        cat.firstPlace.push(playerStr);
+      } else if (reg.placement === "SECOND") {
+        cat.secondPlace.push(playerStr);
+      } else if (reg.placement === "THIRD") {
+        cat.thirdPlace.push(playerStr);
+      }
+    }
+
+    const wb = xlsx.utils.book_new();
+
+    // Sheet 1: Summary Overview
+    const summaryData = [
+      ["TOURNAMENT SUMMARY REPORT"],
+      ["Generated Date", new Date().toLocaleString()],
+      [],
+      ["Tournament Title", tournament.title],
+      ["Date", new Date(tournament.date).toLocaleDateString() + (tournament.dateTo ? ` to ${new Date(tournament.dateTo).toLocaleDateString()}` : "")],
+      ["Location", tournament.location],
+      ["Level", tournament.level],
+      ["Category", tournament.category || "General"],
+      ["Status", tournament.status],
+      ["Organized By Club/Official", tournament.club?.name || tournament.official?.fullName || "N/A"],
+      [],
+      ["PARTICIPATION METRICS"],
+      ["Total Players Registered", totalPlayers],
+      ["Male Players Count", maleCount],
+      ["Female Players Count", femaleCount],
+      ["Other / Unspecified", otherCount],
+      ["Total Categories / Divisions", Object.keys(categoryMap).length],
+    ];
+    const summaryWs = xlsx.utils.aoa_to_sheet(summaryData);
+    xlsx.utils.book_append_sheet(wb, summaryWs, "Tournament Summary");
+
+    // Sheet 2: Category Breakdown & Winners
+    const categoryRows = Object.values(categoryMap).map((cat) => ({
+      "Age Group": cat.ageGroup,
+      "Gender": cat.gender,
+      "Weight Category": cat.weightCategory,
+      "Male Players": cat.males,
+      "Female Players": cat.females,
+      "Total Players": cat.total,
+      "Gold (1st Place)": cat.firstPlace.join(", ") || "N/A",
+      "Silver (2nd Place)": cat.secondPlace.join(", ") || "N/A",
+      "Bronze (3rd Place)": cat.thirdPlace.join(", ") || "N/A",
+    }));
+    const categoryWs = xlsx.utils.json_to_sheet(categoryRows);
+    xlsx.utils.book_append_sheet(wb, categoryWs, "Category Winners");
+
+    // Sheet 3: Full Player Roster
+    const rosterRows = regs.map((reg) => ({
+      "TNJA ID": reg.player?.permanentId || reg.player?.tempId || "N/A",
+      "Player Name": reg.player?.fullName || "N/A",
+      "Gender": reg.gender || reg.player?.gender || "N/A",
+      "Age Group": reg.ageGroup,
+      "Weight Category": reg.weightCategory,
+      "Club": reg.player?.club?.name || "N/A",
+      "District": reg.player?.district?.name || "N/A",
+      "Placement": reg.placement || "PARTICIPATION",
+      "Payment Status": reg.isPaid ? "Paid" : "Pending",
+      "Registration Status": reg.status,
+    }));
+    const rosterWs = xlsx.utils.json_to_sheet(rosterRows);
+    xlsx.utils.book_append_sheet(wb, rosterWs, "Player Roster");
+
+    const buffer = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
+
+    const safeTitle = tournament.title.replace(/[^a-zA-Z0-9_-]/g, "_");
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename=Tournament_Report_${safeTitle}.xlsx`);
+    return res.send(buffer);
+  } catch (error) {
+    console.error("Error generating tournament report:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
