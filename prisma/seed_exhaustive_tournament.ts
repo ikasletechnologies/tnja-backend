@@ -1,4 +1,4 @@
-import { PrismaClient, EventLevel, Status, Gender } from '@prisma/client';
+import { PrismaClient, EventLevel, Status, Gender, Placement, Prisma } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 
@@ -412,7 +412,7 @@ async function main() {
         isPaid: true,
         height: '165',
         weight: weightStr,
-        placement: 'PARTICIPATION',
+        placement: Placement.PARTICIPATION,
         ageGroup: config.name,
         weightCategory: weightCat,
         gender: gender,
@@ -478,8 +478,8 @@ async function main() {
   });
   totalTournamentsCreated++;
 
-  const students3P = [];
-  const regs3P = [];
+  const students3P: Prisma.StudentCreateManyInput[] = [];
+  const regs3P: Prisma.TournamentRegistrationCreateManyInput[] = [];
   
   for (let i = 1; i <= 3; i++) {
     const seq = studentSequence++;
@@ -530,7 +530,7 @@ async function main() {
       isPaid: true,
       height: '170',
       weight: weightStr,
-      placement: 'PARTICIPATION',
+      placement: Placement.PARTICIPATION,
       ageGroup: "Senior",
       weightCategory: weightCat,
       gender: Gender.MALE,
@@ -578,8 +578,8 @@ async function main() {
   });
   totalTournamentsCreated++;
 
-  const students2P = [];
-  const regs2P = [];
+  const students2P: Prisma.StudentCreateManyInput[] = [];
+  const regs2P: Prisma.TournamentRegistrationCreateManyInput[] = [];
   
   for (let i = 1; i <= 2; i++) {
     const seq = studentSequence++;
@@ -630,7 +630,7 @@ async function main() {
       isPaid: true,
       height: '170',
       weight: weightStr,
-      placement: 'PARTICIPATION',
+      placement: Placement.PARTICIPATION,
       ageGroup: "Senior",
       weightCategory: weightCat,
       gender: Gender.MALE,

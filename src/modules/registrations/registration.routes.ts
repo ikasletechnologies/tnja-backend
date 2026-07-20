@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { registerStudent, registerCoach, registerClub, registerMember, resubmitApplication } from "./registration.controller.js";
-import { updateApplicationStatus, requestChanges, getApplicationDetails, getPendingApplications, getDashboardStats, getLocationAnalytics, createPaymentOrder, verifyPayment, getGlobalSettings, updateGlobalSettings, promoteMember, forceCreateStudent, forceCreateClub, forceCreateMember } from "../admin/admin.controller.js";
+import { updateApplicationStatus, requestChanges, getApplicationDetails, getPendingApplications, getDashboardStats, getLocationAnalytics, createPaymentOrder, verifyPayment, getGlobalSettings, updateGlobalSettings, promoteMember, forceCreateStudent, forceCreateClub, forceCreateMember, importStudentsExcel, importCoachesExcel } from "../admin/admin.controller.js";
 import { getAllUsers, updateUserCredentials, updateUserProfile, getPublicCoaches, getPublicMembers, getCoachStudents, deleteUser, getUserDetails, searchRefereeById, blockUser } from "../users/user.controller.js";
 import { getClubs } from "../clubs/club.controller.js";
 import { getDistricts, getTaluksByDistrict, getTalukDetails } from "../locations/location.controller.js";
@@ -102,6 +102,8 @@ router.post("/application/verify-payment", authenticateJWT, verifyPayment);
 router.post("/admin/create-student", authenticateJWT, authorize(["SUPER_ADMIN", "CEO"]), forceCreateStudent);
 router.post("/admin/create-club", authenticateJWT, authorize(["SUPER_ADMIN", "CEO"]), forceCreateClub);
 router.post("/admin/create-member", authenticateJWT, authorize(["SUPER_ADMIN", "CEO"]), forceCreateMember);
+router.post("/admin/import-students", authenticateJWT, authorize(["SUPER_ADMIN", "CEO"]), upload.single("file"), importStudentsExcel);
+router.post("/admin/import-coaches", authenticateJWT, authorize(["SUPER_ADMIN", "CEO"]), upload.single("file"), importCoachesExcel);
 
 router.get("/settings/global", getGlobalSettings);
 router.patch("/settings/global", authenticateJWT, authorizeAdmin, updateGlobalSettings);

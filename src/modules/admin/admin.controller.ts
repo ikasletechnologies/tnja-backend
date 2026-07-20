@@ -3,6 +3,8 @@ import prisma from "../../database/prisma.js";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 import { sendApprovalEmail, sendRejectionEmail, sendPaymentRequestEmail } from "../../config/mailer.js";
+import xlsx from "xlsx";
+import fs from "fs";
 import Razorpay from "razorpay";
 
 const razorpay = new Razorpay({
@@ -1358,4 +1360,457 @@ export const forceCreateMember = async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+export const importStudentsExcel = async (req: Request, res: Response) => {
+  const file = req.file;
+  if (!file) {
+    return res.status(400).json({ error: "No Excel file uploaded" });
+  }
+
+  try {
+    const workbook = xlsx.readFile(file.path);
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName as string];
+    const rows = xlsx.utils.sheet_to_json<any>(sheet as any);
+
+    fs.unlinkSync(file.path); // Clean up the temp uploaded file
+
+    const dummyPasswordHash = await bcrypt.hash("Welcome@123", 10);
+    let successCount = 0;
+    let failedCount = 0;
+    const errors: any[] = [];
+
+    let _seq = Math.floor(100000 + Math.random() * 900000);
+    const nextSeq = () => _seq++;
+
+    for (const [index, row] of rows.entries()) {
+      const rowNum = index + 2; // Excel row numbering (1-indexed + header)
+
+      const fullName = row["Full Name"] || row["FullName"] || row["Name"];
+      const email = row["Email"] || row["Email ID"] || row["EmailId"];
+      const mobile = row["Mobile Number"] || row["Mobile"] || row["MobileNumber"];
+      const aadhaar = row["Aadhaar Number"] || row["Aadhaar"] || row["AadhaarNumber"];
+      const dobRaw = row["Date of Birth"] || row["DOB"] || row["DateOfBirth"];
+      const genderRaw = row["Gender"] || row["Sex"];
+      const bloodGroup = row["Blood Group"] || row["BloodGroup"] || "O+";
+      const address = row["Address"] || "N/A";
+      const city = row["City"] || "Chennai";
+      const state = row["State"] || "Tamil Nadu";
+      const pincode = String(row["Pincode"] || row["ZipCode"] || "600002");
+      const districtName = row["District Name"] || row["District"];
+      const talukName = row["Taluk Name"] || row["Taluk"];
+      const schoolName = row["School Name"] || row["SchoolName"] || row["School"] || "Chennai Public School";
+      const grade = row["Grade"] || row["Class"] || "10th";
+      const annualIncome = parseFloat(row["Annual Income"] || row["AnnualIncome"] || row["Income"] || "150000");
+      const height = row["Height"] ? String(row["Height"]) : "165";
+      const weight = row["Weight"] ? String(row["Weight"]) : "55";
+      const statusRaw = row["Status"] || "APPROVED";
+      const coachName = row["Coach Name"] || row["Coach"] || row["CoachName"];
+      const customTempId = row["Temporary ID"] || row["Temp ID"] || row["tempId"] || row["TemporaryID"];
+      const customPermId = row["Permanent ID"] || row["Perm ID"] || row["permanentId"] || row["PermanentID"];
+
+      if (!fullName || !email || !mobile || !aadhaar || !dobRaw || !genderRaw || !districtName || !talukName) {
+        failedCount++;
+        errors.push({ row: rowNum, error: "Missing required fields (Name, Email, Mobile, Aadhaar, DOB, Gender, District, or Taluk)" });
+        continue;
+      }
+
+      // Gender parsing
+      let gender: "MALE" | "FEMALE" | "OTHER" = "MALE";
+      if (String(genderRaw).toUpperCase().trim() === "FEMALE") {
+        gender = "FEMALE";
+      } else if (String(genderRaw).toUpperCase().trim() === "OTHER") {
+        gender = "OTHER";
+      }
+
+      // Status parsing
+      let status: "APPROVED" | "PENDING" = "APPROVED";
+      if (String(statusRaw).toUpperCase().trim() === "PENDING") {
+        status = "PENDING";
+      }
+
+      // DOB parsing
+      let dob: Date;
+      try {
+        if (typeof dobRaw === "number") {
+          dob = new Date((dobRaw - 25569) * 86400 * 1000);
+        } else {
+          dob = new Date(dobRaw);
+        }
+        if (isNaN(dob.getTime())) {
+          throw new Error("Invalid Date format");
+        }
+      } catch (e) {
+        failedCount++;
+        errors.push({ row: rowNum, error: `Invalid date of birth: "${dobRaw}". Expecting YYYY-MM-DD.` });
+        continue;
+      }
+
+      const age = new Date().getFullYear() - dob.getFullYear();
+
+      try {
+        // Look up District in DB
+        const districtDb = await prisma.district.findFirst({
+          where: { name: { equals: String(districtName).trim(), mode: "insensitive" } },
+        });
+
+        if (!districtDb) {
+          failedCount++;
+          errors.push({ row: rowNum, error: `District "${districtName}" not found in database.` });
+          continue;
+        }
+
+        // Look up Taluk under this district in DB
+        const talukDb = await prisma.taluk.findFirst({
+          where: {
+            districtId: districtDb.id,
+            name: { equals: String(talukName).trim(), mode: "insensitive" },
+          },
+        });
+
+        if (!talukDb) {
+          failedCount++;
+          errors.push({ row: rowNum, error: `Taluk "${talukName}" not found in database under District "${districtName}".` });
+          continue;
+        }
+
+        // Check duplicate records
+        const existingPlayer = await prisma.student.findFirst({
+          where: {
+            OR: [
+              { email: String(email).trim() },
+              { mobileNumber: String(mobile).trim() },
+              { aadhaarNumber: String(aadhaar).trim() }
+            ]
+          }
+        });
+
+        if (existingPlayer) {
+          failedCount++;
+          errors.push({ row: rowNum, error: "A player with this Email, Mobile, or Aadhaar already exists." });
+          continue;
+        }
+
+        // Look up Coach if provided (by ID first, then fallback to Name)
+        let coachId: string | null = null;
+        if (coachName) {
+          const coachDb = await prisma.coachReferee.findFirst({
+            where: {
+              OR: [
+                { tempId: String(coachName).trim() },
+                { permanentId: String(coachName).trim() },
+                { fullName: { equals: String(coachName).trim(), mode: "insensitive" } }
+              ]
+            },
+          });
+          if (coachDb) {
+            coachId = coachDb.id;
+          }
+        }
+
+        // Check custom temporary ID uniqueness if provided
+        if (customTempId) {
+          const tempExists = await prisma.student.findFirst({
+            where: {
+              OR: [
+                { tempId: String(customTempId).trim() },
+                { permanentId: String(customTempId).trim() }
+              ]
+            }
+          });
+          if (tempExists) {
+            failedCount++;
+            errors.push({ row: rowNum, error: `Temporary ID "${customTempId}" is already taken.` });
+            continue;
+          }
+        }
+
+        // Check custom permanent ID uniqueness if provided
+        if (customPermId) {
+          const permExists = await prisma.student.findFirst({
+            where: {
+              OR: [
+                { tempId: String(customPermId).trim() },
+                { permanentId: String(customPermId).trim() }
+              ]
+            }
+          });
+          if (permExists) {
+            failedCount++;
+            errors.push({ row: rowNum, error: `Permanent ID "${customPermId}" is already taken.` });
+            continue;
+          }
+        }
+
+        // Generate IDs
+        const seq = nextSeq();
+        const tempId = customTempId ? String(customTempId).trim() : `STU${seq}`;
+        const permanentId = customPermId ? String(customPermId).trim() : (status === "APPROVED" ? `PERM${seq}` : null);
+
+        // Insert Student
+        await prisma.student.create({
+          data: {
+            tempId,
+            permanentId,
+            fullName: String(fullName).trim(),
+            gender,
+            dob,
+            age,
+            bloodGroup: String(bloodGroup).trim(),
+            mobileNumber: String(mobile).trim(),
+            email: String(email).trim(),
+            aadhaarNumber: String(aadhaar).trim(),
+            address: String(address).trim(),
+            city: String(city).trim(),
+            state: String(state).trim(),
+            pincode,
+            addressPincode: pincode,
+            nationality: "Indian",
+            annualIncome,
+            isBPL: false,
+            schoolName: String(schoolName).trim(),
+            grade: String(grade).trim(),
+            password: dummyPasswordHash,
+            status,
+            isPaid: status === "APPROVED",
+            districtId: districtDb.id,
+            talukId: talukDb.id,
+            weight,
+            height,
+            coachId,
+          },
+        });
+
+        successCount++;
+      } catch (err: any) {
+        failedCount++;
+        errors.push({ row: rowNum, error: err.message || "Database insert error" });
+      }
+    }
+
+    return res.json({
+      message: "Excel import process complete.",
+      successCount,
+      failedCount,
+      errors
+    });
+
+  } catch (error: any) {
+    if (file && fs.existsSync(file.path)) {
+      fs.unlinkSync(file.path);
+    }
+    console.error("[importStudentsExcel]", error);
+    return res.status(500).json({ error: error.message || "Failed to process Excel file" });
+  }
+};
+
+export const importCoachesExcel = async (req: Request, res: Response) => {
+  const file = req.file;
+  if (!file) {
+    return res.status(400).json({ error: "No Excel file uploaded" });
+  }
+
+  try {
+    const workbook = xlsx.readFile(file.path);
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName as string];
+    const rows = xlsx.utils.sheet_to_json<any>(sheet as any);
+
+    fs.unlinkSync(file.path); // Clean up the temp uploaded file
+
+    const dummyPasswordHash = await bcrypt.hash("Welcome@123", 10);
+    let successCount = 0;
+    let failedCount = 0;
+    const errors: any[] = [];
+
+    for (const [index, row] of rows.entries()) {
+      const rowNum = index + 2; // Excel row numbering (1-indexed + header)
+
+      const fullName = row["Full Name"] || row["FullName"] || row["Name"];
+      const fatherName = row["Father Name"] || row["FatherName"] || row["Father's Name"];
+      const email = row["Email"] || row["Email ID"] || row["EmailId"];
+      const mobile = row["Mobile Number"] || row["Mobile"] || row["MobileNumber"];
+      const aadhaar = row["Aadhaar Number"] || row["Aadhaar"] || row["AadhaarNumber"];
+      const dobRaw = row["Date of Birth"] || row["DOB"] || row["DateOfBirth"];
+      const genderRaw = row["Gender"] || row["Sex"];
+      const bloodGroup = row["Blood Group"] || row["BloodGroup"] || "O+";
+      const districtName = row["District Name"] || row["District"];
+      const talukName = row["Taluk Name"] || row["Taluk"];
+      const pincode = String(row["Pincode"] || row["ZipCode"] || "600002");
+      const historyInJudo = row["History in Judo"] || row["HistoryInJudo"] || "None";
+      const historyInOtherMartial = row["History in Other Martial"] || row["HistoryInOtherMartial"] || "None";
+      const presentGradeInJudo = row["Present Grade in Judo"] || row["PresentGradeInJudo"] || "None";
+      const statusRaw = row["Status"] || "APPROVED";
+      const customTempId = row["Temporary ID"] || row["Temp ID"] || row["tempId"] || row["TemporaryID"];
+      const customPermId = row["Permanent ID"] || row["Perm ID"] || row["permanentId"] || row["PermanentID"];
+
+      if (!fullName || !fatherName || !email || !mobile || !aadhaar || !dobRaw || !genderRaw || !districtName || !talukName) {
+        failedCount++;
+        errors.push({ row: rowNum, error: "Missing required fields (Name, Father Name, Email, Mobile, Aadhaar, DOB, Gender, District, or Taluk)" });
+        continue;
+      }
+
+      // Gender parsing
+      let gender: "MALE" | "FEMALE" | "OTHER" = "MALE";
+      if (String(genderRaw).toUpperCase().trim() === "FEMALE") {
+        gender = "FEMALE";
+      } else if (String(genderRaw).toUpperCase().trim() === "OTHER") {
+        gender = "OTHER";
+      }
+
+      // Status parsing
+      let status: "APPROVED" | "PENDING" = "APPROVED";
+      if (String(statusRaw).toUpperCase().trim() === "PENDING") {
+        status = "PENDING";
+      }
+
+      // DOB parsing
+      let dob: Date;
+      try {
+        if (typeof dobRaw === "number") {
+          dob = new Date((dobRaw - 25569) * 86400 * 1000);
+        } else {
+          dob = new Date(dobRaw);
+        }
+        if (isNaN(dob.getTime())) {
+          throw new Error("Invalid Date format");
+        }
+      } catch (e) {
+        failedCount++;
+        errors.push({ row: rowNum, error: `Invalid date of birth: "${dobRaw}". Expecting YYYY-MM-DD.` });
+        continue;
+      }
+
+      const age = new Date().getFullYear() - dob.getFullYear();
+
+      try {
+        // Look up District in DB
+        const districtDb = await prisma.district.findFirst({
+          where: { name: { equals: String(districtName).trim(), mode: "insensitive" } },
+        });
+
+        if (!districtDb) {
+          failedCount++;
+          errors.push({ row: rowNum, error: `District "${districtName}" not found in database.` });
+          continue;
+        }
+
+        // Look up Taluk under this district in DB
+        const talukDb = await prisma.taluk.findFirst({
+          where: {
+            districtId: districtDb.id,
+            name: { equals: String(talukName).trim(), mode: "insensitive" },
+          },
+        });
+
+        if (!talukDb) {
+          failedCount++;
+          errors.push({ row: rowNum, error: `Taluk "${talukName}" not found in database under District "${districtName}".` });
+          continue;
+        }
+
+        // Check duplicate records
+        const existingCoach = await prisma.coachReferee.findFirst({
+          where: {
+            OR: [
+              { email: String(email).trim() },
+              { mobileNumber: String(mobile).trim() },
+              { aadhaarNumber: String(aadhaar).trim() }
+            ]
+          }
+        });
+
+        if (existingCoach) {
+          failedCount++;
+          errors.push({ row: rowNum, error: "A coach with this Email, Mobile, or Aadhaar already exists." });
+          continue;
+        }
+
+        // Check custom temporary ID uniqueness if provided
+        if (customTempId) {
+          const tempExists = await prisma.coachReferee.findFirst({
+            where: {
+              OR: [
+                { tempId: String(customTempId).trim() },
+                { permanentId: String(customTempId).trim() }
+              ]
+            }
+          });
+          if (tempExists) {
+            failedCount++;
+            errors.push({ row: rowNum, error: `Temporary ID "${customTempId}" is already taken.` });
+            continue;
+          }
+        }
+
+        // Check custom permanent ID uniqueness if provided
+        if (customPermId) {
+          const permExists = await prisma.coachReferee.findFirst({
+            where: {
+              OR: [
+                { tempId: String(customPermId).trim() },
+                { permanentId: String(customPermId).trim() }
+              ]
+            }
+          });
+          if (permExists) {
+            failedCount++;
+            errors.push({ row: rowNum, error: `Permanent ID "${customPermId}" is already taken.` });
+            continue;
+          }
+        }
+
+        // Generate IDs
+        const tempId = customTempId ? String(customTempId).trim() : `TEMP-COA-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+        const permanentId = customPermId ? String(customPermId).trim() : (status === "APPROVED" ? generatePermanentId("COA") : null);
+
+        // Insert CoachReferee
+        await prisma.coachReferee.create({
+          data: {
+            tempId,
+            permanentId,
+            fullName: String(fullName).trim(),
+            fatherName: String(fatherName).trim(),
+            gender,
+            dob,
+            age,
+            bloodGroup: String(bloodGroup).trim(),
+            mobileNumber: String(mobile).trim(),
+            email: String(email).trim(),
+            aadhaarNumber: String(aadhaar).trim(),
+            pincode,
+            historyInJudo: String(historyInJudo).trim(),
+            historyInOtherMartial: String(historyInOtherMartial).trim(),
+            presentGradeInJudo: String(presentGradeInJudo).trim(),
+            password: dummyPasswordHash,
+            status,
+            isPaid: status === "APPROVED",
+            districtId: districtDb.id,
+            talukId: talukDb.id,
+          },
+        });
+
+        successCount++;
+      } catch (err: any) {
+        failedCount++;
+        errors.push({ row: rowNum, error: err.message || "Database insert error" });
+      }
+    }
+
+    return res.json({
+      message: "Excel import process complete.",
+      successCount,
+      failedCount,
+      errors
+    });
+
+  } catch (error: any) {
+    if (file && fs.existsSync(file.path)) {
+      fs.unlinkSync(file.path);
+    }
+    console.error("[importCoachesExcel]", error);
+    return res.status(500).json({ error: error.message || "Failed to process Excel file" });
+  }
+};
+
 
