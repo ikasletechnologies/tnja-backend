@@ -57,7 +57,7 @@ async function main() {
       data: {
         name: dist.district,
         taluks: {
-          create: dist.taluks.map((name: string) => ({ name })),
+          create: dist.taluks.map((name: string) => ({ name, pincode: "000000" })),
         },
       },
       include: { taluks: true },
