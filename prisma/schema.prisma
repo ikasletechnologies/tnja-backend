@@ -24,13 +24,15 @@ model District {
 model Taluk {
   id         String         @id @default(uuid())
   name       String
-  pincode    String
+  pincode    String?
   districtId String
   clubs      Club[]
   coaches    CoachReferee[]
   members    Member[]
   students   Student[]
   district   District       @relation(fields: [districtId], references: [id])
+
+  @@unique([districtId, name])
 }
 
 model Club {
@@ -122,6 +124,7 @@ model Student {
   draws                 Int                      @default(0)
   height                String?
   weight                String?
+  belt                  String?
   coachId               String?
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
@@ -325,6 +328,7 @@ model TournamentRegistration {
   paymentId      String?
   height         String?
   weight         String?
+  belt           String?
   placement      Placement?                      @default(PARTICIPATION)
   ageGroup       String                          @default("SENIOR")
   weightCategory String                          @default("ALL")

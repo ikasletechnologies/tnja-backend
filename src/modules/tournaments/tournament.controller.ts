@@ -2,7 +2,8 @@ import type { Request, Response } from "express";
 import prisma from "../../database/prisma.js";
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import * as xlsx from "xlsx";
+import bcrypt from "bcrypt";
+import xlsx from "xlsx";
 import fs from "fs";
 import { sendNotificationToUser } from "../../socket/socket.js";
 import { sendEventRegistrationEmail, sendNewTournamentAnnouncement } from "../../config/mailer.js";
@@ -419,9 +420,9 @@ export const getTournamentRegistrations = async (req: Request, res: Response) =>
       where: { tournamentId: id },
       include: {
         player: {
-          select: { id: true, fullName: true, permanentId: true, tempId: true, email: true, gender: true, age: true, dob: true, club: { select: { name: true } } },
+          select: { id: true, fullName: true, permanentId: true, tempId: true, email: true, gender: true, age: true, dob: true, belt: true, club: { select: { id: true, name: true } }, district: { select: { name: true } } },
         },
-        coach: { select: { fullName: true } }
+        coach: { select: { id: true, fullName: true } }
       },
       orderBy: { createdAt: "asc" },
     });
@@ -586,7 +587,7 @@ export const updateRegistrationMetrics = async (req: Request, res: Response) => 
   const { userId, role } = (req as any).user;
   const tournamentId = req.params.id as string;
   const regId = req.params.regId as string;
-  const { weight, height } = req.body;
+  const { weight, height, belt, clubId, coachId, ageGroup } = req.body;
 
   const isClub = role === "CLUB";
   const isOfficial = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN"].includes(role);
@@ -608,21 +609,38 @@ export const updateRegistrationMetrics = async (req: Request, res: Response) => 
 
     const registration = await prisma.tournamentRegistration.findUnique({
       where: { id: regId },
+      include: { player: { select: { gender: true } } },
     });
-    
+
     if (!registration) return res.status(404).json({ error: "Registration not found" });
+
+    const effectiveWeight = weight || registration.weight;
+    const effectiveAgeGroup = ageGroup || registration.ageGroup;
+    const weightCategory = effectiveWeight
+      ? getWeightCategory(Number(effectiveWeight), registration.player.gender, effectiveAgeGroup)
+      : registration.weightCategory;
 
     const updatedRegistration = await prisma.tournamentRegistration.update({
       where: { id: regId },
-      data: { weight: weight || registration.weight, height: height || registration.height },
+      data: {
+        weight: weight || registration.weight,
+        height: height || registration.height,
+        belt: belt !== undefined ? belt : registration.belt,
+        ageGroup: effectiveAgeGroup,
+        weightCategory,
+        coachId: coachId !== undefined ? (coachId || null) : registration.coachId,
+      },
     });
 
-    if (weight || height) {
+    if (weight || height || belt !== undefined || clubId !== undefined || coachId !== undefined) {
       await prisma.student.update({
         where: { id: registration.playerId },
         data: {
           ...(weight && { weight }),
-          ...(height && { height })
+          ...(height && { height }),
+          ...(belt !== undefined && { belt }),
+          ...(clubId !== undefined && { clubId: clubId || null }),
+          ...(coachId !== undefined && { coachId: coachId || null }),
         }
       });
     }
@@ -2016,6 +2034,25 @@ export const updateMatchState = async (req: Request, res: Response) => {
   }
 };
 
+// Matches an Excel column value regardless of exact header wording — case,
+// spacing, punctuation, and unit suffixes like "(kg)"/"(cm)" are ignored, so
+// "Player Name" / "Full Name" / "full_name" all resolve to the same field.
+function normalizeHeader(s: string): string {
+  return s.toLowerCase().replace(/\(.*?\)/g, "").replace(/[^a-z0-9]/g, "");
+}
+
+function pickField(row: Record<string, any>, aliases: string[]): any {
+  const normalizedRow: Record<string, any> = {};
+  for (const key of Object.keys(row)) {
+    normalizedRow[normalizeHeader(key)] = row[key];
+  }
+  for (const alias of aliases) {
+    const value = normalizedRow[normalizeHeader(alias)];
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return undefined;
+}
+
 // ─── CLUB/OFFICIAL: Bulk Import Players from Excel ───────────────────────────
 export const bulkImportRegistrations = async (req: Request, res: Response) => {
   const { userId, role } = (req as any).user;
@@ -2065,9 +2102,12 @@ export const bulkImportRegistrations = async (req: Request, res: Response) => {
 
     for (const [index, row] of data.entries()) {
       const rowNum = index + 2; // Assuming header is row 1
-      const aadhaar = row["Aadhaar Number"] || row["Aadhaar"] || row["AadhaarNumber"];
-      const weight = row["Weight"] || row["Weight (kg)"];
-      const height = row["Height"];
+      const aadhaar = pickField(row, ["Aadhaar Number", "Aadhaar", "AadhaarNumber"]);
+      const weight = pickField(row, ["Weight", "Weight (kg)"]);
+      const height = pickField(row, ["Height", "Height (cm)"]);
+      const belt = pickField(row, ["Belt", "Belt Rank", "Belt Colour", "Belt Color"]);
+      const coachIdInput = pickField(row, ["Coach ID", "Coach Id", "CoachId", "Coach"]);
+      const clubName = pickField(row, ["Club", "Club Name"]);
 
       if (!aadhaar) {
         failedCount++;
@@ -2075,11 +2115,118 @@ export const bulkImportRegistrations = async (req: Request, res: Response) => {
         continue;
       }
 
-      const player = await prisma.student.findUnique({ where: { aadhaarNumber: String(aadhaar) } });
+      // Coach ID is optional — matches a coach's Mobile Number (recommended,
+      // since it's known up-front without waiting on a system-generated ID),
+      // Temp ID, or Permanent ID; all three are resolved internally. If it
+      // doesn't match anything, the registration is still created without a coach.
+      let resolvedCoachId: string | null = null;
+      if (coachIdInput) {
+        const coach = await prisma.coachReferee.findFirst({
+          where: {
+            OR: [
+              { mobileNumber: String(coachIdInput).trim() },
+              { tempId: String(coachIdInput).trim() },
+              { permanentId: String(coachIdInput).trim() },
+            ],
+          },
+        });
+        if (coach) resolvedCoachId = coach.id;
+      }
+
+      // Club is optional — matches by name (case-insensitive). Only applied
+      // when creating a brand-new player; falls back to the tournament's own
+      // club if the sheet doesn't specify one.
+      let resolvedClubId: string | null = null;
+      if (clubName) {
+        const club = await prisma.club.findFirst({ where: { name: { equals: String(clubName).trim(), mode: "insensitive" } } });
+        if (club) resolvedClubId = club.id;
+      }
+
+      let player = await prisma.student.findUnique({ where: { aadhaarNumber: String(aadhaar) } });
       if (!player) {
-        failedCount++;
-        errors.push({ row: rowNum, error: `Player not found with Aadhaar: ${aadhaar}` });
-        continue;
+        // Attempt to create new player from Excel data
+        const fullName = pickField(row, ["Full Name", "Name", "FullName", "Player Name"]);
+        const email = pickField(row, ["Email"]) || `dummy_${aadhaar}@example.com`;
+        const mobileNumber = pickField(row, ["Mobile Number", "Mobile"]) || `0000000000`;
+        const dobStr = pickField(row, ["Date of Birth", "DOB"]);
+        const genderStr = pickField(row, ["Gender", "Sex"]);
+        const districtName = pickField(row, ["District Name", "District"]);
+        const talukName = pickField(row, ["Taluk Name", "Taluk"]);
+        const schoolName = pickField(row, ["School Name", "School"]) || "Unknown";
+
+        if (!fullName || !dobStr || !genderStr || !districtName || !talukName) {
+          failedCount++;
+          errors.push({ row: rowNum, error: `Player not found and missing required fields to create new player (Full Name, DOB, Gender, District, Taluk)` });
+          continue;
+        }
+
+        // Parse DOB
+        let dob = new Date(dobStr);
+        if (isNaN(dob.getTime())) {
+           if (typeof dobStr === "number") {
+             dob = new Date((dobStr - (25567 + 2)) * 86400 * 1000);
+           } else {
+             failedCount++;
+             errors.push({ row: rowNum, error: `Invalid Date of Birth format` });
+             continue;
+           }
+        }
+        const age = new Date().getFullYear() - dob.getFullYear();
+        const gender = String(genderStr).toUpperCase() === "FEMALE" ? "FEMALE" : "MALE";
+
+        // Find District and Taluk
+        const district = await prisma.district.findFirst({ where: { name: { equals: districtName, mode: "insensitive" } } });
+        if (!district) {
+          failedCount++;
+          errors.push({ row: rowNum, error: `District not found: ${districtName}` });
+          continue;
+        }
+        const taluk = await prisma.taluk.findFirst({ where: { name: { equals: talukName, mode: "insensitive" }, districtId: district.id } });
+        if (!taluk) {
+          failedCount++;
+          errors.push({ row: rowNum, error: `Taluk not found: ${talukName}` });
+          continue;
+        }
+
+        const hashedPassword = await bcrypt.hash(String(mobileNumber), 10);
+
+        try {
+          player = await prisma.student.create({
+            data: {
+              tempId: `TMP${crypto.randomBytes(4).toString('hex').toUpperCase()}`,
+              districtId: district.id,
+              talukId: taluk.id,
+              fullName: String(fullName),
+              dob,
+              age,
+              gender,
+              mobileNumber: String(mobileNumber),
+              email: String(email),
+              aadhaarNumber: String(aadhaar),
+              password: hashedPassword,
+              status: "APPROVED", // Auto-approved from admin import
+              pincode: "000000",
+              bloodGroup: pickField(row, ["Blood Group"]) || "UNKNOWN",
+              address: "Unknown",
+              city: "Unknown",
+              state: "Tamil Nadu",
+              addressPincode: "000000",
+              nationality: "Indian",
+              annualIncome: pickField(row, ["Annual Income"]) ? Number(pickField(row, ["Annual Income"])) : 0,
+              schoolName: String(schoolName),
+              grade: pickField(row, ["Grade"]) ? String(pickField(row, ["Grade"])) : "Unknown",
+              weight: weight ? String(weight) : null,
+              height: height ? String(height) : null,
+              belt: belt ? String(belt) : null,
+              clubId: resolvedClubId || tournament.clubId || null,
+              coachId: resolvedCoachId,
+            }
+          });
+        } catch (e) {
+          failedCount++;
+          errors.push({ row: rowNum, error: `Failed to auto-create player: ${e instanceof Error ? e.message : String(e)}` });
+          continue;
+        }
       }
 
       if (player.status !== "APPROVED") {
@@ -2106,11 +2253,12 @@ export const bulkImportRegistrations = async (req: Request, res: Response) => {
         data: {
           tournamentId,
           playerId: player.id,
-          coachId: player.coachId, // link to coach if any
+          coachId: resolvedCoachId || player.coachId, // Coach ID from the sheet takes priority, else whatever the player's own profile has
           status: "APPROVED", // Auto-approve since imported by club/admin
           isPaid: false, // You could modify this based on Excel if there's a paid column
           weight: weight ? String(weight) : player.weight,
           height: height ? String(height) : player.height,
+          belt: belt ? String(belt) : player.belt,
           ageGroup,
           weightCategory,
           gender: player.gender,
@@ -2128,7 +2276,7 @@ export const bulkImportRegistrations = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error during bulk import:", error);
     if (file && fs.existsSync(file.path)) fs.unlinkSync(file.path);
-    return res.status(500).json({ error: "Internal Server Error" });
+    return res.status(500).json({ error: "Internal Server Error", details: error instanceof Error ? error.message : String(error) });
   }
 };
 

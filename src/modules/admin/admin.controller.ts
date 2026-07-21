@@ -1491,12 +1491,15 @@ export const importStudentsExcel = async (req: Request, res: Response) => {
           continue;
         }
 
-        // Look up Coach if provided (by ID first, then fallback to Name)
+        // Look up Coach if provided — by Mobile Number (recommended, known
+        // up-front without waiting on a system-generated ID), Temp ID,
+        // Permanent ID, or full Name.
         let coachId: string | null = null;
         if (coachName) {
           const coachDb = await prisma.coachReferee.findFirst({
             where: {
               OR: [
+                { mobileNumber: String(coachName).trim() },
                 { tempId: String(coachName).trim() },
                 { permanentId: String(coachName).trim() },
                 { fullName: { equals: String(coachName).trim(), mode: "insensitive" } }

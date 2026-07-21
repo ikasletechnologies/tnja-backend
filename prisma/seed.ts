@@ -28,8 +28,6 @@ function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-// districtsList removed in favor of tn_locations.json
-
 async function main() {
   console.log('🚀 Tamil Nadu Judo Association — Minimal Seed');
   console.log('\n═══════════════════════════════════════════════════════\n');
@@ -47,21 +45,19 @@ async function main() {
   await prisma.district.deleteMany();
   console.log('✅ Database cleaned');
 
-  console.log('\n📍 Creating Districts & Taluks from tn_locations.json...');
+  console.log('\n📍 Creating Districts & Taluks from tn-districts-taluks.json...');
   const districtRecs: { id: string; name: string; talukId: string }[] = [];
-  
-  const locationsData = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'prisma', 'tn_locations.json'), 'utf8'));
+
+  const locationsData: { district: string; taluks: string[] }[] = JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), 'prisma', 'data', 'tn-districts-taluks.json'), 'utf8')
+  );
 
   for (const dist of locationsData) {
     const d = await prisma.district.create({
       data: {
-        name: dist.name,
-        zoneName: dist.zone,
+        name: dist.district,
         taluks: {
-          create: dist.taluks.map((t: any) => ({
-            name: t.name,
-            pincode: t.pincode,
-          })),
+          create: dist.taluks.map((name: string) => ({ name })),
         },
       },
       include: { taluks: true },
