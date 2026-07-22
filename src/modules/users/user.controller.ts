@@ -451,17 +451,23 @@ export const searchRefereeById = async (req: Request, res: Response) => {
   try {
     const { id, q } = req.query;
 
-    // Autocomplete mode: partial match on name or ID, returns a list.
-    if (typeof q === "string" && q.trim()) {
+    // Autocomplete / browse mode: partial match on name or ID, returns a list.
+    // An empty q (as opposed to an omitted one) returns the full approved
+    // roster for browsing, so admins can scan name + ID pairs without typing.
+    if (typeof q === "string") {
       const query = q.trim();
       const referees = await prisma.coachReferee.findMany({
         where: {
           status: "APPROVED",
-          OR: [
-            { fullName: { contains: query, mode: "insensitive" } },
-            { tempId: { contains: query, mode: "insensitive" } },
-            { permanentId: { contains: query, mode: "insensitive" } }
-          ]
+          ...(query
+            ? {
+                OR: [
+                  { fullName: { contains: query, mode: "insensitive" } },
+                  { tempId: { contains: query, mode: "insensitive" } },
+                  { permanentId: { contains: query, mode: "insensitive" } }
+                ]
+              }
+            : {})
         },
         select: {
           id: true,
@@ -471,7 +477,7 @@ export const searchRefereeById = async (req: Request, res: Response) => {
           district: { select: { name: true } },
           club: { select: { name: true } }
         },
-        take: 8,
+        take: query ? 8 : 50,
         orderBy: { fullName: "asc" }
       });
 

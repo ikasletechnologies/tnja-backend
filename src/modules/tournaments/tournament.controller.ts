@@ -5,6 +5,7 @@ import crypto from "crypto";
 import bcrypt from "bcrypt";
 import xlsx from "xlsx";
 import fs from "fs";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { sendNotificationToUser } from "../../socket/socket.js";
 import { sendEventRegistrationEmail, sendNewTournamentAnnouncement } from "../../config/mailer.js";
 
@@ -2083,7 +2084,13 @@ export const bulkImportRegistrations = async (req: Request, res: Response) => {
       return res.status(403).json({ error: "This tournament does not belong to you" });
     }
 
-    if (tournament.registrationClosed || new Date(tournament.date) < new Date()) {
+    // Compare against the end of the tournament's last day, not its start-of-day
+    // timestamp — otherwise this blocks imports from the moment the tournament's
+    // calendar date begins, even hours before it actually starts.
+    const tournamentEnd = new Date(tournament.dateTo || tournament.date);
+    tournamentEnd.setHours(23, 59, 59, 999);
+
+    if (tournament.registrationClosed || tournamentEnd < new Date()) {
       fs.unlinkSync(file.path);
       return res.status(400).json({ error: "Registrations are closed or tournament has already started" });
     }
@@ -2432,68 +2439,178 @@ export const downloadTournamentReport = async (req: Request, res: Response) => {
       }
     }
 
-    const wb = xlsx.utils.book_new();
+    // ─── Build PDF Report ──────────────────────────────────────────────────
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    // Sheet 1: Summary Overview
-    const summaryData = [
-      ["TOURNAMENT SUMMARY REPORT"],
-      ["Generated Date", new Date().toLocaleString()],
-      [],
+    const pageWidth = 595.28; // A4 portrait
+    const pageHeight = 841.89;
+    const margin = 40;
+
+    const black = rgb(0.1, 0.1, 0.1);
+    const gray = rgb(0.4, 0.4, 0.4);
+    const orange = rgb(1, 0.45, 0);
+    const lightLine = rgb(0.85, 0.85, 0.85);
+
+    let page = pdfDoc.addPage([pageWidth, pageHeight]);
+    let y = pageHeight - margin;
+
+    const ensureSpace = (needed: number) => {
+      if (y - needed < margin) {
+        page = pdfDoc.addPage([pageWidth, pageHeight]);
+        y = pageHeight - margin;
+      }
+    };
+
+    const drawText = (
+      text: string,
+      opts: { size?: number; bold?: boolean; color?: ReturnType<typeof rgb>; x?: number } = {}
+    ) => {
+      const { size = 10, bold = false, color = black, x = margin } = opts;
+      page.drawText(text || "", { x, y, size, font: bold ? boldFont : font, color });
+    };
+
+    const drawLine = () => {
+      page.drawLine({
+        start: { x: margin, y },
+        end: { x: pageWidth - margin, y },
+        thickness: 0.5,
+        color: lightLine,
+      });
+    };
+
+    const drawSectionHeader = (title: string) => {
+      ensureSpace(40);
+      y -= 10;
+      drawText(title, { size: 13, bold: true, color: orange });
+      y -= 6;
+      drawLine();
+      y -= 20;
+    };
+
+    // ── Title ──
+    const title = "TOURNAMENT SUMMARY REPORT";
+    const titleWidth = boldFont.widthOfTextAtSize(title, 20);
+    drawText(title, { size: 20, bold: true, x: pageWidth / 2 - titleWidth / 2 });
+    y -= 18;
+    drawText(`Generated: ${new Date().toLocaleString()}`, { size: 9, color: gray });
+    y -= 25;
+    drawLine();
+    y -= 25;
+
+    // ── Tournament Info ──
+    const infoRows: [string, string][] = [
       ["Tournament Title", tournament.title],
-      ["Date", new Date(tournament.date).toLocaleDateString() + (tournament.dateTo ? ` to ${new Date(tournament.dateTo).toLocaleDateString()}` : "")],
+      [
+        "Date",
+        new Date(tournament.date).toLocaleDateString() +
+          (tournament.dateTo ? ` to ${new Date(tournament.dateTo).toLocaleDateString()}` : ""),
+      ],
       ["Location", tournament.location],
       ["Level", tournament.level],
       ["Category", tournament.category || "General"],
       ["Status", tournament.status],
-      ["Organized By Club/Official", tournament.club?.name || tournament.official?.fullName || "N/A"],
-      [],
-      ["PARTICIPATION METRICS"],
+      ["Organized By", tournament.club?.name || tournament.official?.fullName || "N/A"],
+    ];
+    for (const [label, value] of infoRows) {
+      ensureSpace(20);
+      drawText(`${label}:`, { size: 10, bold: true, x: margin });
+      drawText(String(value), { size: 10, x: margin + 150 });
+      y -= 18;
+    }
+
+    // ── Participation Metrics ──
+    drawSectionHeader("PARTICIPATION METRICS");
+    const metricRows: [string, string | number][] = [
       ["Total Players Registered", totalPlayers],
-      ["Male Players Count", maleCount],
-      ["Female Players Count", femaleCount],
+      ["Male Players", maleCount],
+      ["Female Players", femaleCount],
       ["Other / Unspecified", otherCount],
       ["Total Categories / Divisions", Object.keys(categoryMap).length],
     ];
-    const summaryWs = xlsx.utils.aoa_to_sheet(summaryData);
-    xlsx.utils.book_append_sheet(wb, summaryWs, "Tournament Summary");
+    for (const [label, value] of metricRows) {
+      ensureSpace(20);
+      drawText(`${label}:`, { size: 10, bold: true, x: margin });
+      drawText(String(value), { size: 10, x: margin + 220 });
+      y -= 18;
+    }
 
-    // Sheet 2: Category Breakdown & Winners
-    const categoryRows = Object.values(categoryMap).map((cat) => ({
-      "Age Group": cat.ageGroup,
-      "Gender": cat.gender,
-      "Weight Category": cat.weightCategory,
-      "Male Players": cat.males,
-      "Female Players": cat.females,
-      "Total Players": cat.total,
-      "Gold (1st Place)": cat.firstPlace.join(", ") || "N/A",
-      "Silver (2nd Place)": cat.secondPlace.join(", ") || "N/A",
-      "Bronze (3rd Place)": cat.thirdPlace.join(", ") || "N/A",
-    }));
-    const categoryWs = xlsx.utils.json_to_sheet(categoryRows);
-    xlsx.utils.book_append_sheet(wb, categoryWs, "Category Winners");
+    // ── Category Breakdown & Winners ──
+    drawSectionHeader("CATEGORY BREAKDOWN & WINNERS");
+    for (const cat of Object.values(categoryMap)) {
+      ensureSpace(85);
+      drawText(`${cat.ageGroup} · ${cat.gender} · ${cat.weightCategory}`, { size: 11, bold: true });
+      y -= 16;
+      drawText(`Players: ${cat.total} (M: ${cat.males}, F: ${cat.females})`, { size: 9, color: gray });
+      y -= 15;
+      drawText(`Gold (1st): ${cat.firstPlace.join(", ") || "N/A"}`, { size: 9 });
+      y -= 14;
+      drawText(`Silver (2nd): ${cat.secondPlace.join(", ") || "N/A"}`, { size: 9 });
+      y -= 14;
+      drawText(`Bronze (3rd): ${cat.thirdPlace.join(", ") || "N/A"}`, { size: 9 });
+      y -= 22;
+    }
 
-    // Sheet 3: Full Player Roster
-    const rosterRows = regs.map((reg) => ({
-      "TNJA ID": reg.player?.permanentId || reg.player?.tempId || "N/A",
-      "Player Name": reg.player?.fullName || "N/A",
-      "Gender": reg.gender || reg.player?.gender || "N/A",
-      "Age Group": reg.ageGroup,
-      "Weight Category": reg.weightCategory,
-      "Club": reg.player?.club?.name || "N/A",
-      "District": reg.player?.district?.name || "N/A",
-      "Placement": reg.placement || "PARTICIPATION",
-      "Payment Status": reg.isPaid ? "Paid" : "Pending",
-      "Registration Status": reg.status,
-    }));
-    const rosterWs = xlsx.utils.json_to_sheet(rosterRows);
-    xlsx.utils.book_append_sheet(wb, rosterWs, "Player Roster");
+    // ── Full Player Roster (table) ──
+    drawSectionHeader("FULL PLAYER ROSTER");
+    const columns = [
+      { label: "TNJA ID", width: 65 },
+      { label: "Name", width: 110 },
+      { label: "Category", width: 105 },
+      { label: "Club", width: 90 },
+      { label: "District", width: 70 },
+      { label: "Placement", width: 45 },
+      { label: "Payment", width: 30 },
+    ];
 
-    const buffer = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
+    const drawTableHeader = () => {
+      ensureSpace(30);
+      let colX = margin;
+      for (const col of columns) {
+        drawText(col.label, { size: 8.5, bold: true, x: colX, color: black });
+        colX += col.width;
+      }
+      y -= 6;
+      drawLine();
+      y -= 14;
+    };
+
+    drawTableHeader();
+
+    for (const reg of regs) {
+      const pageBeforeRow = page;
+      ensureSpace(16);
+      if (page !== pageBeforeRow) {
+        drawTableHeader();
+      }
+      const rowValues = [
+        reg.player?.permanentId || reg.player?.tempId || "N/A",
+        reg.player?.fullName || "N/A",
+        `${reg.ageGroup} ${reg.gender || reg.player?.gender || ""} ${reg.weightCategory}`,
+        reg.player?.club?.name || "N/A",
+        reg.player?.district?.name || "N/A",
+        reg.placement || "-",
+        reg.isPaid ? "Paid" : "Due",
+      ];
+      let colX = margin;
+      rowValues.forEach((val, i) => {
+        const col = columns[i];
+        if (!col) return;
+        const maxChars = Math.floor(col.width / 4.2);
+        const text = String(val).length > maxChars ? String(val).slice(0, maxChars - 1) + "…" : String(val);
+        drawText(text, { size: 8, x: colX, color: gray });
+        colX += col.width;
+      });
+      y -= 15;
+    }
+
+    const pdfBytes = await pdfDoc.save();
 
     const safeTitle = tournament.title.replace(/[^a-zA-Z0-9_-]/g, "_");
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename=Tournament_Report_${safeTitle}.xlsx`);
-    return res.send(buffer);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=Tournament_Report_${safeTitle}.pdf`);
+    return res.end(Buffer.from(pdfBytes));
   } catch (error) {
     console.error("Error generating tournament report:", error);
     return res.status(500).json({ error: "Internal Server Error" });
