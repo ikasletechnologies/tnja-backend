@@ -1574,6 +1574,7 @@ export const importStudentsExcel = async (req: Request, res: Response) => {
             schoolName: String(schoolName).trim(),
             grade: String(grade).trim(),
             password: dummyPasswordHash,
+            mustChangePassword: true,
             status,
             isPaid: status === "APPROVED",
             districtId: districtDb.id,
@@ -1595,7 +1596,8 @@ export const importStudentsExcel = async (req: Request, res: Response) => {
       message: "Excel import process complete.",
       successCount,
       failedCount,
-      errors
+      errors,
+      defaultPassword: successCount > 0 ? "Welcome@123" : undefined
     });
 
   } catch (error: any) {
@@ -1786,6 +1788,7 @@ export const importCoachesExcel = async (req: Request, res: Response) => {
             historyInOtherMartial: String(historyInOtherMartial).trim(),
             presentGradeInJudo: String(presentGradeInJudo).trim(),
             password: dummyPasswordHash,
+            mustChangePassword: true,
             status,
             isPaid: status === "APPROVED",
             districtId: districtDb.id,
@@ -1804,7 +1807,8 @@ export const importCoachesExcel = async (req: Request, res: Response) => {
       message: "Excel import process complete.",
       successCount,
       failedCount,
-      errors
+      errors,
+      defaultPassword: successCount > 0 ? "Welcome@123" : undefined
     });
 
   } catch (error: any) {

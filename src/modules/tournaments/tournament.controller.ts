@@ -1692,6 +1692,28 @@ const autoAdvanceWinner = (rounds: any[]): any[] => {
 };
 
 // ─── ADMIN/CLUB: Save Tournament Draw ────────────────────────────────────────
+// A user may modify a match/draw if they own the tournament (club/official),
+// are a global admin, or are the referee assigned to that draw's specific mat —
+// a coach assigned to Mat 1 must not be able to edit matches on Mat 2.
+async function canModifyTournamentMatch(
+  userId: string,
+  role: string,
+  tournament: { clubId: string | null; officialId: string | null },
+  matNumber: number,
+  tournamentId: string
+): Promise<boolean> {
+  if (role === "SUPER_ADMIN" || role === "CEO") return true;
+  const isOfficial = ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY"].includes(role);
+  if ((isOfficial || role === "CLUB") && (tournament.clubId === userId || tournament.officialId === userId)) return true;
+  if (role === "COACH") {
+    const isAssigned = await prisma.tournamentMat.findFirst({
+      where: { tournamentId, refereeId: userId, matNumber }
+    });
+    return !!isAssigned;
+  }
+  return false;
+}
+
 export const saveTournamentDraw = async (req: Request, res: Response) => {
   const { userId, role } = (req as any).user;
   const id = req.params.id as string;
@@ -1712,23 +1734,12 @@ export const saveTournamentDraw = async (req: Request, res: Response) => {
   try {
     const tournament = await prisma.tournament.findUnique({ where: { id } });
     if (!tournament) return res.status(404).json({ error: "Tournament not found" });
-    if (
-      role !== "SUPER_ADMIN" &&
-      role !== "CEO" &&
-      tournament.clubId !== userId &&
-      tournament.officialId !== userId
-    ) {
-      if (isCoach) {
-        // Verify they are assigned as a referee
-        const isAssigned = await prisma.tournamentMat.findFirst({
-          where: { tournamentId: id, refereeId: userId }
-        });
-        if (!isAssigned) {
-          return res.status(403).json({ error: "You are not assigned as a referee to this tournament" });
-        }
-      } else {
-        return res.status(403).json({ error: "This tournament does not belong to you" });
-      }
+
+    const allowed = await canModifyTournamentMatch(userId, role, tournament, matNumber ? Number(matNumber) : 1, id);
+    if (!allowed) {
+      return res.status(403).json({
+        error: isCoach ? "You are not assigned as a referee to this mat" : "This tournament does not belong to you"
+      });
     }
 
     // Auto-advance winners to next round
@@ -1878,7 +1889,7 @@ export const getTournamentMats = async (req: Request, res: Response) => {
   try {
     const mats = await prisma.tournamentMat.findMany({
       where: { tournamentId: id as string },
-      include: { referee: { select: { fullName: true } } },
+      include: { referee: { select: { fullName: true, permanentId: true, tempId: true } } },
       orderBy: { matNumber: 'asc' }
     });
     return res.json({ mats });
@@ -1948,40 +1959,40 @@ export const getRefereeMats = async (req: Request | any, res: Response) => {
 };
 
 export const submitMatchResult = async (req: Request, res: Response) => {
+  const { userId, role } = (req as any).user;
   const { id, matchId } = req.params;
   const { winnerId } = req.body;
 
   try {
+    const tournament = await prisma.tournament.findUnique({ where: { id: id as string } });
+    if (!tournament) return res.status(404).json({ error: "Tournament not found" });
+
     const draws = await prisma.tournamentDraw.findMany({ where: { tournamentId: id as string } });
-    
-    let updated = false;
+
+    let targetDraw: (typeof draws)[number] | null = null;
+    let targetMatch: any = null;
     for (const draw of draws) {
       const rounds: any[][] = draw.rounds as any[][];
-      let matchFound = false;
-
       for (const round of rounds) {
-        for (const match of round) {
-          if (match.matchId === matchId) {
-            match.winnerId = winnerId;
-            match.status = "COMPLETED";
-            matchFound = true;
-            break;
-          }
-        }
-        if (matchFound) break;
+        const match = round.find((m: any) => m.matchId === matchId);
+        if (match) { targetDraw = draw; targetMatch = match; break; }
       }
-
-      if (matchFound) {
-        await prisma.tournamentDraw.update({
-          where: { id: draw.id },
-          data: { rounds: rounds as any }
-        });
-        updated = true;
-        break;
-      }
+      if (targetMatch) break;
     }
 
-    if (!updated) return res.status(404).json({ error: "Match not found" });
+    if (!targetDraw || !targetMatch) return res.status(404).json({ error: "Match not found" });
+
+    const allowed = await canModifyTournamentMatch(userId, role, tournament, targetDraw.matNumber, id as string);
+    if (!allowed) return res.status(403).json({ error: "You are not authorized to update this match" });
+
+    targetMatch.winnerId = winnerId;
+    targetMatch.status = "COMPLETED";
+
+    await prisma.tournamentDraw.update({
+      where: { id: targetDraw.id },
+      data: { rounds: targetDraw.rounds as any }
+    });
+
     return res.json({ message: "Match result saved successfully" });
   } catch (error) {
     console.error("Error saving match result:", error);
@@ -1990,44 +2001,43 @@ export const submitMatchResult = async (req: Request, res: Response) => {
 };
 
 export const updateMatchState = async (req: Request, res: Response) => {
+  const { userId, role } = (req as any).user;
   const { id, matchId } = req.params;
   const { scoreA, scoreB, logs, timeLeft, status } = req.body;
 
   try {
+    const tournament = await prisma.tournament.findUnique({ where: { id: id as string } });
+    if (!tournament) return res.status(404).json({ error: "Tournament not found" });
+
     const draws = await prisma.tournamentDraw.findMany({ where: { tournamentId: id as string } });
-    
-    let updated = false;
+
+    let targetDraw: (typeof draws)[number] | null = null;
+    let targetMatch: any = null;
     for (const draw of draws) {
       const rounds: any[][] = draw.rounds as any[][];
-      let matchFound = false;
-
       for (const round of rounds) {
-        for (const match of round) {
-          if (match.matchId === matchId) {
-            if (scoreA !== undefined) match.scoreA = scoreA;
-            if (scoreB !== undefined) match.scoreB = scoreB;
-            if (logs !== undefined) match.logs = logs;
-            if (timeLeft !== undefined) match.timeLeft = timeLeft;
-            if (status !== undefined) match.status = status;
-            
-            matchFound = true;
-            break;
-          }
-        }
-        if (matchFound) break;
+        const match = round.find((m: any) => m.matchId === matchId);
+        if (match) { targetDraw = draw; targetMatch = match; break; }
       }
-
-      if (matchFound) {
-        await prisma.tournamentDraw.update({
-          where: { id: draw.id },
-          data: { rounds: rounds as any }
-        });
-        updated = true;
-        break;
-      }
+      if (targetMatch) break;
     }
 
-    if (!updated) return res.status(404).json({ error: "Match not found" });
+    if (!targetDraw || !targetMatch) return res.status(404).json({ error: "Match not found" });
+
+    const allowed = await canModifyTournamentMatch(userId, role, tournament, targetDraw.matNumber, id as string);
+    if (!allowed) return res.status(403).json({ error: "You are not authorized to update this match" });
+
+    if (scoreA !== undefined) targetMatch.scoreA = scoreA;
+    if (scoreB !== undefined) targetMatch.scoreB = scoreB;
+    if (logs !== undefined) targetMatch.logs = logs;
+    if (timeLeft !== undefined) targetMatch.timeLeft = timeLeft;
+    if (status !== undefined) targetMatch.status = status;
+
+    await prisma.tournamentDraw.update({
+      where: { id: targetDraw.id },
+      data: { rounds: targetDraw.rounds as any }
+    });
+
     return res.json({ message: "Match state updated successfully" });
   } catch (error) {
     console.error("Error updating match state:", error);

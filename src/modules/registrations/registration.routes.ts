@@ -122,6 +122,5 @@ router.patch("/member/promote", authenticateJWT, authorizeAdmin, promoteMember);
 
 // ── Coach/Referee Dashboard ────────────────────────────────────────────────────────
 router.get("/coach/students", authenticateJWT, getCoachStudents);
-router.get("/referees/my-mats", authenticateJWT, getRefereeMats);
 
 export default router;
