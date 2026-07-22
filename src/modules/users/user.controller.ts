@@ -449,7 +449,43 @@ export const getUserDetails = async (req: Request, res: Response) => {
 
 export const searchRefereeById = async (req: Request, res: Response) => {
   try {
-    const { id } = req.query;
+    const { id, q } = req.query;
+
+    // Autocomplete mode: partial match on name or ID, returns a list.
+    if (typeof q === "string" && q.trim()) {
+      const query = q.trim();
+      const referees = await prisma.coachReferee.findMany({
+        where: {
+          status: "APPROVED",
+          OR: [
+            { fullName: { contains: query, mode: "insensitive" } },
+            { tempId: { contains: query, mode: "insensitive" } },
+            { permanentId: { contains: query, mode: "insensitive" } }
+          ]
+        },
+        select: {
+          id: true,
+          tempId: true,
+          permanentId: true,
+          fullName: true,
+          district: { select: { name: true } },
+          club: { select: { name: true } }
+        },
+        take: 8,
+        orderBy: { fullName: "asc" }
+      });
+
+      return res.json({
+        referees: referees.map((r) => ({
+          id: r.id,
+          refId: r.permanentId || r.tempId,
+          name: r.fullName,
+          district: r.district?.name || "N/A",
+          club: r.club?.name || "Independent"
+        }))
+      });
+    }
+
     if (!id || typeof id !== "string") {
       return res.status(400).json({ error: "Please provide a valid referee ID." });
     }
@@ -483,6 +519,60 @@ export const searchRefereeById = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error searching referee:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const searchStudents = async (req: Request, res: Response) => {
+  try {
+    const { q } = req.query;
+    if (typeof q !== "string" || !q.trim()) {
+      return res.status(400).json({ error: "Please provide a search term." });
+    }
+    const query = q.trim();
+
+    const students = await prisma.student.findMany({
+      where: {
+        status: "APPROVED",
+        OR: [
+          { fullName: { contains: query, mode: "insensitive" } },
+          { tempId: { contains: query, mode: "insensitive" } },
+          { permanentId: { contains: query, mode: "insensitive" } }
+        ]
+      },
+      select: {
+        id: true,
+        tempId: true,
+        permanentId: true,
+        fullName: true,
+        gender: true,
+        age: true,
+        weight: true,
+        height: true,
+        belt: true,
+        district: { select: { name: true } },
+        club: { select: { name: true } }
+      },
+      take: 8,
+      orderBy: { fullName: "asc" }
+    });
+
+    return res.json({
+      students: students.map((s) => ({
+        id: s.id,
+        refId: s.permanentId || s.tempId,
+        name: s.fullName,
+        gender: s.gender,
+        age: s.age,
+        weight: s.weight,
+        height: s.height,
+        belt: s.belt,
+        district: s.district?.name || "N/A",
+        club: s.club?.name || "Independent"
+      }))
+    });
+  } catch (error) {
+    console.error("Error searching students:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
