@@ -2064,6 +2064,84 @@ function pickField(row: Record<string, any>, aliases: string[]): any {
   return undefined;
 }
 
+// Finds an existing Student by Aadhaar number, or creates one with the same
+// defaults the bulk-import flow has always used (auto-approved, tempId
+// auto-generated, password hashed from mobile number). Shared by the Excel
+// bulk-import path (which resolves district/taluk/club/coach by name before
+// calling this) and the single-player "Create New Player" admin flow (which
+// already has resolved IDs from dropdowns).
+async function findOrCreateStudentByAadhaar(input: {
+  aadhaarNumber: string;
+  fullName?: string;
+  email?: string;
+  mobileNumber?: string;
+  dob?: Date;
+  gender?: string;
+  districtId?: string;
+  talukId?: string;
+  schoolName?: string;
+  bloodGroup?: string;
+  annualIncome?: number;
+  grade?: string;
+  weight?: string | null;
+  height?: string | null;
+  belt?: string | null;
+  clubId?: string | null;
+  coachId?: string | null;
+}): Promise<{ student: Awaited<ReturnType<typeof prisma.student.create>> } | { error: string }> {
+  const existing = await prisma.student.findUnique({ where: { aadhaarNumber: input.aadhaarNumber } });
+  if (existing) return { student: existing };
+
+  if (!input.fullName || !input.dob || !input.gender || !input.districtId || !input.talukId) {
+    return { error: "Player not found and missing required fields to create new player (Full Name, DOB, Gender, District, Taluk)" };
+  }
+  if (isNaN(input.dob.getTime())) {
+    return { error: "Invalid Date of Birth format" };
+  }
+
+  const age = new Date().getFullYear() - input.dob.getFullYear();
+  const mobileNumber = input.mobileNumber || "0000000000";
+  const email = input.email || `dummy_${input.aadhaarNumber}@example.com`;
+  const hashedPassword = await bcrypt.hash(String(mobileNumber), 10);
+
+  try {
+    const student = await prisma.student.create({
+      data: {
+        tempId: `TMP${crypto.randomBytes(4).toString("hex").toUpperCase()}`,
+        districtId: input.districtId,
+        talukId: input.talukId,
+        fullName: input.fullName,
+        dob: input.dob,
+        age,
+        gender: input.gender.toUpperCase() === "FEMALE" ? "FEMALE" : "MALE",
+        mobileNumber: String(mobileNumber),
+        email: String(email),
+        aadhaarNumber: input.aadhaarNumber,
+        password: hashedPassword,
+        status: "APPROVED", // Auto-approved from admin-side creation
+        pincode: "000000",
+        bloodGroup: input.bloodGroup || "UNKNOWN",
+        address: "Unknown",
+        city: "Unknown",
+        state: "Tamil Nadu",
+        addressPincode: "000000",
+        nationality: "Indian",
+        annualIncome: input.annualIncome ?? 0,
+        schoolName: input.schoolName || "Unknown",
+        grade: input.grade || "Unknown",
+        weight: input.weight || null,
+        height: input.height || null,
+        belt: input.belt || null,
+        clubId: input.clubId || null,
+        coachId: input.coachId || null,
+      },
+    });
+    return { student };
+  } catch (e) {
+    return { error: `Failed to create player: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
 // ─── CLUB/OFFICIAL: Bulk Import Players from Excel ───────────────────────────
 export const bulkImportRegistrations = async (req: Request, res: Response) => {
   const { userId, role } = (req as any).user;
@@ -2166,19 +2244,19 @@ export const bulkImportRegistrations = async (req: Request, res: Response) => {
         if (!player) {
           // Attempt to create new player from Excel data
           const fullName = pickField(row, ["Full Name", "Name", "FullName", "Player Name"]);
-          const email = pickField(row, ["Email"]) || `dummy_${aadhaar}@example.com`;
-          const mobileNumber = pickField(row, ["Mobile Number", "Mobile"]) || `0000000000`;
+          const email = pickField(row, ["Email"]);
+          const mobileNumber = pickField(row, ["Mobile Number", "Mobile"]);
           const dobStr = pickField(row, ["Date of Birth", "DOB"]);
           const genderStr = pickField(row, ["Gender", "Sex"]);
           const districtName = pickField(row, ["District Name", "District"]);
           const talukName = pickField(row, ["Taluk Name", "Taluk"]);
-          const schoolName = pickField(row, ["School Name", "School"]) || "Unknown";
+          const schoolName = pickField(row, ["School Name", "School"]);
 
           if (!fullName || !dobStr || !genderStr || !districtName || !talukName) {
             return { ok: false, row: rowNum, error: `Player not found and missing required fields to create new player (Full Name, DOB, Gender, District, Taluk)` };
           }
 
-          // Parse DOB
+          // Parse DOB (Excel serial dates aren't real Date objects)
           let dob = new Date(dobStr);
           if (isNaN(dob.getTime())) {
             if (typeof dobStr === "number") {
@@ -2187,10 +2265,8 @@ export const bulkImportRegistrations = async (req: Request, res: Response) => {
               return { ok: false, row: rowNum, error: `Invalid Date of Birth format` };
             }
           }
-          const age = new Date().getFullYear() - dob.getFullYear();
-          const gender = String(genderStr).toUpperCase() === "FEMALE" ? "FEMALE" : "MALE";
 
-          // Find District and Taluk
+          // Find District and Taluk by name (Excel gives names, not IDs)
           const district = await prisma.district.findFirst({ where: { name: { equals: districtName, mode: "insensitive" } } });
           if (!district) {
             return { ok: false, row: rowNum, error: `District not found: ${districtName}` };
@@ -2200,43 +2276,29 @@ export const bulkImportRegistrations = async (req: Request, res: Response) => {
             return { ok: false, row: rowNum, error: `Taluk not found: ${talukName}` };
           }
 
-          const hashedPassword = await bcrypt.hash(String(mobileNumber), 10);
-
-          try {
-            player = await prisma.student.create({
-              data: {
-                tempId: `TMP${crypto.randomBytes(4).toString('hex').toUpperCase()}`,
-                districtId: district.id,
-                talukId: taluk.id,
-                fullName: String(fullName),
-                dob,
-                age,
-                gender,
-                mobileNumber: String(mobileNumber),
-                email: String(email),
-                aadhaarNumber: String(aadhaar),
-                password: hashedPassword,
-                status: "APPROVED", // Auto-approved from admin import
-                pincode: "000000",
-                bloodGroup: pickField(row, ["Blood Group"]) || "UNKNOWN",
-                address: "Unknown",
-                city: "Unknown",
-                state: "Tamil Nadu",
-                addressPincode: "000000",
-                nationality: "Indian",
-                annualIncome: pickField(row, ["Annual Income"]) ? Number(pickField(row, ["Annual Income"])) : 0,
-                schoolName: String(schoolName),
-                grade: pickField(row, ["Grade"]) ? String(pickField(row, ["Grade"])) : "Unknown",
-                weight: weight ? String(weight) : null,
-                height: height ? String(height) : null,
-                belt: belt ? String(belt) : null,
-                clubId: resolvedClubId || tournament.clubId || null,
-                coachId: resolvedCoachId,
-              }
-            });
-          } catch (e) {
-            return { ok: false, row: rowNum, error: `Failed to auto-create player: ${e instanceof Error ? e.message : String(e)}` };
+          const created = await findOrCreateStudentByAadhaar({
+            aadhaarNumber: String(aadhaar),
+            fullName: String(fullName),
+            email: email ? String(email) : undefined,
+            mobileNumber: mobileNumber ? String(mobileNumber) : undefined,
+            dob,
+            gender: String(genderStr),
+            districtId: district.id,
+            talukId: taluk.id,
+            schoolName: schoolName ? String(schoolName) : undefined,
+            bloodGroup: pickField(row, ["Blood Group"]) ? String(pickField(row, ["Blood Group"])) : undefined,
+            annualIncome: pickField(row, ["Annual Income"]) ? Number(pickField(row, ["Annual Income"])) : undefined,
+            grade: pickField(row, ["Grade"]) ? String(pickField(row, ["Grade"])) : undefined,
+            weight: weight ? String(weight) : null,
+            height: height ? String(height) : null,
+            belt: belt ? String(belt) : null,
+            clubId: resolvedClubId || tournament.clubId || null,
+            coachId: resolvedCoachId,
+          });
+          if ("error" in created) {
+            return { ok: false, row: rowNum, error: created.error };
           }
+          player = created.student;
         }
 
         if (player.status !== "APPROVED") {
@@ -2303,21 +2365,58 @@ export const bulkImportRegistrations = async (req: Request, res: Response) => {
   }
 };
 
-// ─── Admin: Add a single existing player to a tournament ────────────────────
+// ─── Admin: Add a player to a tournament — either an existing approved      ──
+// ─── player (`studentId`), or a brand-new one (`newPlayer`, same field set  ──
+// ─── as the bulk-import Excel flow, resolved through the same shared helper)─
 export const addManualRegistration = async (req: Request, res: Response) => {
   const tournamentId = req.params.id as string;
-  const { studentId, weight, height, belt } = req.body;
+  const { studentId, newPlayer, weight, height, belt } = req.body;
 
-  if (!studentId) {
-    return res.status(400).json({ error: "Please select a player." });
+  if (!studentId && !newPlayer) {
+    return res.status(400).json({ error: "Please select a player or provide new player details." });
   }
 
   try {
     const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
     if (!tournament) return res.status(404).json({ error: "Tournament not found" });
 
-    const player = await prisma.student.findUnique({ where: { id: studentId } });
-    if (!player) return res.status(404).json({ error: "Player not found" });
+    let player;
+    if (studentId) {
+      player = await prisma.student.findUnique({ where: { id: studentId } });
+      if (!player) return res.status(404).json({ error: "Player not found" });
+    } else {
+      const { fullName, gender, dob, aadhaarNumber, districtId, talukId, mobileNumber, email, schoolName, bloodGroup, annualIncome, grade, clubId, coachId } = newPlayer || {};
+      if (!fullName || !gender || !dob || !aadhaarNumber || !districtId || !talukId || !mobileNumber) {
+        return res.status(400).json({ error: "Missing required fields for new player (Full Name, Gender, DOB, Aadhaar, Mobile, District, Taluk)." });
+      }
+      const parsedDob = new Date(dob);
+      if (isNaN(parsedDob.getTime())) {
+        return res.status(400).json({ error: "Invalid Date of Birth." });
+      }
+      const created = await findOrCreateStudentByAadhaar({
+        aadhaarNumber: String(aadhaarNumber),
+        fullName: String(fullName),
+        email: email ? String(email) : undefined,
+        mobileNumber: String(mobileNumber),
+        dob: parsedDob,
+        gender: String(gender),
+        districtId: String(districtId),
+        talukId: String(talukId),
+        schoolName: schoolName ? String(schoolName) : undefined,
+        bloodGroup: bloodGroup ? String(bloodGroup) : undefined,
+        annualIncome: annualIncome !== undefined ? Number(annualIncome) : undefined,
+        grade: grade ? String(grade) : undefined,
+        weight: weight ? String(weight) : null,
+        height: height ? String(height) : null,
+        belt: belt ? String(belt) : null,
+        clubId: clubId ? String(clubId) : null,
+        coachId: coachId ? String(coachId) : null,
+      });
+      if ("error" in created) {
+        return res.status(400).json({ error: created.error });
+      }
+      player = created.student;
+    }
     if (player.status !== "APPROVED") {
       return res.status(400).json({ error: "Only approved players can be added to a tournament" });
     }
