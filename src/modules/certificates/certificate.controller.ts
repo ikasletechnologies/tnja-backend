@@ -4,22 +4,40 @@ import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import fs from "fs";
 import path from "path";
 
+const TOURNAMENT_MANAGER_ROLES = [
+  "CLUB", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY",
+  "STATE_PRESIDENT", "STATE_SECRETARY", "CEO", "SUPER_ADMIN",
+];
+
 export const downloadCertificate = async (req: Request, res: Response) => {
   const { userId, role } = (req as any).user;
   const tournamentId = req.params.id as string;
-
-  if (role !== "PLAYER" && role !== "STUDENT") {
-    return res.status(403).json({ error: "Only participants can download certificates." });
-  }
-
   const regId = req.query.regId as string | undefined;
 
+  const isParticipant = role === "PLAYER" || role === "STUDENT";
+  const isManager = TOURNAMENT_MANAGER_ROLES.includes(role);
+
+  if (!isParticipant && !isManager) {
+    return res.status(403).json({ error: "Only participants or tournament organisers can download certificates." });
+  }
+
+  if (isManager && !regId) {
+    return res.status(400).json({ error: "regId is required to download a participant's certificate." });
+  }
+
   try {
-    let whereClause: any = {
-      tournamentId,
-      playerId: userId,
-    };
-    if (regId) {
+    let whereClause: any = { tournamentId };
+
+    if (isParticipant) {
+      // Players can only ever pull their own registration's certificate.
+      whereClause.playerId = userId;
+      if (regId) whereClause.id = regId;
+    } else {
+      const managedTournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
+      if (!managedTournament) return res.status(404).json({ error: "Tournament not found." });
+      if (role !== "SUPER_ADMIN" && role !== "CEO" && managedTournament.clubId !== userId && managedTournament.officialId !== userId) {
+        return res.status(403).json({ error: "This tournament does not belong to you." });
+      }
       whereClause.id = regId;
     }
 
@@ -69,7 +87,7 @@ export const downloadCertificate = async (req: Request, res: Response) => {
       for (const round of rounds) {
         if (!Array.isArray(round)) continue;
         for (const match of round) {
-          if (match.slotA?.playerId === userId || match.slotB?.playerId === userId) {
+          if (match.slotA?.playerId === registration.playerId || match.slotB?.playerId === registration.playerId) {
             playerFound = true;
             break;
           }
