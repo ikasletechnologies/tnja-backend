@@ -231,8 +231,9 @@ export const createTournament = async (req: Request, res: Response) => {
     // Initial approval setup based on level
     let districtApproval = level === "NATIONAL" ? "PENDING" : "APPROVED";
     let stateApproval = ["NATIONAL", "STATE", "ZONE", "DISTRICT"].includes(level) ? "PENDING" : "APPROVED";
-    const superAdminApproval = "PENDING";
-    const ceoApproval = ["NATIONAL", "STATE", "ZONE"].includes(level) ? "PENDING" : "NOT_REQUIRED";
+    let superAdminApproval = "PENDING";
+    let ceoApproval = ["NATIONAL", "STATE", "ZONE"].includes(level) ? "PENDING" : "NOT_REQUIRED";
+    let initialStatus = "PENDING";
 
     if (isOfficial) {
       if (role === "STATE_PRESIDENT" || role === "STATE_SECRETARY" || role === "CEO" || role === "SUPER_ADMIN") {
@@ -241,6 +242,16 @@ export const createTournament = async (req: Request, res: Response) => {
       } else if (role === "DISTRICT_PRESIDENT" || role === "DISTRICT_SECRETARY" || role === "ZONE_PRESIDENT" || role === "ZONE_SECRETARY") {
         districtApproval = "NOT_REQUIRED";
         // stateApproval remains PENDING
+      }
+
+      // Super Admin sits above the approval chain — their own tournaments
+      // shouldn't wait in their own (or anyone else's) approval queue.
+      if (role === "SUPER_ADMIN") {
+        districtApproval = "APPROVED";
+        stateApproval = "APPROVED";
+        superAdminApproval = "APPROVED";
+        ceoApproval = "APPROVED";
+        initialStatus = "APPROVED";
       }
     }
 
@@ -264,11 +275,11 @@ export const createTournament = async (req: Request, res: Response) => {
         zoneId: zoneId || null,
         clubId: isClub ? userId : null,
         officialId: (isOfficial && role !== "SUPER_ADMIN") ? userId : null,
-        status: "PENDING",
+        status: initialStatus as any,
         districtApproval: districtApproval as any,
         stateApproval: stateApproval as any,
-        superAdminApproval,
-        ceoApproval,
+        superAdminApproval: superAdminApproval as any,
+        ceoApproval: ceoApproval as any,
       },
     });
 
