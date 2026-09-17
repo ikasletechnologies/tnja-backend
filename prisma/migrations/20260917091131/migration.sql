@@ -29,7 +29,7 @@ CREATE TABLE "District" (
 CREATE TABLE "Taluk" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "pincode" TEXT NOT NULL,
+    "pincode" TEXT,
     "districtId" TEXT NOT NULL,
 
     CONSTRAINT "Taluk_pkey" PRIMARY KEY ("id")
@@ -123,6 +123,7 @@ CREATE TABLE "Student" (
     "draws" INTEGER NOT NULL DEFAULT 0,
     "height" TEXT,
     "weight" TEXT,
+    "belt" TEXT,
     "coachId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -317,6 +318,7 @@ CREATE TABLE "TournamentRegistration" (
     "paymentId" TEXT,
     "height" TEXT,
     "weight" TEXT,
+    "belt" TEXT,
     "placement" "Placement" DEFAULT 'PARTICIPATION',
     "ageGroup" TEXT NOT NULL DEFAULT 'SENIOR',
     "weightCategory" TEXT NOT NULL DEFAULT 'ALL',
@@ -426,6 +428,9 @@ CREATE TABLE "AadhaarOTP" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "District_name_key" ON "District"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Taluk_districtId_name_key" ON "Taluk"("districtId", "name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Club_tempId_key" ON "Club"("tempId");
