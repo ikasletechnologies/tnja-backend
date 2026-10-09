@@ -1,19 +1,19 @@
 import { Router } from "express";
 import { registerStudent, registerCoach, registerClub, registerMember, resubmitApplication } from "./registration.controller.js";
 import { updateApplicationStatus, requestChanges, getApplicationDetails, getPendingApplications, getDashboardStats, getLocationAnalytics, createPaymentOrder, verifyPayment, getGlobalSettings, updateGlobalSettings, promoteMember, forceCreateStudent, forceCreateClub, forceCreateMember, importStudentsExcel, importCoachesExcel } from "../admin/admin.controller.js";
-import { getAllUsers, updateUserCredentials, updateUserProfile, getPublicCoaches, getPublicMembers, getCoachStudents, deleteUser, getUserDetails, searchRefereeById, searchStudents, blockUser } from "../users/user.controller.js";
+import { getAllUsers, updateUserCredentials, updateUserProfile, getPublicCoaches, getPublicMembers, getCoachStudents, getCoachDashboard, deleteUser, getUserDetails, searchRefereeById, searchStudents, blockUser } from "../users/user.controller.js";
 import { getClubs } from "../clubs/club.controller.js";
 import { getDistricts, getTaluksByDistrict, getTalukDetails } from "../locations/location.controller.js";
 import { authenticateJWT, authorizeAdmin, authorize } from "../../middleware/authMiddleware.js";
 import { createEvent, getActiveEvents, getAdminEvents, getMyEvents, updateEvent, applyForEvent, createEventPaymentOrder, verifyEventPayment, getEventSections } from "../events/event.controller.js";
 import { createTournament, startTournament, getClubTournaments, getTournamentRegistrations, updateRegistrationStatus, disqualifyRegistration, updateRegistrationMetrics, sendRegistrationReply, getRegistrationMessages, updateTournament, deleteTournament, getPlayerTournaments, getPlayerPublicMatches, getCategoryParticipants, createTournamentPaymentOrder, verifyTournamentPayment, getAdminTournaments, getAdminApprovedTournaments, approveTournament, sendTournamentReply, getApprovedTournaments, getTournamentById, getTournamentDraws, saveTournamentDraw, getTournamentMessages, getTournamentMats, saveTournamentMats, getRefereeMats, submitMatchResult, updateMatchState, submitTournamentResults, bulkImportRegistrations, addManualRegistration, downloadTournamentReport } from "../tournaments/tournament.controller.js";
-import { downloadCertificate } from "../certificates/certificate.controller.js";
+import { downloadCertificate, getMyCertificates } from "../certificates/certificate.controller.js";
 import { scoreboardOptions } from "../../constants/scoreboardOptions.js";
 import { upload } from "../../middleware/uploadMiddleware.js";
 
 const router = Router();
 
-router.post("/events/create", authenticateJWT, createEvent);
+router.post("/events/create", authenticateJWT, authorize(["CLUB", "SUPER_ADMIN", "STATE_PRESIDENT", "STATE_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "CEO"]), createEvent);
 router.get("/events/my", authenticateJWT, getMyEvents);
 router.put("/events/:id", authenticateJWT, updateEvent);
 router.post("/events/apply", authenticateJWT, applyForEvent);
@@ -27,7 +27,7 @@ router.get("/events/sections", authenticateJWT, getEventSections);
 router.get("/referees/my-mats", authenticateJWT, getRefereeMats);
 
 // Club
-router.post("/tournaments/club/create", authenticateJWT, createTournament);
+router.post("/tournaments/club/create", authenticateJWT, authorize(["CLUB"]), createTournament);
 router.put("/tournaments/:id/start", authenticateJWT, startTournament);
 router.get("/tournaments/club", authenticateJWT, getClubTournaments);
 // Official
@@ -41,6 +41,7 @@ router.get("/tournaments/player/category-participants", authenticateJWT, getCate
 router.get("/tournaments/player/matches", authenticateJWT, getPlayerPublicMatches);
 router.post("/tournaments/player/pay", authenticateJWT, createTournamentPaymentOrder);
 router.post("/tournaments/player/verify", authenticateJWT, verifyTournamentPayment);
+router.get("/certificates/my", authenticateJWT, getMyCertificates);
 router.get("/tournaments/:id/certificate", authenticateJWT, downloadCertificate);
 router.get("/tournaments/:id/report", authenticateJWT, downloadTournamentReport);
 
@@ -122,5 +123,6 @@ router.patch("/member/promote", authenticateJWT, authorizeAdmin, promoteMember);
 
 // ── Coach/Referee Dashboard ────────────────────────────────────────────────────────
 router.get("/coach/students", authenticateJWT, getCoachStudents);
+router.get("/coach/dashboard", authenticateJWT, getCoachDashboard);
 
 export default router;

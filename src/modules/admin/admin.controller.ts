@@ -870,7 +870,7 @@ export const createPaymentOrder = async (req: Request, res: Response) => {
     };
 
     const order = await razorpay.orders.create(options);
-    return res.json(order);
+    return res.json({ ...order, keyId: process.env.RAZORPAY_KEY_ID });
   } catch (error) {
     console.error("Razorpay order error:", error);
     return res.status(500).json({ error: "Failed to create payment order" });

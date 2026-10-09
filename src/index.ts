@@ -7,6 +7,7 @@ import registrationRoutes from "./modules/registrations/registration.routes.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import grievanceRoutes from "./modules/grievances/grievance.routes.js";
 import uploadRoutes from "./modules/upload/upload.routes.js";
+import profileEditRequestRoutes from "./modules/profileEditRequests/profileEditRequest.routes.js";
 
 import { createServer } from "http";
 import { initWebSocketServer } from "./socket/socket.js";
@@ -32,6 +33,7 @@ app.use("/api", registrationRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api", grievanceRoutes);
 app.use("/api", uploadRoutes);
+app.use("/api", profileEditRequestRoutes);
 
 // Basic health check
 app.get("/health", (req, res) => {

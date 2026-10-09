@@ -87,6 +87,7 @@ model Student {
   talukId               String
   pincode               String
   fullName              String
+  fatherName            String?
   profilePhoto          String?
   gender                Gender
   dob                   DateTime
@@ -133,6 +134,7 @@ model Student {
   district              District                 @relation(fields: [districtId], references: [id])
   taluk                 Taluk                    @relation(fields: [talukId], references: [id])
   tournamentRegs        TournamentRegistration[]
+  profileEditRequests   ProfileEditRequest[]     @relation("StudentProfileEditRequests")
 }
 
 model CoachReferee {
@@ -183,6 +185,7 @@ model CoachReferee {
   students              Student[]                @relation("CoachStudents")
   tournamentMats        TournamentMat[]
   tournamentRegs        TournamentRegistration[]
+  profileEditRequests   ProfileEditRequest[]     @relation("CoachProfileEditRequests")
 }
 
 model Member {
@@ -413,6 +416,23 @@ model ApplicationLog {
   action    String
   remark    String?
   createdAt DateTime @default(now())
+}
+
+model ProfileEditRequest {
+  id              String       @id @default(uuid())
+  studentId       String
+  coachId         String
+  requestedFields String[]     @default([])
+  reason          String
+  status          Status       @default(PENDING)
+  reviewedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  student         Student      @relation("StudentProfileEditRequests", fields: [studentId], references: [id], onDelete: Cascade)
+  coach           CoachReferee @relation("CoachProfileEditRequests", fields: [coachId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, status])
+  @@index([coachId, status])
 }
 
 model AadhaarOTP {

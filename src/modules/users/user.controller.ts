@@ -643,3 +643,61 @@ export const blockUser = async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+export const getCoachDashboard = async (req: Request, res: Response) => {
+  const { userId, role } = (req as any).user;
+  if (role !== "COACH") return res.status(403).json({ error: "Only coaches can access this dashboard." });
+
+  try {
+    const students = await prisma.student.findMany({
+      where: { coachId: userId, status: "APPROVED" },
+      select: { id: true, fullName: true, permanentId: true, tempId: true, age: true, wins: true, losses: true, draws: true, createdAt: true },
+      orderBy: { fullName: "asc" },
+    });
+    const studentIds = students.map((student) => student.id);
+    const registrations = studentIds.length ? await prisma.tournamentRegistration.findMany({
+      where: { playerId: { in: studentIds }, status: "APPROVED" },
+      include: { player: { select: { id: true, fullName: true, permanentId: true, tempId: true } }, tournament: { select: { id: true, title: true, date: true, location: true, level: true, status: true } } },
+      orderBy: { tournament: { date: "desc" } },
+    }) : [];
+    const completed = registrations.filter((registration) => registration.tournament.status === "CLOSED");
+    const medals = completed.filter((registration) => ["FIRST", "SECOND", "THIRD"].includes(registration.placement || ""));
+    const events = await prisma.event.findMany({
+      where: { status: "APPROVED", date: { gte: new Date() }, participantType: { in: ["ALL", "COACH"] } },
+      select: { id: true, title: true, date: true, location: true, level: true },
+      orderBy: { date: "asc" },
+      take: 3,
+    });
+
+    return res.json({
+      metrics: {
+        totalStudents: students.length,
+        activeStudents: students.length,
+        newJoiners: students.filter((student) => student.createdAt >= new Date(Date.now() - 30 * 86400000)).length,
+        eventsParticipated: new Set(registrations.map((registration) => registration.tournamentId)).size,
+        medals: medals.length,
+        certificatesIssued: completed.length,
+      },
+      students: students.slice(0, 5),
+      upcomingEvents: events,
+      recentResults: completed.slice(0, 5).map((registration) => ({
+        id: registration.id,
+        studentName: registration.player.fullName,
+        studentId: registration.player.permanentId || registration.player.tempId,
+        tournamentName: registration.tournament.title,
+        placement: registration.placement || "PARTICIPATION",
+      })),
+      certificates: completed.slice(0, 3).map((registration) => ({
+        id: registration.id,
+        tournamentId: registration.tournamentId,
+        studentName: registration.player.fullName,
+        eventName: registration.tournament.title,
+        date: registration.tournament.date,
+        placement: registration.placement || "PARTICIPATION",
+      })),
+    });
+  } catch (error) {
+    console.error("Error loading coach dashboard:", error);
+    return res.status(500).json({ error: "Unable to load coach dashboard." });
+  }
+};

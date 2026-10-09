@@ -193,6 +193,13 @@ export const updateProfile = async (req: any, res: Response) => {
     }
 
     if (role === "PLAYER") {
+      if (typeof updates.profileEditRequestId === "string") {
+        const approvedRequest = await prisma.profileEditRequest.findFirst({
+          where: { id: updates.profileEditRequestId, studentId: userId, status: "APPROVED" },
+          select: { id: true },
+        });
+        if (!approvedRequest) return res.status(403).json({ error: "Coach approval is required to edit this profile." });
+      }
       updatedUser = await prisma.student.update({
         where: { id: userId },
         data: {
@@ -210,15 +217,53 @@ export const updateProfile = async (req: any, res: Response) => {
           addressPincode: updates.addressPincode !== undefined ? updates.addressPincode : undefined,
         }
       });
+      if (typeof updates.profileEditRequestId === "string") {
+        await prisma.profileEditRequest.updateMany({
+          where: { id: updates.profileEditRequestId, studentId: userId, status: "APPROVED" },
+          data: { status: "CLOSED" },
+        });
+      }
     } else if (role === "COACH") {
+      const namePattern = /^[\p{L}][\p{L}\s.'-]{1,99}$/u;
+      const fullName = typeof updates.fullName === "string" ? updates.fullName.trim() : undefined;
+      const fatherName = typeof updates.fatherName === "string" ? updates.fatherName.trim() : undefined;
+      const mobileNumber = typeof updates.mobileNumber === "string" ? updates.mobileNumber.trim() : undefined;
+      const alternateMobileNumber = typeof updates.alternateMobileNumber === "string" ? updates.alternateMobileNumber.trim() : undefined;
+
+      if (fullName !== undefined && !namePattern.test(fullName)) {
+        return res.status(400).json({ error: "Full name must contain only letters, spaces, apostrophes, dots or hyphens." });
+      }
+      if (fatherName !== undefined && !namePattern.test(fatherName)) {
+        return res.status(400).json({ error: "Father's name must contain only letters, spaces, apostrophes, dots or hyphens." });
+      }
+      if (mobileNumber !== undefined && !/^\d{10}$/.test(mobileNumber)) {
+        return res.status(400).json({ error: "Mobile number must contain exactly 10 digits." });
+      }
+      if (alternateMobileNumber && !/^\d{10}$/.test(alternateMobileNumber)) {
+        return res.status(400).json({ error: "Alternate mobile number must contain exactly 10 digits." });
+      }
+      if (mobileNumber && alternateMobileNumber && mobileNumber === alternateMobileNumber) {
+        return res.status(400).json({ error: "Alternate mobile number must be different from the primary mobile number." });
+      }
+
       updatedUser = await prisma.coachReferee.update({
         where: { id: userId },
         data: {
-          fullName: updates.fullName !== undefined ? updates.fullName : undefined,
-          fatherName: updates.fatherName !== undefined ? updates.fatherName : undefined,
+          fullName: fullName !== undefined ? fullName : undefined,
+          fatherName: fatherName !== undefined ? fatherName : undefined,
           bloodGroup: updates.bloodGroup !== undefined ? updates.bloodGroup : undefined,
           gender: updates.gender !== undefined ? updates.gender : undefined,
-          mobileNumber: updates.mobileNumber !== undefined ? updates.mobileNumber : undefined,
+          mobileNumber: mobileNumber !== undefined ? mobileNumber : undefined,
+          alternateMobileNumber: alternateMobileNumber !== undefined ? alternateMobileNumber || null : undefined,
+          presentGradeInJudo: updates.presentGradeInJudo !== undefined ? updates.presentGradeInJudo : undefined,
+          historyInJudo: updates.historyInJudo !== undefined ? updates.historyInJudo : undefined,
+          historyInOtherMartial: updates.historyInOtherMartial !== undefined ? updates.historyInOtherMartial : undefined,
+          employmentType: updates.employmentType !== undefined ? updates.employmentType || null : undefined,
+          companyName: updates.companyName !== undefined ? updates.companyName || null : undefined,
+          designation: updates.designation !== undefined ? updates.designation || null : undefined,
+          deptName: updates.deptName !== undefined ? updates.deptName || null : undefined,
+          contactPersonDept: updates.contactPersonDept !== undefined ? updates.contactPersonDept || null : undefined,
+          addressDept: updates.addressDept !== undefined ? updates.addressDept || null : undefined,
         }
       });
     } else if (["MEMBER", "DISTRICT_PRESIDENT", "DISTRICT_SECRETARY", "ZONE_PRESIDENT", "ZONE_SECRETARY", "STATE_PRESIDENT", "STATE_SECRETARY", "CEO"].includes(role)) {
@@ -486,20 +531,25 @@ export const trackStatus = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Incorrect password." });
     }
 
-    const tokenPayload: any = { userId: user.id, role: role };
-    if (user.districtId) {
-      tokenPayload.districtId = (user.assignedDistrictId && ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) ? user.assignedDistrictId : user.districtId;
-    }
-    const token = jwt.sign(
-      tokenPayload,
-      process.env.JWT_SECRET || "fallback",
-      { expiresIn: "24h" }
-    );
-
     const { password: _, ...safeUser } = user;
+
+    // Pending application tracking must never create an authenticated session.
+    // Keep tokens for REPLAY/REJECTED because the resubmission flow requires one.
+    let token: string | undefined;
+    if (user.status !== "PENDING") {
+      const tokenPayload: any = { userId: user.id, role: role };
+      if (user.districtId) {
+        tokenPayload.districtId = (user.assignedDistrictId && ["DISTRICT_PRESIDENT", "DISTRICT_SECRETARY"].includes(role)) ? user.assignedDistrictId : user.districtId;
+      }
+      token = jwt.sign(
+        tokenPayload,
+        process.env.JWT_SECRET || "fallback",
+        { expiresIn: "24h" }
+      );
+    }
     
     return res.json({
-      token,
+      ...(token ? { token } : {}),
       user: {
         ...safeUser,
         fullName: safeUser.fullName || safeUser.name || safeUser.clubName,

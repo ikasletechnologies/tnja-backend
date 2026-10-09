@@ -363,3 +363,56 @@ export const downloadCertificate = async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Failed to generate certificate." });
   }
 };
+
+export const getMyCertificates = async (req: Request, res: Response) => {
+  const { userId, role } = (req as any).user;
+  if (role !== "PLAYER" && role !== "STUDENT") {
+    return res.status(403).json({ error: "Only players can view their certificates." });
+  }
+
+  try {
+    const registrations = await prisma.tournamentRegistration.findMany({
+      where: { playerId: userId, status: "APPROVED" },
+      include: {
+        tournament: {
+          select: { id: true, title: true, date: true, location: true, level: true, status: true },
+        },
+      },
+      orderBy: { tournament: { date: "desc" } },
+    });
+
+    const draws = await prisma.tournamentDraw.findMany({
+      where: { tournamentId: { in: registrations.map((registration) => registration.tournamentId) }, isConcluded: true },
+      select: { tournamentId: true, ageGroup: true, gender: true, weightCategory: true },
+    });
+    const concludedCategories = new Set(
+      draws.map((draw) => `${draw.tournamentId}_${draw.ageGroup}_${draw.gender}_${draw.weightCategory}`),
+    );
+
+    const certificates = registrations
+      .filter((registration) => {
+        const key = `${registration.tournamentId}_${registration.ageGroup}_${registration.gender}_${registration.weightCategory}`;
+        return registration.tournament.status === "CLOSED" || concludedCategories.has(key);
+      })
+      .map((registration) => {
+        const achievement = ["FIRST", "SECOND", "THIRD"].includes(registration.placement || "");
+        return {
+          id: registration.id,
+          tournamentId: registration.tournamentId,
+          eventName: registration.tournament.title,
+          date: registration.tournament.date,
+          location: registration.tournament.location,
+          level: registration.tournament.level,
+          type: achievement ? "ACHIEVEMENT" : "PARTICIPATION",
+          placement: registration.placement || "PARTICIPATION",
+          result: registration.placement === "FIRST" ? "WINNER" : registration.placement === "SECOND" ? "RUNNER UP" : registration.placement === "THIRD" ? "THIRD PLACE" : "PARTICIPATION",
+          downloadUrl: `/tournaments/${registration.tournamentId}/certificate?regId=${registration.id}`,
+        };
+      });
+
+    return res.json(certificates);
+  } catch (error) {
+    console.error("Error loading player certificates:", error);
+    return res.status(500).json({ error: "Failed to load certificates." });
+  }
+};
