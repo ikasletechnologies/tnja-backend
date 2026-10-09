@@ -10,6 +10,7 @@ import { createTournament, startTournament, getClubTournaments, getTournamentReg
 import { downloadCertificate, getMyCertificates } from "../certificates/certificate.controller.js";
 import { scoreboardOptions } from "../../constants/scoreboardOptions.js";
 import { upload } from "../../middleware/uploadMiddleware.js";
+import { lookupPincode } from "../postal/postal.controller.js";
 
 const router = Router();
 
@@ -76,6 +77,7 @@ router.get("/scoreboard/options", (req, res) => {
   return res.json(scoreboardOptions);
 });
 
+router.get("/pincode/:pincode", lookupPincode);
 router.get("/districts", getDistricts);
 router.get("/districts/:districtId/taluks", getTaluksByDistrict);
 router.get("/taluks/:id", getTalukDetails);
